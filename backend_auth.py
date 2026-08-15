@@ -166,6 +166,17 @@ def update_user_role(access_token: str, ss_user_id: str, role: str) -> dict:
     )
 
 
+def update_user_active_status(access_token: str, ss_user_id: str, is_active: bool) -> dict:
+    """PATCH /auth/users/{id}/active-status (CHỈ admin gọi được). Khoá
+    VĨNH VIỄN 1 tài khoản (is_active=false) — KHÁC khoá tạm thời do sai
+    mật khẩu (locked_until, tự hết hạn). Backend tự chặn admin tự khoá
+    chính mình (400), không cần lặp lại check này ở đây."""
+    return _request(
+        "PATCH", f"/auth/users/{ss_user_id}/active-status", access_token=access_token,
+        json={"is_active": is_active},
+    )
+
+
 # ---------------------------------------------------------------------------
 # /me/... — ứng tuyển & lưu job của CHÍNH học viên đang đăng nhập
 # + GET /jobs/{id}/applications (staff xem ai đã ứng tuyển 1 job)

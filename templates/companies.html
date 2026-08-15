@@ -59,6 +59,9 @@
         <td>
           <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem</a>
           <a class="btn btn-text" href="{{ url_for('company_edit', company_id=c.id) }}">Sửa</a>
+          {% if c.website %}
+          <a class="btn btn-text" href="{{ c.website }}" target="_blank" rel="noopener">Website ↗</a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

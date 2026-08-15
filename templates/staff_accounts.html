@@ -81,6 +81,18 @@
                 {% endfor %}
               </select>
             </form>
+            <form method="post" action="{{ url_for('staff_account_update_active_status', ss_user_id=u.ss_user_id) }}" class="status-inline" style="margin-top: 6px;">
+              {% if u.is_active %}
+                <input type="hidden" name="is_active" value="false">
+                <button type="submit" class="btn btn-text btn-danger-text"
+                        onclick="return confirm('Vô hiệu hoá tài khoản {{ u.full_name }}? Người này sẽ không đăng nhập được nữa cho tới khi được kích hoạt lại.')">
+                  Vô hiệu hoá
+                </button>
+              {% else %}
+                <input type="hidden" name="is_active" value="true">
+                <button type="submit" class="btn btn-text">Kích hoạt lại</button>
+              {% endif %}
+            </form>
           {% endif %}
         </td>
         {% endif %}

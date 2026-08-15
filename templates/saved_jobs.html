@@ -29,9 +29,14 @@
         {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
         {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
       </div>
-      <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
-        <button class="save-btn saved" type="submit">🔖 Bỏ lưu</button>
-      </form>
+      <div class="ticket-actions">
+        {% if job.jd_link %}
+        <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
+        {% endif %}
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+          <button class="save-btn saved" type="submit">🔖 Bỏ lưu</button>
+        </form>
+      </div>
     </div>
   </article>
   {% endfor %}

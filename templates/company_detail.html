@@ -86,9 +86,9 @@
       <h4>Thông tin nhanh</h4>
       <dl class="kv">
         <dt>Mã số thuế</dt><dd>{{ company.tax_id or '—' }}</dd>
-        <dt>Website</dt><dd>{% if company.website %}<a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% else %}—{% endif %}</dd>
-        <dt>Fanpage</dt><dd>{% if company.fanpage %}<a href="{{ company.fanpage }}" target="_blank">Xem</a>{% else %}—{% endif %}</dd>
-        <dt>LinkedIn</dt><dd>{% if company.linkedin_company %}<a href="{{ company.linkedin_company }}" target="_blank">Xem</a>{% else %}—{% endif %}</dd>
+        <dt>Website</dt><dd>{% if company.website %}<a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a>{% else %}—{% endif %}</dd>
+        <dt>Fanpage</dt><dd>{% if company.fanpage %}<a href="{{ company.fanpage }}" target="_blank" rel="noopener">Xem</a>{% else %}—{% endif %}</dd>
+        <dt>LinkedIn</dt><dd>{% if company.linkedin_company %}<a href="{{ company.linkedin_company }}" target="_blank" rel="noopener">Xem</a>{% else %}—{% endif %}</dd>
         <dt>Địa chỉ</dt><dd>{{ company.address or '—' }}</dd>
         <dt>Ngày thêm</dt><dd>{{ company.date_collected|format_date }}</dd>
       </dl>

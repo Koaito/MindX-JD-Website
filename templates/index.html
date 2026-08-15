@@ -85,15 +85,20 @@
         {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
         <span>Nguồn: {{ job.source or '—' }}</span>
       </div>
-      {% if current_user.is_authenticated %}
-      <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
-        <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
-          {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
-        </button>
-      </form>
-      {% else %}
-      <a class="save-btn" href="{{ url_for('login') }}">🔖 Đăng nhập để lưu</a>
-      {% endif %}
+      <div class="ticket-actions">
+        {% if job.jd_link %}
+        <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
+        {% endif %}
+        {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+          <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
+            {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
+          </button>
+        </form>
+        {% else %}
+        <a class="save-btn" href="{{ url_for('login') }}">🔖 Đăng nhập để lưu</a>
+        {% endif %}
+      </div>
     </div>
   </article>
   {% endfor %}

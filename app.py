@@ -1019,12 +1019,9 @@ def dashboard():
 
 
 # ---------------------------------------------------------------------------
-# Quản lý tài khoản team SS (đọc: ss_team+, tạo/đổi role: admin-only —
-# backend tự chặn 403 nếu gọi sai quyền, ở đây check thêm để UI không
-# hiện nút/form vô ích cho người không có quyền bấm).
-#
-# Backend hiện KHÔNG có endpoint vô hiệu hoá/xoá tài khoản — trang này
-# vì vậy chỉ có 3 việc: xem danh sách, tạo mới (admin), đổi role (admin).
+# Quản lý tài khoản team SS (đọc: ss_team+, tạo/đổi role/khoá-mở khoá:
+# admin-only — backend tự chặn 403 nếu gọi sai quyền, ở đây check thêm
+# để UI không hiện nút/form vô ích cho người không có quyền bấm).
 # ---------------------------------------------------------------------------
 
 @app.route("/staff-accounts")
@@ -1103,6 +1100,33 @@ def staff_account_update_role(ss_user_id):
     try:
         backend_auth.update_user_role(access_token, ss_user_id, role)
         flash("Đã cập nhật role.", "success")
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("staff_accounts"))
+
+
+@app.route("/staff-accounts/<string:ss_user_id>/active-status", methods=["POST"])
+@staff_required
+def staff_account_update_active_status(ss_user_id):
+    if current_user.role != "admin":
+        flash("Chỉ tài khoản admin mới khoá/mở khoá được tài khoản.", "error")
+        return redirect(url_for("staff_accounts"))
+
+    # Form gửi giá trị "true"/"false" (string) — không dùng checkbox vì
+    # checkbox không gửi field khi unchecked, khó phân biệt "false" với
+    # "không gửi field" trong request.form.get().
+    is_active_raw = request.form.get("is_active", "")
+    if is_active_raw not in ("true", "false"):
+        abort(400)
+    is_active = is_active_raw == "true"
+
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        backend_auth.update_user_active_status(access_token, ss_user_id, is_active)
+        flash(
+            "Đã kích hoạt lại tài khoản." if is_active else "Đã vô hiệu hoá tài khoản.",
+            "success",
+        )
     except BackendAuthError as exc:
         flash(str(exc), "error")
     return redirect(url_for("staff_accounts"))

@@ -112,7 +112,7 @@
       <dl class="kv">
         <dt>Mức lương</dt><dd>{{ job.salary or '—' }}</dd>
         <dt>Deadline</dt><dd>{{ job.deadline|format_date }}</dd>
-        <dt>Link JD gốc</dt><dd>{% if job.jd_link %}<a href="{{ job.jd_link }}" target="_blank">Xem JD</a>{% else %}—{% endif %}</dd>
+        <dt>Link JD gốc</dt><dd>{% if job.jd_link %}<a href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD</a>{% else %}—{% endif %}</dd>
         <dt>Ngày thu thập</dt><dd>{{ job.date_collected|format_date }}</dd>
         {% if current_user.is_authenticated and current_user.is_staff %}
         <dt>Trùng lặp?</dt><dd>{{ 'Có thể trùng job khác' if job.is_duplicate_candidate else 'Chưa phát hiện' }}</dd>
