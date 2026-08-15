@@ -667,14 +667,27 @@ def job_add():
             job = _call_authed(db_data.create_job, request.form, company_id)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            companies = db_data.list_companies(limit=500)
+            try:
+                companies = db_data.list_companies(limit=500)
+            except CrawlerAPIError as exc2:
+                flash(str(exc2), "error")
+                companies = []
             return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                                     locations=LOCATIONS, statuses=JOB_STATUSES,
                                     work_types=WORK_TYPES, salary_types=SALARY_TYPES,
                                     companies=companies, job=request.form)
         flash(f"Đã thêm job “{job['position']}” tại {job['company']}.", "success")
         return redirect(url_for("jobs_index"))
-    companies = db_data.list_companies(limit=500)
+    try:
+        companies = db_data.list_companies(limit=500)
+    except CrawlerAPIError as exc:
+        # Trước đây KHÔNG bọc try/except ở đây -> backend chậm/lỗi (vd
+        # Render free tier "ngủ", cold start quá REQUEST_TIMEOUT) sẽ làm
+        # Flask crash thẳng ra trang 500 trắng, không rõ lý do gì. Giờ
+        # flash lỗi thật ra màn hình + trả list rỗng, trang vẫn vào
+        # được (chỉ dropdown công ty rỗng), người dùng biết cần thử lại.
+        flash(str(exc), "error")
+        companies = []
     return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                             locations=LOCATIONS, statuses=JOB_STATUSES,
                             work_types=WORK_TYPES, salary_types=SALARY_TYPES,
