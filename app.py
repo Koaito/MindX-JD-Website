@@ -61,7 +61,15 @@ login_manager.login_message_category = "error"
 #     backend (đã quyết định để sau, xem lịch sử trao đổi mục "3, 4").
 # ---------------------------------------------------------------------------
 
-INDUSTRIES = ["Code", "Data Analysis", "Business Analysis"]
+INDUSTRIES = [
+    "Code", "Data Analysis", "Data Engineer", "Data Scientist",
+    "Business Analysis", "UI/UX Design",
+]  # ⚠️ Đổi 08/2026 — khớp ĐÚNG matching_industry của cả 6 category
+   # backend crawl (xem config.py: TOPCV_CATEGORIES/VIETNAMWORKS_CATEGORIES).
+   # Trước chỉ có 3 ngành -> job crawl được thuộc "Data Engineer",
+   # "Data Scientist", "UI/UX Design" vẫn hiện đúng trên card (dữ liệu
+   # backend không sai), nhưng KHÔNG chọn được trong dropdown filter/thêm
+   # job vì thiếu option -> nhìn như "job biến mất" dù job vẫn còn.
 LEVELS = db_data.LEVEL_CODES
 LOCATIONS = ["Hà Nội", "TP.HCM", "Remote", "Hybrid"]
 JOB_STATUSES = list(db_data.JOB_STATUS_MAP.values())
@@ -668,7 +676,7 @@ def job_add():
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
             try:
-                companies = db_data.list_companies(limit=500)
+                companies = _list_all_companies()
             except CrawlerAPIError as exc2:
                 flash(str(exc2), "error")
                 companies = []
@@ -679,7 +687,7 @@ def job_add():
         flash(f"Đã thêm job “{job['position']}” tại {job['company']}.", "success")
         return redirect(url_for("jobs_index"))
     try:
-        companies = db_data.list_companies(limit=500)
+        companies = _list_all_companies()
     except CrawlerAPIError as exc:
         # Trước đây KHÔNG bọc try/except ở đây -> backend chậm/lỗi (vd
         # Render free tier "ngủ", cold start quá REQUEST_TIMEOUT) sẽ làm
@@ -890,6 +898,27 @@ def contact_delete(company_id, contact_id):
     return redirect(url_for("company_detail", company_id=company_id))
 
 
+def _list_all_companies():
+    """Lấy TOÀN BỘ công ty (không chỉ 1 trang) — backend giới hạn cứng
+    limit tối đa 200/lần gọi (api/routers/companies.py: le=200), nên
+    phải tự phân trang bằng offset thay vì gọi limit lớn hơn 200 (sẽ bị
+    backend trả 422 "Input should be less than or equal to 200").
+    Dùng chung cho job_add() (dropdown chọn công ty) và dashboard()
+    (đếm công ty theo thành phố) — trước đây mỗi chỗ tự viết 1 kiểu,
+    job_add() còn viết SAI (limit=500) nên bị 422 mỗi lần vào trang."""
+    companies = []
+    offset = 0
+    while True:
+        batch = db_data.list_companies(limit=200, offset=offset)
+        if not batch:
+            break
+        companies.extend(batch)
+        if len(batch) < 200:
+            break
+        offset += 200
+    return companies
+
+
 # ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
@@ -899,16 +928,7 @@ def contact_delete(company_id, contact_id):
 def dashboard():
     try:
         jobs = db_data.list_jobs()
-        companies = []
-        offset = 0
-        while True:
-            batch = db_data.list_companies(limit=200, offset=offset)
-            if not batch:
-                break
-            companies.extend(batch)
-            if len(batch) < 200:
-                break
-            offset += 200
+        companies = _list_all_companies()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         jobs, companies = [], []
