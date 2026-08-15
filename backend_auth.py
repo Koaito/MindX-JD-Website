@@ -226,12 +226,10 @@ def register(full_name: str, email: str, password: str, phone: str = "", track: 
     Trả về {ss_user_id, email, message} — KHÔNG có token, vì tài khoản
     phải xác thực email (bấm link trong mail) trước khi login được.
 
-    LƯU Ý: backend hiện CHƯA có cột phone/track trên ss_team_members
-    (đã báo, sẽ thêm sau) — 2 field này vẫn được gửi kèm ở đây cho ĐÚNG
-    hợp đồng tương lai, nhưng Pydantic (RegisterRequest) sẽ tự bỏ qua
-    field lạ nên KHÔNG lỗi, chỉ đơn giản là chưa được lưu cho tới khi
-    backend bổ sung cột + field trong schema. Không cần sửa lại chỗ gọi
-    hàm này khi backend thêm xong — chỉ cần bỏ đoạn note này đi."""
+    phone/track: backend đã có cột lưu (migration_add_phone_track.sql,
+    08/2026, đã chạy trên Postgres production) — gửi thẳng vào payload
+    nếu có giá trị, backend lưu và trả lại đầy đủ ở GET /auth/me,
+    GET /jobs/{id}/applications."""
     payload = {"full_name": full_name, "email": email, "password": password}
     if phone:
         payload["phone"] = phone
