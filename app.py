@@ -323,6 +323,74 @@ def resend_verification():
     return redirect(url_for("login"))
 
 
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    """Bước 1/2 của luồng quên mật khẩu — nhập email, gọi POST
+    /auth/forgot-password. Backend LUÔN trả cùng 1 message chung chung
+    dù email tồn tại hay không (chống dò email) nên route này KHÔNG có
+    nhánh lỗi "email không tồn tại" — chỉ lỗi khi bản thân request thất
+    bại (mất mạng, backend sập)."""
+    if current_user.is_authenticated:
+        return redirect(url_for("jobs_index"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        if not email:
+            flash("Vui lòng nhập email.", "error")
+            return render_template("forgot_password.html", email=email)
+        try:
+            result = backend_auth.forgot_password(email)
+            flash(result.get("message", "Nếu email này có tài khoản, link đặt lại mật khẩu đã được gửi."), "success")
+        except BackendAuthError as exc:
+            flash(str(exc), "error")
+            return render_template("forgot_password.html", email=email)
+        return redirect(url_for("login"))
+
+    return render_template("forgot_password.html", email="")
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    """Bước 2/2 — link trong email trỏ về đây kèm ?token=..., nhập mật
+    khẩu mới, gọi POST /auth/reset-password. Chặn ngay từ GET nếu thiếu
+    token trên URL (truy cập trực tiếp, không qua email) — không hiện
+    form vô ích, tránh người dùng nhập xong mới biết link sai."""
+    if current_user.is_authenticated:
+        return redirect(url_for("jobs_index"))
+
+    token = request.args.get("token", "").strip() if request.method == "GET" else request.form.get("token", "").strip()
+    if not token:
+        flash("Link đặt lại mật khẩu không hợp lệ — thiếu token. Vui lòng dùng đúng link trong email.", "error")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        new_password = request.form.get("new_password", "")
+        new_password_confirm = request.form.get("new_password_confirm", "")
+
+        if len(new_password) < 8:
+            flash("Mật khẩu mới cần ít nhất 8 ký tự.", "error")
+            return render_template("reset_password.html", token=token)
+        if new_password != new_password_confirm:
+            flash("Mật khẩu mới nhập lại không khớp.", "error")
+            return render_template("reset_password.html", token=token)
+
+        try:
+            backend_auth.reset_password(token, new_password)
+        except BackendAuthError as exc:
+            # Token sai/hết hạn/đã dùng -> message backend đã đủ rõ,
+            # kèm gợi ý xin link mới thay vì để người dùng bế tắc.
+            flash(str(exc), "error")
+            return redirect(url_for("forgot_password"))
+
+        # Backend đã thu hồi toàn bộ refresh token của user khi đổi mật
+        # khẩu thành công -> không có session nào ở đây để clear (route
+        # này chưa từng đăng nhập), chỉ cần điều hướng về /login.
+        flash("Đã đặt lại mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html", token=token)
+
+
 @app.route("/change-password", methods=["GET", "POST"])
 @login_required
 def change_password():

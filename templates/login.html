@@ -18,6 +18,8 @@
       <button class="btn btn-primary" type="submit">Đăng nhập</button>
     </form>
 
+    <p class="auth-foot"><a href="{{ url_for('forgot_password') }}">Quên mật khẩu?</a></p>
+
     {% if show_resend %}
     <form method="post" action="{{ url_for('resend_verification') }}" class="inline-form">
       <input type="hidden" name="email" value="{{ resend_email }}">
@@ -26,7 +28,6 @@
     {% endif %}
 
     <p class="auth-foot">Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký ngay</a></p>
-    <p class="auth-foot">Quên mật khẩu? Tính năng tự khôi phục đang được backend phát triển — liên hệ team SS qua kênh nội bộ để được hỗ trợ tạm thời.</p>
 
     <div class="demo-hint">Tài khoản team SS do admin tạo sẵn phía backend — dùng chung form đăng nhập này.</div>
   </div>

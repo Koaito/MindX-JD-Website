@@ -223,3 +223,21 @@ def resend_verification(email: str) -> dict:
     """POST /auth/resend-verification — xin gửi lại link xác thực (token
     cũ hết hạn sau 24h hoặc email bị thất lạc)."""
     return _request("POST", "/auth/resend-verification", json={"email": email})
+
+
+def forgot_password(email: str) -> dict:
+    """POST /auth/forgot-password — xin link đặt lại mật khẩu. Backend
+    LUÔN trả cùng 1 message chung chung dù email có tồn tại hay không
+    (chống dò email) — hàm này KHÔNG bao giờ raise vì email sai/không
+    tồn tại, chỉ raise nếu bản thân request lỗi (mất mạng, backend sập).
+    Trả {"message": "..."} — flash thẳng message này cho user."""
+    return _request("POST", "/auth/forgot-password", json={"email": email})
+
+
+def reset_password(token: str, new_password: str) -> dict:
+    """POST /auth/reset-password — đặt mật khẩu mới bằng token nhận từ
+    email. Raise BackendAuthError (status_code=400) nếu token sai/đã
+    dùng/hết hạn — message tiếng Việt từ backend đã đủ rõ để flash
+    thẳng, không cần phân biệt thêm ở đây (khác wrong_credentials của
+    login()) vì chỉ có 1 lý do 400 duy nhất ở route này."""
+    return _request("POST", "/auth/reset-password", json={"token": token, "new_password": new_password})

@@ -2,8 +2,9 @@
 
 > Tài liệu này mô tả kiến trúc, tính năng và cách vận hành website MindX
 > Career Hub, dành cho các thành viên trong team (dev, team SS) tham khảo
-> và sử dụng. Cập nhật lần gần nhất theo bản code đã chuyển sang
-> **Supabase** cho Auth + Job + Contact.
+> và sử dụng. **Cập nhật 08/2026** — kiến trúc đã chuyển hẳn sang gọi
+> 100% qua API backend "Scrap JD" (FastAPI, deploy Render). **Không còn
+> Supabase, không còn SQLite** ở tầng frontend này.
 
 ---
 
@@ -11,11 +12,11 @@
 
 MindX Career Hub là một web app nội bộ giúp:
 
-- **Học viên (student):** tìm việc làm/thực tập phù hợp (Code, Data
+- **Học viên (role `user`):** tìm việc làm/thực tập phù hợp (Code, Data
   Analysis, Business Analysis), lưu job quan tâm, ứng tuyển, theo dõi
   trạng thái các đơn đã ứng tuyển.
-- **Team SS (staff):** thu thập & quản lý job từ nhiều nguồn, quản lý
-  danh sách công ty/người liên hệ (contact) để hợp tác tuyển dụng, xem
+- **Team SS (role `ss_team` / `admin`):** thêm/sửa job, quản lý danh
+  sách công ty & người liên hệ (contact) để hợp tác tuyển dụng, xem
   dashboard tổng quan, và xem danh sách học viên đã ứng tuyển vào từng
   job để hỗ trợ kết nối.
 
@@ -25,19 +26,21 @@ MindX Career Hub là một web app nội bộ giúp:
 
 | Thành phần | Công nghệ | Lưu ở đâu |
 |---|---|---|
-| Web server | Flask (Python) | — |
-| Giao diện | Jinja2 templates + CSS thuần | `templates/`, `static/` |
-| Đăng nhập/Đăng ký + phân quyền | **Supabase Auth** (email/password) | Supabase (`auth.users`) |
-| Hồ sơ + role (student/staff) | Bảng `profiles` | **Supabase Postgres** |
-| Job (tin tuyển dụng) | Bảng `jobs` | **Supabase Postgres** (đã có sẵn) |
-| Contact (công ty/người liên hệ) | Bảng `contacts` | **Supabase Postgres** (đã có sẵn) |
-| Job đã lưu / Đơn ứng tuyển | `SavedJob`, `JobApplication` | **SQLite cục bộ** (`mindx.db`) |
+| Web server (frontend) | Flask (Python), deploy **Vercel** | — |
+| Giao diện | Jinja2 templates + CSS thuần | `templates/`, `public/style.css` |
+| Backend API | FastAPI ("Scrap JD"), deploy **Render** | repo riêng `Koaito/scrap-jd` |
+| Đăng nhập/Đăng ký + phân quyền | JWT (access 30 phút + refresh 30 ngày) do **chính backend** phát hành | **Postgres** (Render) — bảng `app_users` |
+| Job / Company / Company contact | Đọc/ghi qua REST API backend | **Postgres** (Render) |
+| Job đã lưu / Đơn ứng tuyển | `/me/saved-jobs`, `/me/applications` — API backend | **Postgres** (Render) |
 
-**Vì sao tách như vậy:** tài khoản, job, contact là dữ liệu dùng chung,
-cần đồng bộ real-time và có thể quản lý qua Supabase Dashboard, nên đặt
-trên Supabase. Job đã lưu/đơn ứng tuyển gắn chặt với logic phiên đăng
-nhập của riêng app này nên vẫn giữ ở SQLite cho gọn — không ảnh hưởng gì
-đến cách người dùng sử dụng, hoàn toàn "vô hình" với họ.
+**Không còn gì lưu cục bộ ở phía Flask app này** — không SQLite, không
+session data ngoài 2 token (access/refresh) ký trong cookie session mặc
+định của Flask. Mọi dữ liệu người dùng thật sự nằm 100% ở backend.
+
+**Vì sao đổi từ Supabase sang JWT tự quản:** tránh phải giữ
+`SUPABASE_SERVICE_ROLE_KEY` (toàn quyền, bỏ qua RLS) ở phía server
+Flask — rủi ro bảo mật nếu key này lộ. Chuyển hẳn xác thực về backend
+tự viết, dùng chung hạ tầng Postgres đang có sẵn cho job/company.
 
 ### Sơ đồ luồng dữ liệu (tổng quan)
 
@@ -45,113 +48,123 @@ nhập của riêng app này nên vẫn giữ ở SQLite cho gọn — không �
 Người dùng (trình duyệt)
         │
         ▼
-   Flask app (app.py)
-   ├── auth.py ───────► Supabase Auth (đăng ký/đăng nhập/đăng xuất)
-   ├── data.py ───────► Supabase Postgres: bảng jobs, contacts, profiles
-   └── SQLAlchemy ────► SQLite (mindx.db): SavedJob, JobApplication
+   Flask app (app.py) — deploy Vercel
+   ├── backend_auth.py ──► Backend API /auth/*, /me/* (JWT: đăng ký, đăng
+   │                        nhập, đổi mật khẩu, quên mật khẩu, ứng tuyển,
+   │                        lưu job)
+   └── crawler_client.py ─► Backend API /jobs, /companies,
+                             /companies/{id}/contacts (đọc/ghi, cần
+                             Bearer token cho thao tác ghi)
+                             │
+                             ▼
+                    Backend "Scrap JD" (FastAPI) — deploy Render
+                             │
+                             ▼
+                        Postgres (Render)
 ```
 
-### File/thư mục quan trọng
+### File/thư mục quan trọng (frontend — repo này)
 
 | File | Vai trò |
 |---|---|
-| `app.py` | Toàn bộ route (URL) của web app |
-| `auth.py` | Đăng ký/đăng nhập/đăng xuất qua Supabase Auth, class `AuthUser` |
-| `data.py` | Đọc/ghi bảng `jobs`, `contacts` trên Supabase |
-| `supabase_client.py` | Khởi tạo 2 client Supabase (anon + service_role) |
-| `seed_supabase.py` | Script tạo sẵn tài khoản staff (chạy 1 lần, thủ công) |
-| `supabase_schema.sql` | Câu lệnh SQL tạo bảng `profiles` + RLS |
-| `templates/*.html` | Giao diện các trang |
-| `mindx.db` | Database SQLite cục bộ (tự tạo khi chạy app lần đầu) |
-| `.env` | Biến môi trường / API key (không commit lên git) |
+| `app.py` | Toàn bộ route (URL) của web app; quản lý session token, auto-refresh khi access token hết hạn |
+| `auth.py` | `BackendUser` — lớp user cho Flask-Login, dựng từ response `GET /auth/me` |
+| `backend_auth.py` | Client gọi API xác thực: login/register/refresh/change-password/forgot-password (⚠️ chưa dùng)/logout, và `/me/applications`, `/me/saved-jobs` |
+| `crawler_client.py` | Client gọi API job/company/contact — chuẩn hoá field backend sang tên field template dùng (`job.company`, `job.position`...) |
+| `env_loader.py` | Đọc file `.env` khi chạy local (`python app.py`) — Vercel không dùng, set env trực tiếp trên dashboard |
+| `templates/*.html` | Giao diện các trang (Jinja2) |
+| `public/style.css` | CSS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
+| `vercel.json` | Cấu hình deploy Vercel (`maxDuration: 30` cho `app.py`) |
+| `.env.example` | Mẫu 3 biến môi trường cần set: `CRAWLER_API_URL`, `CRAWLER_API_KEY`, `FLASK_SECRET_KEY` |
+
+**Không còn trong repo** (đã xoá 08/2026, dọn dẹp cùng đợt chuyển sang
+backend API thật): `supabase_client.py`, `seed_supabase.py`,
+`supabase_schema.sql`, `data.py`, `static/` (thư mục cũ, còn sót file
+nhưng không còn được Flask serve — xem mục 8).
 
 ---
 
 ## 3. Vai trò & phân quyền
 
-Có 2 role, lưu ở cột `role` trong bảng `profiles` trên Supabase:
+3 role, quản lý ở backend (bảng `app_users`, cột `role`), theo thứ bậc
+`user < ss_team < admin`:
 
-- **`student`** — tài khoản tự đăng ký qua trang `/register`.
-- **`staff`** — tài khoản team SS, **không** tự đăng ký được qua web;
-  phải tạo trước bằng script `seed_supabase.py` (xem mục 6).
+- **`user`** — học viên. Tự đăng ký qua `/register` (frontend) →
+  `POST /auth/register` (backend, public). Bắt buộc xác thực email
+  (bấm link trong mail) trước khi đăng nhập được.
+- **`ss_team`** — nhân viên team SS. **Không** tự đăng ký qua web được;
+  phải do `admin` tạo qua `POST /auth/users` (backend) — thao tác này
+  frontend **chưa có giao diện** (xem mục 7, mục "cần làm tiếp").
+- **`admin`** — quản trị, có thêm quyền tạo/đổi role người khác, trigger
+  crawl job tự động (route backend riêng, không liên quan frontend này).
 
-Route nào yêu cầu `staff` sẽ được đánh dấu bằng decorator
-`@staff_required` trong `app.py` — nếu học viên cố truy cập sẽ bị đá về
-trang chủ kèm thông báo lỗi.
+Ở tầng frontend, decorator `@staff_required` trong `app.py` coi
+`ss_team` và `admin` đều là "team SS" (property `current_user.is_staff`)
+— route nào cần vai trò này mà học viên cố truy cập sẽ bị đá về trang
+job kèm cảnh báo.
+
+Ngoài ra: nếu tài khoản đang `must_change_password=True` (mật khẩu tạm
+do admin cấp), mọi route staff sẽ ép chuyển hướng về `/change-password`
+trước, trừ chính route đó và `/logout`.
 
 ---
 
 ## 4. Danh sách tính năng
 
-### 4.1. Dành cho học viên (student)
+### 4.1. Dành cho học viên (`user`)
 
 | Tính năng | Trang / URL | Mô tả |
 |---|---|---|
-| Đăng ký tài khoản | `/register` | Nhập họ tên, email, mật khẩu, SĐT, track (Code/Data/BA). Tạo xong tự đăng nhập luôn (trừ khi Supabase đang bật xác nhận email). |
-| Đăng nhập | `/login` | Email + mật khẩu. |
-| Đăng xuất | `/logout` | — |
-| Xem danh sách job | `/` hoặc `/jobs` | Có tìm kiếm theo từ khóa (công ty/vị trí/kỹ năng) + lọc theo ngành, level, địa điểm, trạng thái. |
-| Xem chi tiết job | `/jobs/<id>` | Mô tả công việc, yêu cầu, kỹ năng, lương, hạn nộp, link JD gốc. |
-| Lưu / bỏ lưu job | Nút "Lưu" trên trang chi tiết job | Toggle — bấm lại để bỏ lưu. |
-| Xem job đã lưu | `/saved-jobs` | Danh sách job đã bấm "Lưu". |
-| Ứng tuyển job | Nút "Ứng tuyển" trên trang chi tiết job | Có thể kèm ghi chú; mỗi học viên chỉ ứng tuyển 1 lần / job. |
-| Xem đơn đã ứng tuyển | `/my-applications` | Danh sách job đã ứng tuyển kèm trạng thái. |
+| Đăng ký tài khoản | `/register` | Họ tên, email, mật khẩu, SĐT, track. **Lưu ý:** backend hiện chưa có cột lưu `phone`/`track` — 2 field này gửi lên nhưng bị bỏ qua, chưa hiển thị được ở đâu. |
+| Đăng nhập | `/login` | Bắt buộc đã xác thực email. Có nút "Gửi lại email xác thực" nếu login báo lỗi 403 do chưa xác thực. |
+| Đăng xuất | `/logout` | Thu hồi refresh token phía backend. |
+| Xem danh sách job | `/` hoặc `/jobs` | Tìm kiếm theo từ khoá + lọc theo ngành, level, địa điểm, trạng thái. |
+| Xem chi tiết job | `/jobs/<id>` | Mô tả, yêu cầu, kỹ năng, lương, hạn nộp, link JD gốc. |
+| Lưu / bỏ lưu job | Nút "Lưu" ở trang chi tiết job | Toggle qua `POST /jobs/<id>/save`. |
+| Xem job đã lưu | `/saved-jobs` | — |
+| Ứng tuyển job | Nút "Ứng tuyển" ở trang chi tiết | Kèm ghi chú tuỳ chọn; backend chặn nếu job không ở trạng thái `OPEN` hoặc đã ứng tuyển rồi. |
+| Huỷ ứng tuyển | `/jobs/<id>/withdraw` | Route đã có (backend hỗ trợ `DELETE /me/applications/{id}`), cần xác nhận có nút gọi route này trên UI đơn đã ứng tuyển. |
+| Xem đơn đã ứng tuyển | `/my-applications` | — |
 
-### 4.2. Dành cho team SS (staff)
+### 4.2. Dành cho team SS (`ss_team` / `admin`)
 
 | Tính năng | Trang / URL | Mô tả |
 |---|---|---|
-| Dashboard tổng quan | `/dashboard` | Thống kê số job/contact/học viên/đơn ứng tuyển, phân bổ theo ngành/level/trạng thái/địa điểm/thành phố. |
-| Xem danh sách job | `/jobs` | Giống học viên, cộng thêm quyền thao tác. |
-| Thêm job mới | `/jobs/add` | Form nhập đầy đủ thông tin job. |
-| Cập nhật trạng thái job | Trên trang chi tiết job | Đổi giữa: Còn tuyển / Hết hạn / Chưa xác minh / Đã gửi cho học viên. |
-| Xóa job | Trên trang chi tiết job | Xóa khỏi bảng `jobs`. |
-| Xem ai đã ứng tuyển | Trang chi tiết job (chỉ staff thấy) | Danh sách học viên đã ứng tuyển kèm tên, email, SĐT (lấy từ bảng `profiles`). |
-| Cảnh báo trùng job | Trang chi tiết job | Tự động phát hiện nếu có job khác cùng công ty + cùng vị trí. |
-| Quản lý danh sách contact | `/contacts` | Tìm kiếm + lọc theo thành phố, trạng thái, mức độ phù hợp. |
-| Thêm contact mới | `/contacts/add` | Thông tin công ty + người liên hệ tuyển dụng. |
-| Cập nhật trạng thái contact | Trên trang danh sách contact | Đổi trạng thái liên hệ (Chưa liên hệ → ... → Đã giới thiệu học viên). |
-| Xóa contact | Trên trang danh sách contact | — |
+| Dashboard tổng quan | `/dashboard` | Số job/company theo ngành/level/trạng thái/địa điểm/thành phố. Tổng học viên lấy qua `GET /auth/users`. **Tổng đơn ứng tuyển hiện luôn ẩn** — backend chưa có endpoint đếm tổng (xem mục 7). |
+| Thêm / sửa job | `/jobs/add`, `/jobs/<id>/edit` | Chọn công ty có sẵn hoặc tạo mới ngay tại chỗ. |
+| Đổi trạng thái job | `/jobs/<id>/status` | `OPEN` / `EXPIRED` / `CLOSED`. |
+| "Xoá" job | `/jobs/<id>/delete` | **Không xoá thật** — backend không có `DELETE /jobs/{id}` (job xoá thật sẽ bị crawl lại tạo trùng). Thực chất là chuyển `job_status=CLOSED`. |
+| Xem ai đã ứng tuyển | Trang chi tiết job (chỉ staff) | `GET /jobs/{id}/applications`, trả sẵn tên/email người ứng tuyển. |
+| Cảnh báo job trùng | Trang chi tiết job | Tự phát hiện job khác cùng công ty + cùng vị trí. |
+| Quản lý công ty | `/companies` | Tìm kiếm + lọc theo thành phố. |
+| Thêm / sửa công ty | `/companies/add`, `/companies/<id>/edit` | Tạo idempotent theo `tax_id` (gọi lại với tax_id đã có sẽ vá thông tin công ty cũ, không tạo trùng). **Không có xoá công ty** (backend không hỗ trợ). |
+| Quản lý người liên hệ (contact) | Trang chi tiết công ty | Contact là bảng con của company — CRUD đầy đủ (thêm/sửa/đổi trạng thái/xoá mềm). |
 
 ---
 
 ## 5. Hướng dẫn cài đặt & chạy (cho dev)
 
-### Bước 1 — Chuẩn bị Supabase
-
-1. Vào Supabase Dashboard của project → **SQL Editor** → chạy file
-   `supabase_schema.sql` để tạo bảng `profiles` (nếu chưa có).
-2. Đảm bảo project đã có sẵn 2 bảng `jobs` và `contacts` (nếu tên bảng/cột
-   khác, sửa hằng số `JOBS_TABLE`/`CONTACTS_TABLE` và tên cột tương ứng
-   trong `data.py`).
-3. Vào **Settings → API**, lấy 3 giá trị:
-   - `Project URL`
-   - `anon public` key
-   - `service_role` key (⚠️ giữ bí mật, không chia sẻ qua chat/git)
-
-### Bước 2 — Cấu hình project
+### Bước 1 — Cấu hình biến môi trường
 
 ```bash
 cp .env.example .env
-# rồi mở .env, điền SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
 ```
 
-### Bước 3 — Cài thư viện
+Điền 3 biến (xem mô tả chi tiết trong `.env.example`):
+
+| Biến | Bắt buộc? | Ghi chú |
+|---|---|---|
+| `CRAWLER_API_URL` | Không (có default) | URL backend Render, mặc định `https://scrap-jd-api.onrender.com` |
+| `CRAWLER_API_KEY` | **Có** | Trùng với `API_KEY` trong `.env` của backend — thiếu sẽ lỗi ngay mọi request |
+| `FLASK_SECRET_KEY` | Nên có | Ký session cookie; có fallback dev nhưng **không an toàn cho production** |
+
+### Bước 2 — Cài thư viện
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Bước 4 — (Tuỳ chọn) tạo tài khoản staff
-
-```bash
-python seed_supabase.py
-```
-
-In ra danh sách email/mật khẩu vừa tạo — đổi mật khẩu sau khi đăng nhập
-lần đầu.
-
-### Bước 5 — Chạy app
+### Bước 3 — Chạy app
 
 ```bash
 python app.py
@@ -159,43 +172,110 @@ python app.py
 
 Mặc định chạy ở `http://localhost:5000`.
 
-> **Lưu ý:** Supabase mặc định bật "Confirm email". Nếu muốn đăng ký
-> xong đăng nhập được ngay (môi trường dev/test), vào **Authentication →
-> Providers → Email** trên Supabase Dashboard và tắt "Confirm email".
+> **Lưu ý:** app này **không tự tạo tài khoản mẫu nào**. Muốn có tài
+> khoản staff để test, phải nhờ backend tạo qua `POST /auth/users`
+> (route backend, cần role `admin` gọi trước — frontend hiện chưa có
+> giao diện gọi route này, xem mục 7).
+
+### Deploy production (Vercel)
+
+Đã deploy thật — xem lại phiên làm việc trước để biết domain cụ thể.
+Tóm tắt quy trình (không cần lặp lại trừ khi tạo project Vercel mới):
+
+1. Code phải nằm trong 1 Git repo (GitHub) — Vercel bắt buộc kết nối
+   qua Git, không upload zip trực tiếp.
+2. Trên Vercel: Import repo → set 3 biến môi trường ở **Project
+   Settings → Environment Variables** (Vercel không đọc file `.env`).
+3. Trên backend (Render): thêm domain Vercel vào `ALLOWED_ORIGINS`
+   (CORS) và set `FRONTEND_BASE_URL` (để link email trỏ đúng chỗ — cần
+   cho tính năng quên mật khẩu khi frontend làm xong, xem mục 7).
 
 ---
 
 ## 6. Quản lý tài khoản staff
 
-Vì `/register` chỉ tạo tài khoản `student`, tài khoản `staff` phải được
-tạo bằng 1 trong 2 cách:
+`/register` (frontend) chỉ tạo role `user`. Tài khoản `ss_team`/`admin`
+phải được tạo **ở phía backend**, bằng 1 trong 2 cách:
 
-1. **Chạy `seed_supabase.py`** — cách nhanh nhất, tạo sẵn danh sách trong
-   file (sửa list `STAFF_ACCOUNTS` trong file này nếu muốn thêm người).
-2. **Thủ công trên Supabase Dashboard** — tạo user ở Authentication →
-   Users, sau đó vào Table Editor → bảng `profiles`, thêm dòng tương ứng
-   với `id` = id của user vừa tạo và `role = 'staff'`.
+1. **`POST /auth/users`** (backend, cần JWT role `admin`) — hiện phải
+   gọi trực tiếp API (Postman/curl), **frontend chưa có form nào cho
+   thao tác này** (xem mục 7).
+2. **Thao tác trực tiếp trên Postgres (Render)** — sửa cột `role` của
+   dòng tương ứng trong bảng `app_users`.
+
+> Template `templates/staff_accounts.html` đã tồn tại sẵn trong repo
+> nhưng **chưa có route nào trong `app.py` trỏ tới nó** — có thể đây là
+> nơi định làm giao diện quản lý tài khoản staff nhưng chưa nối route.
+> Xem mục 7.
 
 ---
 
-## 7. Câu hỏi thường gặp / xử lý sự cố
+## 7. Việc cần làm tiếp (tính đến bản audit này)
+
+Theo mức độ ưu tiên:
+
+1. **Giao diện "Quên mật khẩu" — backend đã xong, frontend chưa có gì.**
+   `templates/login.html` hiện chỉ có dòng text tĩnh bảo học viên liên
+   hệ team SS thủ công. Cần thêm:
+   - Link "Quên mật khẩu?" ở `/login` → trang nhập email → gọi
+     `POST /auth/forgot-password` (`backend_auth.py` đã có sẵn hàm
+     `resend_verification`-style nhưng **chưa có hàm gọi
+     forgot-password/reset-password** — cần bổ sung 2 hàm này vào
+     `backend_auth.py` trước).
+   - Trang `/reset-password?token=...` → form nhập mật khẩu mới → gọi
+     `POST /auth/reset-password`.
+   - Đảm bảo `FRONTEND_BASE_URL` trên Render trỏ đúng domain Vercel
+     hiện tại (nếu domain đổi từ lần set trước).
+
+2. **Không có giao diện quản lý tài khoản staff.** Backend có
+   `POST /auth/users` (tạo) nhưng frontend chưa có form gọi route này —
+   hiện phải tạo tài khoản `ss_team`/`admin` thủ công qua API hoặc DB.
+   Template `staff_accounts.html` có sẵn nhưng mồ côi route — nên tận
+   dụng lại thay vì viết mới.
+
+3. **Dashboard thiếu "Tổng đơn ứng tuyển".** Backend chưa có endpoint
+   đếm tổng số `job_applications` toàn hệ thống (chỉ có đếm theo 1 user
+   hoặc theo 1 job) — cần thêm ở backend trước (vd
+   `GET /stats/applications`) rồi mới hiện được số này ở `/dashboard`.
+
+4. **`static/style.css` là file thừa, có thể gây nhầm.** App đã đổi
+   sang serve static từ `public/` (khớp chuẩn Vercel) — file trong
+   `static/` không còn được Flask serve nữa. Nên xoá để tránh 2 người
+   sửa nhầm file không có tác dụng.
+
+5. **`phone`/`track` của học viên bị "câm".** Form đăng ký gửi 2 field
+   này lên nhưng backend chưa có cột lưu → dữ liệu mất, không hiển thị
+   được ở đâu (kể cả dashboard/trang xem người ứng tuyển). Cần backend
+   thêm cột trước khi 2 field này có ý nghĩa thật.
+
+6. **Nút "Huỷ ứng tuyển" cần rà lại UI.** Route `/jobs/<id>/withdraw`
+   đã có ở `app.py`, cần xác nhận `templates/my_applications.html` (hoặc
+   trang chi tiết job) có nút gọi đúng route này chưa.
+
+---
+
+## 8. Câu hỏi thường gặp / xử lý sự cố
 
 | Vấn đề | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| Đăng ký xong không đăng nhập được, báo "kiểm tra email" | Supabase đang bật xác nhận email | Tắt "Confirm email" (dev) hoặc bấm link xác nhận trong email đã nhận |
-| Trang báo lỗi "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY" | Thiếu key trong `.env` | Điền `SUPABASE_SERVICE_ROLE_KEY` vào `.env`, khởi động lại app |
-| Dashboard hiện "Tổng học viên: None" | Chưa cấu hình service_role key | Giống trên |
-| Job/Contact không hiện dù đã thêm trên Supabase Studio | Sai tên bảng/cột so với `data.py` | Kiểm tra lại `JOBS_TABLE`/`CONTACTS_TABLE` và tên cột trong `data.py` |
-| Lỗi "Host not in allowlist" khi gọi Supabase | Đang chạy trong môi trường có giới hạn mạng (sandbox) | Chạy ở máy local/server thật, không giới hạn domain `supabase.co` |
+| Trang báo "Server chưa cấu hình CRAWLER_API_KEY" | Thiếu biến trong `.env` (local) hoặc Environment Variables (Vercel) | Điền `CRAWLER_API_KEY`, khởi động/redeploy lại |
+| Đăng nhập báo lỗi liên quan "xác thực" (403) | Tài khoản chưa bấm link xác thực email | Bấm nút "Gửi lại email xác thực" trên trang login, hoặc kiểm tra hộp thư/spam |
+| Trang job/company hiện lỗi 422 khi tải danh sách dài | Gọi backend với `limit > 200` | Backend giới hạn cứng 200/lần — dùng field `total` để đếm, dùng `offset` để lặp trang (đã fix ở `crawler_client.py`, xem `count_jobs()`/`list_company_cities()`) |
+| Session tự đăng xuất giữa chừng dù mới đăng nhập | Access token (30 phút) hết hạn nhưng refresh cũng thất bại | Kiểm tra refresh token còn hạn (30 ngày) hay đã bị thu hồi (vd sau khi đổi mật khẩu ở thiết bị khác) |
+| CORS lỗi khi frontend gọi backend sau khi đổi domain Vercel | `ALLOWED_ORIGINS` bên backend (Render) chưa có domain mới | Thêm domain Vercel mới vào `ALLOWED_ORIGINS`, redeploy backend |
+| Link trong email "quên mật khẩu" trỏ về `localhost` | `FRONTEND_BASE_URL` chưa set trên Render | Set `FRONTEND_BASE_URL=https://<domain-vercel-thật>` trong `.env` backend |
 
 ---
 
-## 8. Ghi chú bảo mật
+## 9. Ghi chú bảo mật
 
-- **`service_role` key có toàn quyền** đọc/ghi mọi bảng, bỏ qua RLS —
-  chỉ dùng ở phía server (file `.env`), tuyệt đối không đưa vào code
-  frontend, không commit lên git, không gửi qua chat/email không mã hoá.
-- Nếu nghi ngờ key đã bị lộ (vd lỡ dán vào chat, commit nhầm lên git
-  công khai), vào **Settings → API → Reset service_role secret** ngay
-  và cập nhật lại `.env`.
-- File `.env` đã được thêm vào `.gitignore`, không tự động commit.
+- **Không còn key "toàn quyền" nào ở tầng frontend** (khác bản Supabase
+  cũ) — `CRAWLER_API_KEY` chỉ là API key xác định frontend hợp lệ, mọi
+  quyền hạn thật sự do JWT (gắn với 1 user cụ thể) quyết định.
+- `FLASK_SECRET_KEY` ký session cookie chứa access/refresh token —
+  **bắt buộc đổi giá trị thật khi deploy**, không dùng fallback dev
+  trong code.
+- File `.env` đã nằm trong `.gitignore`, không tự động commit.
+- Đổi mật khẩu thành công → backend tự thu hồi **toàn bộ** refresh
+  token hiện có của user (đăng xuất mọi thiết bị khác) — hành vi này cố
+  ý, không phải bug.
