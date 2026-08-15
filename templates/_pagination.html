@@ -20,5 +20,27 @@
   {% else %}
     <span class="page-btn page-next is-disabled">Sau ›</span>
   {% endif %}
+
+  {# Nhảy thẳng tới 1 trang bất kỳ — GET form, không cần JS. Method GET nên
+     Flask nhận qua query string y hệt bấm link, filter hiện tại giữ nguyên
+     nhờ hidden input (không dùng url_for vì action cần trỏ đúng route hiện
+     tại kèm querystring do trình duyệt tự build từ input name="page"). #}
+  <form class="page-jump" action="{{ url_for(request.endpoint) }}" method="get">
+    {% for key, value in pagination_filters.items() %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <label class="page-jump-label" for="page-jump-input">Tới trang</label>
+    <input
+      id="page-jump-input"
+      class="page-jump-input"
+      type="number"
+      name="page"
+      min="1"
+      max="{{ total_pages }}"
+      value="{{ page }}"
+      inputmode="numeric"
+      aria-label="Nhập số trang muốn tới">
+    <button type="submit" class="page-btn page-jump-btn">Tới</button>
+  </form>
 </nav>
 {% endif %}

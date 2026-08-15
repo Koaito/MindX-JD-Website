@@ -997,14 +997,16 @@ def dashboard():
             total_students = sum(1 for u in users if u.get("role") == "user")
         except BackendAuthError:
             pass
-    # Tổng đơn ứng tuyển: backend CHƯA có endpoint đếm tổng (chỉ có
-    # GET /me/applications — của riêng 1 user — và GET /jobs/{id}/applications
-    # — của riêng 1 job). Gọi list_job_applicants() cho từng job trong
-    # `jobs` rồi cộng dồn là khả thi nhưng tốn N lần gọi API mỗi lần mở
-    # dashboard (N = tổng số job) — không đáng đánh đổi chỉ để ra 1 con
-    # số thống kê. Tạm hiện None (ẩn ở template) — nên đề xuất backend
-    # thêm 1 endpoint đếm tổng kiểu GET /stats/applications sau này.
+    # Tổng đơn ứng tuyển: backend đã bổ sung total_applications vào
+    # GET /stats (commit b508644, 08/2026) — gọi 1 lần, không cần lặp
+    # qua từng job. Lỗi backend tạm thời thì hiện None (ẩn ở template)
+    # thay vì làm sập cả trang dashboard.
     total_applications = None
+    try:
+        stats = db_data.get_stats()
+        total_applications = stats.get("total_applications")
+    except CrawlerAPIError:
+        pass
 
     return render_template(
         "dashboard.html",

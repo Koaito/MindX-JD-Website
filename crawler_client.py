@@ -277,6 +277,12 @@ def count_jobs(q="", industry="", level="", location="", status=""):
     return data.get("total", 0)
 
 
+def get_stats() -> dict:
+    """GET /stats — tổng job, tổng công ty, tổng đơn ứng tuyển (total_applications,
+    thêm 08/2026)... Chỉ cần API key, không cần access_token. Dùng cho dashboard."""
+    return _request("GET", "/stats") or {}
+
+
 def is_duplicate_candidate(job: dict) -> bool:
     matches = list_jobs(q=job["company"], limit=50)
     return any(
