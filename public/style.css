@@ -408,7 +408,11 @@ a { color: inherit; text-decoration: none; }
 
 .job-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* auto-fit thay vì auto-fill: khi hàng cuối không đủ card lấp hết số
+     cột (vd 20 job / trang, màn hình xếp được 3 cột -> hàng cuối dư 2),
+     auto-fit collapse track trống thay vì giữ chỗ, card hàng cuối tự
+     giãn lấp đầy chiều rộng thay vì để lại khoảng hở bên phải. */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
 }
 
