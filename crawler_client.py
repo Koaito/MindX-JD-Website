@@ -256,11 +256,24 @@ def list_jobs(q="", industry="", level="", location="", status="", limit=200, of
     return [_normalize_job(j) for j in items]
 
 
-def count_jobs():
+def count_jobs(q="", industry="", level="", location="", status=""):
     """Dùng field `total` backend trả sẵn trong response phân trang —
     KHÔNG cố lấy limit=1000 rồi đếm len() (backend chặn limit tối đa
-    200, gửi 1000 sẽ bị 422 'Input should be less than or equal to 200')."""
-    data = _request("GET", "/jobs", params={"limit": 1}) or {}
+    200, gửi 1000 sẽ bị 422 'Input should be less than or equal to 200').
+    Nhận đúng bộ filter như list_jobs() để `total` khớp với danh sách
+    đang lọc (dùng cho phân trang) chứ không phải tổng toàn bộ DB."""
+    params = {"limit": 1}
+    if q:
+        params["keyword"] = q
+    if industry:
+        params["industry"] = industry
+    if level:
+        params["level"] = level
+    if location:
+        params["province"] = location
+    if status:
+        params["status"] = JOB_STATUS_MAP_REV.get(status, status)
+    data = _request("GET", "/jobs", params=params) or {}
     return data.get("total", 0)
 
 
@@ -342,9 +355,15 @@ def list_companies(q="", city="", limit=200, offset=0):
     return [_normalize_company(c) for c in items]
 
 
-def count_companies():
-    """Dùng field `total` backend trả sẵn — xem giải thích ở count_jobs()."""
-    data = _request("GET", "/companies", params={"limit": 1}) or {}
+def count_companies(q="", city=""):
+    """Dùng field `total` backend trả sẵn — xem giải thích ở count_jobs().
+    Nhận đúng bộ filter như list_companies() để khớp danh sách đang lọc."""
+    params = {"limit": 1}
+    if q:
+        params["keyword"] = q
+    if city:
+        params["province"] = city
+    data = _request("GET", "/companies", params=params) or {}
     return data.get("total", 0)
 
 

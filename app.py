@@ -1,3 +1,4 @@
+import math
 import os
 from datetime import datetime
 from functools import wraps
@@ -77,6 +78,25 @@ WORK_TYPES = list(db_data.WORK_TYPE_MAP.values())
 SALARY_TYPES = list(db_data.SALARY_TYPE_MAP.values())
 
 CONTACT_STATUSES = list(db_data.CONTACT_STATUS_MAP.values())
+
+# Số card/hàng mỗi trang cho danh sách job và công ty — 20 là điểm cân bằng
+# phổ biến ở các trang tuyển dụng (TopCV/VietnamWorks ~20-25, Indeed ~15,
+# LinkedIn ~25): đủ lướt nhanh 1 lần cuộn, không load quá nặng, chia đẹp
+# cho layout grid 4 cột (.job-grid) ở màn hình rộng.
+JOBS_PER_PAGE = 20
+COMPANIES_PER_PAGE = 20
+
+
+def _paginate_args(default_per_page):
+    """Đọc ?page= từ query string, ép về số nguyên >=1 (giá trị rác/âm/0
+    coi như trang 1 thay vì lỗi 500)."""
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+    if page < 1:
+        page = 1
+    return page, default_per_page
 
 # Nhãn tiếng Việt cho 3 role backend hỗ trợ (user/ss_team/admin) — dùng
 # ở trang quản lý tài khoản team SS (staff_accounts.html) cho dropdown
@@ -578,19 +598,34 @@ def jobs_index():
     level = request.args.get("level", "")
     location = request.args.get("location", "")
     status = request.args.get("status", "")
+    page, per_page = _paginate_args(JOBS_PER_PAGE)
 
     try:
-        jobs = db_data.list_jobs(q=q, industry=industry, level=level, location=location, status=status)
-        total_jobs = db_data.count_jobs()
+        total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status)
+        total_pages = max(1, math.ceil(total_jobs / per_page))
+        # Trang xin quá số trang thực tế (vd sửa tay ?page=999) -> kéo về
+        # trang cuối cùng có dữ liệu thay vì trả trang trắng.
+        if page > total_pages:
+            page = total_pages
+        jobs = db_data.list_jobs(
+            q=q, industry=industry, level=level, location=location, status=status,
+            limit=per_page, offset=(page - 1) * per_page,
+        )
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-        jobs, total_jobs = [], 0
+        jobs, total_jobs, total_pages, page = [], 0, 1, 1
 
     return render_template(
         "index.html", jobs=jobs, industries=INDUSTRIES, levels=LEVELS,
         locations=LOCATIONS, statuses=JOB_STATUSES,
         filters={"q": q, "industry": industry, "level": level, "location": location, "status": status},
-        total_jobs=total_jobs,
+        # Bản filter đã bỏ field rỗng — dùng riêng cho link phân trang, để
+        # URL trang 2 không kéo theo ?q=&industry=&... (Flask url_for vẫn
+        # add param dù value rỗng, nhìn rối và không cần thiết).
+        pagination_filters={k: v for k, v in
+                             {"q": q, "industry": industry, "level": level,
+                              "location": location, "status": status}.items() if v},
+        total_jobs=total_jobs, page=page, total_pages=total_pages, per_page=per_page,
     )
 
 
@@ -772,18 +807,24 @@ def job_delete(job_id):
 def companies_index():
     q = request.args.get("q", "").strip()
     city = request.args.get("city", "")
+    page, per_page = _paginate_args(COMPANIES_PER_PAGE)
 
     try:
-        companies = db_data.list_companies(q=q, city=city)
         cities = db_data.list_company_cities()
-        total_companies = db_data.count_companies()
+        total_companies = db_data.count_companies(q=q, city=city)
+        total_pages = max(1, math.ceil(total_companies / per_page))
+        if page > total_pages:
+            page = total_pages
+        companies = db_data.list_companies(q=q, city=city, limit=per_page, offset=(page - 1) * per_page)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-        companies, cities, total_companies = [], [], 0
+        companies, cities, total_companies, total_pages, page = [], [], 0, 1, 1
 
     return render_template(
         "companies.html", companies=companies, cities=cities,
         filters={"q": q, "city": city}, total_companies=total_companies,
+        pagination_filters={k: v for k, v in {"q": q, "city": city}.items() if v},
+        page=page, total_pages=total_pages, per_page=per_page,
     )
 
 

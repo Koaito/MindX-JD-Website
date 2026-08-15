@@ -1,0 +1,24 @@
+{# Partial phân trang dùng chung — cần truyền vào (từ view, qua render_template):
+   page              : trang hiện tại (int, bắt đầu từ 1)
+   total_pages       : tổng số trang (int, luôn >= 1)
+   pagination_filters: dict filter hiện tại ĐÃ bỏ field rỗng, để giữ khi đổi trang
+   Route đích lấy tự động từ request.endpoint (Flask đưa sẵn vào Jinja
+   context) — không cần truyền tay, tránh gõ nhầm tên route.
+   Chỉ hiện khi total_pages > 1 — 1 trang duy nhất thì không cần render gì. #}
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Phân trang">
+  {% if page > 1 %}
+    <a class="page-btn page-prev" href="{{ url_for(request.endpoint, page=page - 1, **pagination_filters) }}">‹ Trước</a>
+  {% else %}
+    <span class="page-btn page-prev is-disabled">‹ Trước</span>
+  {% endif %}
+
+  <span class="page-status">Trang {{ page }} / {{ total_pages }}</span>
+
+  {% if page < total_pages %}
+    <a class="page-btn page-next" href="{{ url_for(request.endpoint, page=page + 1, **pagination_filters) }}">Sau ›</a>
+  {% else %}
+    <span class="page-btn page-next is-disabled">Sau ›</span>
+  {% endif %}
+</nav>
+{% endif %}

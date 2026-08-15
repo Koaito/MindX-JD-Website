@@ -27,7 +27,13 @@
   {% endif %}
 </form>
 
-<p class="result-count">{{ companies|length }} / {{ total_companies }} công ty phù hợp</p>
+{% if companies %}
+<p class="result-count">
+  Hiển thị {{ (page - 1) * per_page + 1 }}–{{ (page - 1) * per_page + companies|length }} / {{ total_companies }} công ty phù hợp
+</p>
+{% else %}
+<p class="result-count">{{ total_companies }} công ty phù hợp</p>
+{% endif %}
 
 {% if companies %}
 <div class="contact-table-wrap">
@@ -59,6 +65,7 @@
     </tbody>
   </table>
 </div>
+{% include "_pagination.html" %}
 {% else %}
 <div class="empty-state">
   <p>Chưa có công ty nào khớp bộ lọc.</p>
