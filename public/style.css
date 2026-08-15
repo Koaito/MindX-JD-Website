@@ -407,13 +407,22 @@ a { color: inherit; text-decoration: none; }
 /* ---------------- Job ticket cards ---------------- */
 
 .job-grid {
-  display: grid;
-  /* auto-fit thay vì auto-fill: khi hàng cuối không đủ card lấp hết số
-     cột (vd 20 job / trang, màn hình xếp được 3 cột -> hàng cuối dư 2),
-     auto-fit collapse track trống thay vì giữ chỗ, card hàng cuối tự
-     giãn lấp đầy chiều rộng thay vì để lại khoảng hở bên phải. */
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* Flexbox thay vì CSS Grid — lý do: Grid auto-fill/auto-fit chỉ khác
+     nhau khi có CỘT TRỐNG TOÀN BỘ lưới (vd tổng job ít hơn số cột màn
+     hình cho phép); khi hàng CUỐI thiếu card (vd 20 job, màn hình xếp
+     được 3 cột -> hàng cuối dư 2), Grid vẫn để hở vì track cột dùng
+     chung dọc suốt lưới, không co giãn riêng theo từng hàng — auto-fill
+     hay auto-fit đều bị y hệt. Flexbox + flex-wrap giải quyết đúng gốc:
+     card hàng cuối tự giãn (flex-grow) lấp đầy chiều rộng còn lại, dù
+     dư bao nhiêu card cũng không để hở, ở mọi kích cỡ màn hình. */
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
+}
+
+.job-grid > .ticket {
+  flex: 1 1 320px;
+  min-width: 320px;
 }
 
 .ticket {
