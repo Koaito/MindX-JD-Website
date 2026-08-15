@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Contact doanh nghiệp — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Doanh nghiệp</span>
+    <h1>Database HR &amp; đối tác doanh nghiệp</h1>
+    <p class="lede">Contact công khai của HR / Hiring Manager để xin JD, gửi profile học viên và mở rộng mạng lưới tuyển dụng.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('contact_add') }}">＋ Thêm contact</a>
+</header>
+
+<form class="filter-bar" method="get">
+  <input type="text" name="q" placeholder="Tìm theo công ty, ngành, người liên hệ…" value="{{ filters.q }}">
+
+  <select name="city">
+    <option value="">Mọi thành phố</option>
+    {% for c in cities %}
+      <option value="{{ c }}" {{ 'selected' if filters.city == c }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status">
+    <option value="">Mọi trạng thái</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="fit_level">
+    <option value="">Mọi mức tiềm năng</option>
+    {% for f in fit_levels %}
+      <option value="{{ f }}" {{ 'selected' if filters.fit_level == f }}>{{ f }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.q or filters.city or filters.status or filters.fit_level %}
+    <a class="btn btn-text" href="{{ url_for('contacts_index') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ contacts|length }} / {{ total_contacts }} contact phù hợp</p>
+
+{% if contacts %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Công ty</th>
+        <th>Người liên hệ</th>
+        <th>Chức danh</th>
+        <th>Thành phố</th>
+        <th>Tiềm năng</th>
+        <th>Trạng thái</th>
+        <th>Nguồn</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td>
+          <strong>{{ c.company }}</strong>
+          <span class="muted">{{ c.industry or '' }}</span>
+        </td>
+        <td>{{ c.contact_name or '—' }}</td>
+        <td>{{ c.title or '—' }}</td>
+        <td>{{ c.city or '—' }}</td>
+        <td><span class="fit-chip fit-{{ (c.fit_level or '')|lower|replace('ì','i') }}">{{ c.fit_level or '—' }}</span></td>
+        <td>
+          <form method="post" action="{{ url_for('contact_update_status', contact_id=c.id) }}" class="status-inline">
+            <select name="status" onchange="this.form.submit()">
+              {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td class="muted">{{ c.source or '—' }}</td>
+        <td>
+          <a class="btn btn-text" href="{{ url_for('contact_edit', contact_id=c.id) }}">Sửa</a>
+          <form method="post" action="{{ url_for('contact_delete', contact_id=c.id) }}" onsubmit="return confirm('Xóa contact này?');">
+            <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
+          </form>
+        </td>
+      </tr>
+      {% if c.note %}
+      <tr class="note-row"><td colspan="8">📝 {{ c.note }}</td></tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có contact nào khớp bộ lọc.</p>
+  <a class="btn btn-primary" href="{{ url_for('contact_add') }}">Thêm contact đầu tiên</a>
+</div>
+{% endif %}
+
+{% endblock %}

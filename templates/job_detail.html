@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ job.position }} — MindX Career Hub{% endblock %}
+{% block content %}
+
+<a class="back-link" href="{{ url_for('jobs_index') }}">← Danh sách job</a>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">JOB-{{ job.id[:8]|upper }} · {{ job.industry }} · {{ job.level }}</span>
+    <h1>{{ job.position }}</h1>
+    <p class="lede"><a href="{{ url_for('company_detail', company_id=job.company_id) }}">{{ job.company }}</a> · {{ job.location }}{% if job.work_type %} · {{ job.work_type }}{% endif %}</p>
+  </div>
+  <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
+</header>
+
+<div class="detail-grid">
+  <div class="detail-main">
+    {% if job.description %}
+    <section class="card">
+      <h4>Mô tả công việc</h4>
+      <p>{{ job.description }}</p>
+    </section>
+    {% endif %}
+    {% if job.requirements %}
+    <section class="card">
+      <h4>Yêu cầu ứng viên</h4>
+      <p>{{ job.requirements }}</p>
+    </section>
+    {% endif %}
+    {% if job.skills %}
+    <section class="card">
+      <h4>Kỹ năng / công nghệ</h4>
+      <div class="skill-row">
+        {% for sk in job.skills.split(',') %}<span class="skill-tag">{{ sk.strip() }}</span>{% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    {% if job.benefits %}
+    <section class="card">
+      <h4>Quyền lợi</h4>
+      <p>{{ job.benefits }}</p>
+    </section>
+    {% endif %}
+    {% if job.note %}
+    <section class="card">
+      <h4>Ghi chú của team SS</h4>
+      <p>{{ job.note }}</p>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="detail-side">
+    {% if current_user.is_authenticated and current_user.is_staff %}
+    <section class="card">
+      <h4>Cập nhật trạng thái</h4>
+      <form method="post" action="{{ url_for('job_update_status', job_id=job.id) }}" class="inline-form">
+        <select name="status">
+          {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if job.status == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-ghost" type="submit">Lưu</button>
+      </form>
+      <a class="btn btn-ghost" href="{{ url_for('job_edit', job_id=job.id) }}">Sửa thông tin job</a>
+      <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');">
+        <button class="btn btn-danger" type="submit">Đóng job</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h4>Học viên đã ứng tuyển ({{ applicants|length }})</h4>
+      {% if applicants %}
+      <ul class="applicant-list">
+        {% for a in applicants %}
+        <li>
+          <strong>{{ a.student.full_name }}</strong>
+          <span class="muted">{{ a.student.email }}{% if a.student.phone %} · {{ a.student.phone }}{% endif %}</span>
+          <span class="muted">Ứng tuyển: {{ a.applied_at|format_date }}</span>
+          {% if a.note %}<span class="muted">Ghi chú: {{ a.note }}</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Chưa có học viên nào ứng tuyển job này.</p>
+      {% endif %}
+    </section>
+
+    {% else %}
+
+    <section class="card">
+      {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('job_apply', job_id=job.id) }}">
+          <button class="btn {{ 'btn-ghost' if already_applied else 'btn-primary' }} btn-block" type="submit" {{ 'disabled' if already_applied }}>
+            {{ '✅ Đã ứng tuyển' if already_applied else '📨 Ứng tuyển ngay' }}
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}" style="margin-top: 8px;">
+          <button class="btn {{ 'btn-primary' if job.id not in saved_job_ids else 'btn-ghost' }} btn-block" type="submit">
+            {{ '🔖 Lưu job này' if job.id not in saved_job_ids else '🔖 Bỏ lưu job này' }}
+          </button>
+        </form>
+      {% else %}
+        <a class="btn btn-primary btn-block" href="{{ url_for('login', next=request.path) }}">📨 Đăng nhập để ứng tuyển</a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('login', next=request.path) }}" style="margin-top: 8px;">🔖 Đăng nhập để lưu job</a>
+      {% endif %}
+    </section>
+
+    {% endif %}
+
+    <section class="card">
+      <h4>Thông tin nhanh</h4>
+      <dl class="kv">
+        <dt>Mức lương</dt><dd>{{ job.salary or '—' }}</dd>
+        <dt>Deadline</dt><dd>{{ job.deadline|format_date }}</dd>
+        <dt>Link JD gốc</dt><dd>{% if job.jd_link %}<a href="{{ job.jd_link }}" target="_blank">Xem JD</a>{% else %}—{% endif %}</dd>
+        <dt>Ngày thu thập</dt><dd>{{ job.date_collected|format_date }}</dd>
+        {% if current_user.is_authenticated and current_user.is_staff %}
+        <dt>Trùng lặp?</dt><dd>{{ 'Có thể trùng job khác' if job.is_duplicate_candidate else 'Chưa phát hiện' }}</dd>
+        {% endif %}
+      </dl>
+    </section>
+  </aside>
+</div>
+
+{% endblock %}

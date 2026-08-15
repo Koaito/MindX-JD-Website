@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Quản lý tài khoản — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Team SS</span>
+    <h1>Tài khoản team SS</h1>
+    <p class="lede">
+      Danh sách toàn bộ tài khoản đăng nhập qua backend (không gồm học viên).
+      Tài khoản mới được tạo thủ công qua backend (CLI/script) — trang này chỉ
+      dùng để xem và, nếu bạn là admin, nâng/hạ role cho tài khoản đã có sẵn.
+    </p>
+  </div>
+</header>
+
+{% if current_user.role != "admin" %}
+<div class="flash flash-error" style="margin-bottom: 16px;">
+  Bạn đang xem ở chế độ chỉ đọc (role hiện tại: <strong>{{ current_user.role }}</strong>) —
+  chỉ tài khoản <strong>admin</strong> mới đổi được role của người khác.
+</div>
+{% endif %}
+
+{% if users %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Họ tên</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Trạng thái</th>
+        <th>Lần đăng nhập gần nhất</th>
+        {% if current_user.role == "admin" %}
+        <th>Đổi role</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><strong>{{ u.full_name }}</strong></td>
+        <td class="muted">{{ u.email }}</td>
+        <td>
+          <span class="fit-chip">{{ u.role }}</span>
+          {% if u.must_change_password %}
+            <span class="muted">(chưa đổi mật khẩu tạm)</span>
+          {% endif %}
+        </td>
+        <td>{{ "Đang hoạt động" if u.is_active else "Đã vô hiệu hoá" }}</td>
+        <td class="muted">{{ u.last_login_at or "Chưa từng đăng nhập" }}</td>
+        {% if current_user.role == "admin" %}
+        <td>
+          {% if u.ss_user_id == current_user.id %}
+            <span class="muted">Tài khoản của bạn</span>
+          {% else %}
+            <form method="post" action="{{ url_for('staff_account_update_role', ss_user_id=u.ss_user_id) }}" class="status-inline">
+              <select name="role" onchange="this.form.submit()">
+                {% for r in role_hierarchy.keys() %}
+                  <option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ r }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Không tải được danh sách tài khoản (xem thông báo lỗi phía trên nếu có).</p>
+</div>
+{% endif %}
+
+{% endblock %}

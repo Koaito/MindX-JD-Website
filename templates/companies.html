@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Công ty — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Doanh nghiệp</span>
+    <h1>Database công ty đối tác</h1>
+    <p class="lede">Hồ sơ công ty đã tiếp cận/crawl được — vào từng công ty để xem job đã đăng và quản lý người liên hệ HR.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('company_add') }}">＋ Thêm công ty</a>
+</header>
+
+<form class="filter-bar" method="get">
+  <input type="text" name="q" placeholder="Tìm theo tên công ty…" value="{{ filters.q }}">
+
+  <select name="city">
+    <option value="">Mọi thành phố</option>
+    {% for c in cities %}
+      <option value="{{ c }}" {{ 'selected' if filters.city == c }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.q or filters.city %}
+    <a class="btn btn-text" href="{{ url_for('companies_index') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ companies|length }} / {{ total_companies }} công ty phù hợp</p>
+
+{% if companies %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Công ty</th>
+        <th>Lĩnh vực</th>
+        <th>Thành phố</th>
+        <th>Quy mô</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in companies %}
+      <tr>
+        <td>
+          <strong><a href="{{ url_for('company_detail', company_id=c.id) }}">{{ c.company }}</a></strong>
+        </td>
+        <td class="muted">{{ c.industry or '—' }}</td>
+        <td>{{ c.city or '—' }}</td>
+        <td class="muted">{{ c.company_size or '—' }}</td>
+        <td>
+          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem</a>
+          <a class="btn btn-text" href="{{ url_for('company_edit', company_id=c.id) }}">Sửa</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có công ty nào khớp bộ lọc.</p>
+  <a class="btn btn-primary" href="{{ url_for('company_add') }}">Thêm công ty đầu tiên</a>
+</div>
+{% endif %}
+
+{% endblock %}

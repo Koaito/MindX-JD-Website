@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MindX Career Hub{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">MX</span>
+      <div class="brand-text">
+        <strong>Career Hub</strong>
+        <span>Student Success</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <span class="nav-label">Việc làm</span>
+      <a href="{{ url_for('jobs_index') }}" class="{{ 'active' if request.endpoint in ['jobs_index','job_detail'] else '' }}">
+        <span class="nav-ic">▤</span> Danh sách job
+      </a>
+      {% if current_user.is_authenticated and current_user.is_staff %}
+      <a href="{{ url_for('job_add') }}" class="{{ 'active' if request.endpoint == 'job_add' else '' }}">
+        <span class="nav-ic">＋</span> Thêm job
+      </a>
+
+      <span class="nav-label">Doanh nghiệp</span>
+      <a href="{{ url_for('companies_index') }}" class="{{ 'active' if request.endpoint in ['companies_index','company_detail'] else '' }}">
+        <span class="nav-ic">☰</span> Danh sách công ty
+      </a>
+      <a href="{{ url_for('company_add') }}" class="{{ 'active' if request.endpoint == 'company_add' else '' }}">
+        <span class="nav-ic">＋</span> Thêm công ty
+      </a>
+
+      <span class="nav-label">Báo cáo</span>
+      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">
+        <span class="nav-ic">◨</span> Dashboard
+      </a>
+      {% endif %}
+
+      {% if current_user.is_authenticated and not current_user.is_staff %}
+      <span class="nav-label">Học viên</span>
+      <a href="{{ url_for('saved_jobs') }}" class="{{ 'active' if request.endpoint == 'saved_jobs' else '' }}">
+        <span class="nav-ic">🔖</span> Job đã lưu
+      </a>
+      <a href="{{ url_for('my_applications') }}" class="{{ 'active' if request.endpoint == 'my_applications' else '' }}">
+        <span class="nav-ic">📨</span> Đã ứng tuyển
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-foot">
+      {% if current_user.is_authenticated %}
+        <div class="auth-box">
+          <div class="auth-avatar">{{ current_user.full_name[0]|upper }}</div>
+          <div class="auth-info">
+            <strong>{{ current_user.full_name }}</strong>
+            <span>{{ 'Team SS' if current_user.is_staff else current_user.email }}</span>
+          </div>
+        </div>
+        {% if current_user.is_staff %}
+        <a class="btn btn-ghost btn-block" href="{{ url_for('change_password') }}">Đổi mật khẩu</a>
+        {% endif %}
+        <a class="btn btn-ghost btn-block" href="{{ url_for('logout') }}">Đăng xuất</a>
+      {% else %}
+        <div class="auth-box auth-box-guest">
+          <p>Học viên MindX? Đăng nhập để lưu job và ứng tuyển.</p>
+        </div>
+        <a class="btn btn-primary btn-block" href="{{ url_for('login') }}">Đăng nhập</a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('register') }}">Đăng ký</a>
+      {% endif %}
+    </div>
+  </aside>
+
+  <main class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

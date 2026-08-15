@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Đăng ký — MindX Career Hub{% endblock %}
+{% block content %}
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <span class="eyebrow">Career Hub / Học viên</span>
+    <h1>Đăng ký tài khoản</h1>
+    <p class="lede">Tạo tài khoản để lưu job yêu thích và theo dõi cơ hội việc làm phù hợp với bạn.</p>
+
+    <form method="post">
+      <label>Họ và tên *
+        <input type="text" name="full_name" value="{{ form.get('full_name', '') }}" required>
+      </label>
+      <label>Email *
+        <input type="email" name="email" value="{{ form.get('email', '') }}" required>
+      </label>
+      <div class="two-col">
+        <label>Mật khẩu * (tối thiểu 8 ký tự)
+          <input type="password" name="password" minlength="8" required>
+        </label>
+        <label>Nhập lại mật khẩu *
+          <input type="password" name="password_confirm" minlength="8" required>
+        </label>
+      </div>
+      <div class="two-col">
+        <label>Số điện thoại
+          <input type="text" name="phone" value="{{ form.get('phone', '') }}">
+        </label>
+        <label>Định hướng ngành
+          <select name="track">
+            <option value="">— chọn —</option>
+            {% for i in industries %}
+              <option value="{{ i }}" {{ 'selected' if form.get('track') == i }}>{{ i }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Tạo tài khoản</button>
+    </form>
+
+    <p class="auth-foot">Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập</a></p>
+    <div class="demo-hint">Sau khi đăng ký, kiểm tra email để bấm link xác thực trước khi đăng nhập được.</div>
+  </div>
+</div>
+
+{% endblock %}

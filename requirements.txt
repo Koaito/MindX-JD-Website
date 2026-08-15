@@ -1,0 +1,5 @@
+Flask==3.0.3
+Flask-Login==0.6.3
+requests==2.32.3
+# supabase==2.10.0  # KHÔNG còn dùng (08/2026) — đã chuyển toàn bộ auth sang backend JWT, xem auth.py/backend_auth.py
+# Flask-SQLAlchemy==3.1.1  # KHÔNG còn dùng (08/2026) — SavedJob/JobApplication đã chuyển sang API /me/..., không còn SQLite nào trong app

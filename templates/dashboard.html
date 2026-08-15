@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Báo cáo</span>
+    <h1>Tổng quan thị trường job &amp; database doanh nghiệp</h1>
+    <p class="lede">Số liệu cập nhật theo dữ liệu hiện có trong hệ thống.</p>
+  </div>
+</header>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <span class="kpi-num">{{ total_jobs }}</span>
+    <span class="kpi-label">Job trong database</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-num">{{ total_contacts }}</span>
+    <span class="kpi-label">Công ty trong database</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-num">{{ jobs_by_status.get('Đang tuyển', 0) }}</span>
+    <span class="kpi-label">Job đang còn tuyển</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-num">{{ total_students if total_students is not none else '—' }}</span>
+    <span class="kpi-label">Học viên đã đăng ký</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-num">{{ total_applications if total_applications is not none else '—' }}</span>
+    <span class="kpi-label">Lượt ứng tuyển</span>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <section class="card">
+    <h4>Job theo ngành</h4>
+    {% for k, v in jobs_by_industry.items() %}
+    <div class="bar-row">
+      <span class="bar-label">{{ k }}</span>
+      <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+      <span class="bar-value">{{ v }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h4>Job theo level</h4>
+    {% for k, v in jobs_by_level.items() %}
+    <div class="bar-row">
+      <span class="bar-label">{{ k }}</span>
+      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+      <span class="bar-value">{{ v }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h4>Job theo địa điểm</h4>
+    {% for k, v in jobs_by_location.items() %}
+    <div class="bar-row">
+      <span class="bar-label">{{ k }}</span>
+      <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+      <span class="bar-value">{{ v }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h4>Job theo trạng thái</h4>
+    {% for k, v in jobs_by_status.items() %}
+    <div class="bar-row">
+      <span class="bar-label">{{ k }}</span>
+      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+      <span class="bar-value">{{ v }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h4>Công ty theo thành phố</h4>
+    {% for k, v in contacts_by_city.items() %}
+    <div class="bar-row">
+      <span class="bar-label">{{ k }}</span>
+      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_contacts * 100) if total_contacts else 0 }}%"></div></div>
+      <span class="bar-value">{{ v }}</span>
+    </div>
+    {% endfor %}
+  </section>
+</div>
+
+{% endblock %}

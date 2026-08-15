@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Việc làm — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Việc làm</span>
+    <h1>Job Intern &amp; Fresher cho học viên MindX</h1>
+    <p class="lede">Tổng hợp job Code, Data Analysis, Business Analysis từ TopCV, LinkedIn, ITviec, VietnamWorks, website công ty và các nguồn công khai khác.</p>
+  </div>
+  {% if current_user.is_authenticated and current_user.is_staff %}
+  <a class="btn btn-primary" href="{{ url_for('job_add') }}">＋ Thêm job mới</a>
+  {% endif %}
+</header>
+
+<form class="filter-bar" method="get">
+  <input type="text" name="q" placeholder="Tìm theo vị trí, công ty, kỹ năng…" value="{{ filters.q }}">
+
+  <select name="industry">
+    <option value="">Tất cả ngành</option>
+    {% for i in industries %}
+      <option value="{{ i }}" {{ 'selected' if filters.industry == i }}>{{ i }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="level">
+    <option value="">Mọi level</option>
+    {% for l in levels %}
+      <option value="{{ l }}" {{ 'selected' if filters.level == l }}>{{ l }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="location">
+    <option value="">Mọi địa điểm</option>
+    {% for loc in locations %}
+      <option value="{{ loc }}" {{ 'selected' if filters.location == loc }}>{{ loc }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status">
+    <option value="">Mọi trạng thái</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.q or filters.industry or filters.level or filters.location or filters.status %}
+    <a class="btn btn-text" href="{{ url_for('jobs_index') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ jobs|length }} / {{ total_jobs }} job phù hợp</p>
+
+{% if jobs %}
+<div class="job-grid">
+  {% for job in jobs %}
+  <article class="ticket">
+    <div class="ticket-stub">
+      <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
+      <span class="ticket-industry ind-{{ loop.index0 % 3 }}">{{ job.industry }}</span>
+      <span class="ticket-level">{{ job.level }}</span>
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-top">
+        <h3><a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.position }}</a></h3>
+        <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
+      </div>
+      <p class="ticket-company">{{ job.company }} · {{ job.location }}</p>
+      {% if job.skills %}
+      <div class="skill-row">
+        {% for sk in job.skills.split(',') %}
+          <span class="skill-tag">{{ sk.strip() }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="ticket-meta">
+        {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
+        {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
+        <span>Nguồn: {{ job.source or '—' }}</span>
+      </div>
+      {% if current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+        <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
+          {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
+        </button>
+      </form>
+      {% else %}
+      <a class="save-btn" href="{{ url_for('login') }}">🔖 Đăng nhập để lưu</a>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có job nào khớp bộ lọc.</p>
+  <a class="btn btn-primary" href="{{ url_for('job_add') }}">Thêm job đầu tiên</a>
+</div>
+{% endif %}
+
+{% endblock %}

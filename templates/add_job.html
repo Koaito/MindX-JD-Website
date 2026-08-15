@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Sửa job' if edit_id else 'Thêm job' }} — MindX Career Hub{% endblock %}
+{% block content %}
+
+<a class="back-link" href="{{ url_for('jobs_index') }}">← Danh sách job</a>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Việc làm</span>
+    <h1>{{ 'Sửa job' if edit_id else 'Thêm job mới' }}</h1>
+    <p class="lede">
+      {% if edit_id %}
+        Cập nhật thông tin job này.
+      {% else %}
+        Nhập thủ công khi không thu thập tự động được, hoặc bổ sung job vừa tìm được từ TopCV, LinkedIn, ITviec…
+      {% endif %}
+    </p>
+  </div>
+</header>
+
+<form class="form-card" method="post">
+  <div class="form-grid">
+
+    {% if not edit_id %}
+    {# Company CHỈ chọn được lúc TẠO job — backend không cho đổi company
+       của job đã tồn tại (PATCH /jobs/{id} không nhận company_id) #}
+    <label class="full">Công ty *
+      <select name="company_id" id="company_id_select" required onchange="document.getElementById('new_company_fields').style.display = this.value === '__new__' ? 'grid' : 'none'; document.getElementById('company_id_select').required = this.value !== '__new__';">
+        <option value="">— chọn công ty đã có —</option>
+        {% for c in companies %}<option value="{{ c.id }}">{{ c.company }}{% if c.city %} ({{ c.city }}){% endif %}</option>{% endfor %}
+        <option value="__new__">＋ Tạo công ty mới…</option>
+      </select>
+    </label>
+    <input type="hidden" name="company_mode" id="company_mode_field" value="existing">
+    <div id="new_company_fields" class="form-grid full" style="display:none; grid-column: 1 / -1;">
+      <label>Tên công ty mới *
+        <input type="text" name="new_company_name">
+      </label>
+      <label>Mã số thuế (nếu có — tránh tạo trùng công ty đã crawl)
+        <input type="text" name="new_company_tax_id">
+      </label>
+      <label>Website
+        <input type="url" name="new_company_website" placeholder="https://">
+      </label>
+      <label>Lĩnh vực
+        <input type="text" name="new_company_industry">
+      </label>
+      <label>Thành phố
+        <input type="text" name="new_company_city">
+      </label>
+    </div>
+    <script>
+      document.querySelector('form.form-card').addEventListener('submit', function() {
+        document.getElementById('company_mode_field').value =
+          document.getElementById('company_id_select').value === '__new__' ? 'new' : 'existing';
+      });
+    </script>
+    {% endif %}
+
+    <label>Vị trí tuyển dụng *
+      <input type="text" name="position" required value="{{ job.position if job else '' }}">
+    </label>
+    <label>Ngành *
+      <select name="industry" required>
+        {% for i in industries %}<option value="{{ i }}" {{ 'selected' if job and job.industry == i }}>{{ i }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Level
+      <select name="level">
+        <option value="">— chọn —</option>
+        {% for l in levels %}<option value="{{ l }}" {{ 'selected' if job and job.level == l }}>{{ l }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Địa điểm
+      <select name="location">
+        <option value="">— chọn —</option>
+        {% for loc in locations %}<option value="{{ loc }}" {{ 'selected' if job and job.location == loc }}>{{ loc }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Hình thức làm việc
+      <select name="work_type">
+        <option value="">— chọn —</option>
+        {% for w in work_types %}<option value="{{ w }}" {{ 'selected' if job and job.work_type == w }}>{{ w }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Loại lương
+      <select name="salary_type">
+        {% for st in salary_types %}<option value="{{ st }}" {{ 'selected' if job and job.get('salary_type') == st }}>{{ st }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Lương tối thiểu
+      <input type="number" name="salary_min" min="0" value="{{ job.salary_min if job else '' }}">
+    </label>
+    <label>Lương tối đa
+      <input type="number" name="salary_max" min="0" value="{{ job.salary_max if job else '' }}">
+    </label>
+    <label>Đơn vị tiền tệ
+      <select name="currency">
+        <option value="VNĐ" {{ 'selected' if not job or job.get('currency','VNĐ') == 'VNĐ' }}>VNĐ</option>
+        <option value="USD" {{ 'selected' if job and job.get('currency') == 'USD' }}>USD</option>
+      </select>
+    </label>
+    <label>Deadline
+      <input type="date" name="deadline" value="{{ job.deadline if job else '' }}">
+    </label>
+  </div>
+
+  <label class="full">Kỹ năng / công nghệ yêu cầu (cách nhau bởi dấu phẩy)
+    <input type="text" name="skills" placeholder="SQL, Python, Excel" value="{{ job.skills if job else '' }}">
+  </label>
+  <label class="full">Mô tả công việc
+    <textarea name="description" rows="3">{{ job.description if job else '' }}</textarea>
+  </label>
+  <label class="full">Yêu cầu ứng viên
+    <textarea name="requirements" rows="3">{{ job.requirements if job else '' }}</textarea>
+  </label>
+  <label class="full">Quyền lợi
+    <textarea name="benefits" rows="2">{{ job.benefits if job else '' }}</textarea>
+  </label>
+  {% if edit_id %}
+  <label class="full">Ghi chú của team SS
+    <textarea name="note" rows="2">{{ job.note if job else '' }}</textarea>
+  </label>
+  {% endif %}
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu job' }}</button>
+    <a class="btn btn-text" href="{{ url_for('job_detail', job_id=edit_id) if edit_id else url_for('jobs_index') }}">Hủy</a>
+  </div>
+</form>
+
+{% endblock %}

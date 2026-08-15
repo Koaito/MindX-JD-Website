@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Job đã lưu — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Học viên</span>
+    <h1>Job bạn đã lưu</h1>
+    <p class="lede">Danh sách job {{ current_user.full_name }} đã đánh dấu để theo dõi.</p>
+  </div>
+</header>
+
+{% if jobs %}
+<div class="job-grid">
+  {% for job in jobs %}
+  <article class="ticket">
+    <div class="ticket-stub">
+      <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
+      <span class="ticket-industry ind-{{ loop.index0 % 3 }}">{{ job.industry }}</span>
+      <span class="ticket-level">{{ job.level }}</span>
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-top">
+        <h3><a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.position }}</a></h3>
+        <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
+      </div>
+      <p class="ticket-company">{{ job.company }} · {{ job.location }}</p>
+      <div class="ticket-meta">
+        {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
+        {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
+      </div>
+      <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+        <button class="save-btn saved" type="submit">🔖 Bỏ lưu</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Bạn chưa lưu job nào.</p>
+  <a class="btn btn-primary" href="{{ url_for('jobs_index') }}">Khám phá job ngay</a>
+</div>
+{% endif %}
+
+{% endblock %}

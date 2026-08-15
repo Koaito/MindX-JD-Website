@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ company.company }} — MindX Career Hub{% endblock %}
+{% block content %}
+
+<a class="back-link" href="{{ url_for('companies_index') }}">← Danh sách công ty</a>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Doanh nghiệp</span>
+    <h1>{{ company.company }}</h1>
+    <p class="lede">
+      {{ company.industry or 'Chưa rõ lĩnh vực' }}{% if company.city %} · {{ company.city }}{% endif %}
+      {% if company.company_size %} · {{ company.company_size }} nhân sự{% endif %}
+    </p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('company_edit', company_id=company.id) }}">Sửa hồ sơ công ty</a>
+</header>
+
+<div class="detail-grid">
+  <div class="detail-main">
+    <section class="card">
+      <h4>Job đã đăng ({{ company.jobs|length if company.jobs else 0 }})</h4>
+      {% if company.jobs %}
+      <ul class="applicant-list">
+        {% for j in company.jobs %}
+        <li>
+          <a href="{{ url_for('job_detail', job_id=j.id) }}"><strong>{{ j.position }}</strong></a>
+          <span class="muted">{{ j.level }} · {{ j.location }} · {{ j.status }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Chưa có job nào của công ty này.</p>
+      {% endif %}
+      <a class="btn btn-ghost" href="{{ url_for('job_add') }}" style="margin-top: 8px;">＋ Thêm job cho công ty này</a>
+    </section>
+
+    <section class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h4>Người liên hệ HR ({{ contacts|length }})</h4>
+        <a class="btn btn-primary" href="{{ url_for('contact_add', company_id=company.id) }}">＋ Thêm người liên hệ</a>
+      </div>
+      {% if contacts %}
+      <div class="contact-table-wrap">
+        <table class="contact-table">
+          <thead>
+            <tr>
+              <th>Tên</th><th>Chức danh</th><th>Email</th><th>SĐT</th><th>Trạng thái</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in contacts %}
+            <tr {{ 'style=opacity:.5' if not c.is_active }}>
+              <td><strong>{{ c.contact_name }}</strong></td>
+              <td class="muted">{{ c.title or '—' }}</td>
+              <td class="muted">{{ c.email or '—' }}</td>
+              <td class="muted">{{ c.phone or '—' }}</td>
+              <td>
+                <form method="post" action="{{ url_for('contact_update_status', company_id=company.id, contact_id=c.id) }}" class="status-inline">
+                  <select name="status" onchange="this.form.submit()">
+                    {% for s in statuses %}
+                      <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+              <td>
+                <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
+                <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này?');" style="display:inline;">
+                  <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>Chưa có người liên hệ nào — thêm HR/hiring manager để bắt đầu theo dõi liên hệ.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="detail-side">
+    <section class="card">
+      <h4>Thông tin nhanh</h4>
+      <dl class="kv">
+        <dt>Mã số thuế</dt><dd>{{ company.tax_id or '—' }}</dd>
+        <dt>Website</dt><dd>{% if company.website %}<a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% else %}—{% endif %}</dd>
+        <dt>Fanpage</dt><dd>{% if company.fanpage %}<a href="{{ company.fanpage }}" target="_blank">Xem</a>{% else %}—{% endif %}</dd>
+        <dt>LinkedIn</dt><dd>{% if company.linkedin_company %}<a href="{{ company.linkedin_company }}" target="_blank">Xem</a>{% else %}—{% endif %}</dd>
+        <dt>Địa chỉ</dt><dd>{{ company.address or '—' }}</dd>
+        <dt>Ngày thêm</dt><dd>{{ company.date_collected|format_date }}</dd>
+      </dl>
+    </section>
+  </aside>
+</div>
+
+{% endblock %}
