@@ -145,6 +145,27 @@ def list_users(access_token: str) -> list:
     return _request("GET", "/auth/users", access_token=access_token)
 
 
+def create_user(access_token: str, full_name: str, email: str, role: str = "ss_team") -> dict:
+    """POST /auth/users (CHỈ admin gọi được, backend tự chặn 403 nếu
+    không phải admin). Mật khẩu TẠM do backend tự sinh, trả về ĐÚNG 1
+    LẦN trong response này ở field temp_password — không có cách nào
+    lấy lại sau, phải admin tự đưa cho người dùng ngay lúc này."""
+    return _request(
+        "POST", "/auth/users", access_token=access_token,
+        json={"full_name": full_name, "email": email, "role": role},
+    )
+
+
+def update_user_role(access_token: str, ss_user_id: str, role: str) -> dict:
+    """PATCH /auth/users/{id}/role (CHỈ admin gọi được). Backend tự chặn
+    admin tự đổi role chính mình (400) — không cần lặp lại check này ở
+    đây, chỉ cần flash thẳng message backend trả về nếu có."""
+    return _request(
+        "PATCH", f"/auth/users/{ss_user_id}/role", access_token=access_token,
+        json={"role": role},
+    )
+
+
 # ---------------------------------------------------------------------------
 # /me/... — ứng tuyển & lưu job của CHÍNH học viên đang đăng nhập
 # + GET /jobs/{id}/applications (staff xem ai đã ứng tuyển 1 job)

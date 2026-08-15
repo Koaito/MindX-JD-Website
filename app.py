@@ -70,6 +70,11 @@ SALARY_TYPES = list(db_data.SALARY_TYPE_MAP.values())
 
 CONTACT_STATUSES = list(db_data.CONTACT_STATUS_MAP.values())
 
+# Nhãn tiếng Việt cho 3 role backend hỗ trợ (user/ss_team/admin) — dùng
+# ở trang quản lý tài khoản team SS (staff_accounts.html) cho dropdown
+# đổi role và hiển thị. Thứ tự dict cũng là thứ tự hiện trong <select>.
+ROLE_LABELS = {"user": "Học viên", "ss_team": "Team SS", "admin": "Admin"}
+
 
 # Job/Contact/Company nằm ở backend Postgres (qua crawler_client.py, API
 # FastAPI). Ứng tuyển (JobApplication) và lưu job (SavedJob) trước đây
@@ -935,6 +940,96 @@ def dashboard():
         jobs_by_status=jobs_by_status, jobs_by_location=jobs_by_location,
         contacts_by_city=companies_by_city,
     )
+
+
+# ---------------------------------------------------------------------------
+# Quản lý tài khoản team SS (đọc: ss_team+, tạo/đổi role: admin-only —
+# backend tự chặn 403 nếu gọi sai quyền, ở đây check thêm để UI không
+# hiện nút/form vô ích cho người không có quyền bấm).
+#
+# Backend hiện KHÔNG có endpoint vô hiệu hoá/xoá tài khoản — trang này
+# vì vậy chỉ có 3 việc: xem danh sách, tạo mới (admin), đổi role (admin).
+# ---------------------------------------------------------------------------
+
+@app.route("/staff-accounts")
+@staff_required
+def staff_accounts():
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        users = backend_auth.list_users(access_token)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        users = []
+
+    # Mật khẩu tạm của tài khoản VỪA tạo (nếu có) — session.pop() để
+    # chỉ hiện đúng 1 lần, F5/quay lại trang sau đó sẽ không còn thấy.
+    new_account = session.pop("new_staff_account", None)
+
+    return render_template(
+        "staff_accounts.html", users=users, role_labels=ROLE_LABELS,
+        roles=list(ROLE_LABELS.keys()), new_account=new_account,
+    )
+
+
+@app.route("/staff-accounts/add", methods=["GET", "POST"])
+@staff_required
+def staff_account_add():
+    if current_user.role != "admin":
+        flash("Chỉ tài khoản admin mới tạo được tài khoản mới.", "error")
+        return redirect(url_for("staff_accounts"))
+
+    if request.method == "POST":
+        full_name = request.form.get("full_name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        role = request.form.get("role", "ss_team")
+
+        error = None
+        if not full_name or not email:
+            error = "Vui lòng điền đầy đủ họ tên và email."
+        elif role not in ROLE_LABELS:
+            error = "Role không hợp lệ."
+
+        if error:
+            flash(error, "error")
+            return render_template("staff_account_add.html", role_labels=ROLE_LABELS, form=request.form)
+
+        access_token, _ = _auth_tokens_from_session()
+        try:
+            created = backend_auth.create_user(access_token, full_name, email, role)
+        except BackendAuthError as exc:
+            flash(str(exc), "error")
+            return render_template("staff_account_add.html", role_labels=ROLE_LABELS, form=request.form)
+
+        session["new_staff_account"] = {
+            "full_name": created["full_name"],
+            "email": created["email"],
+            "role": created["role"],
+            "temp_password": created["temp_password"],
+        }
+        flash(f"Đã tạo tài khoản cho {full_name}.", "success")
+        return redirect(url_for("staff_accounts"))
+
+    return render_template("staff_account_add.html", role_labels=ROLE_LABELS, form={})
+
+
+@app.route("/staff-accounts/<string:ss_user_id>/role", methods=["POST"])
+@staff_required
+def staff_account_update_role(ss_user_id):
+    if current_user.role != "admin":
+        flash("Chỉ tài khoản admin mới đổi được role.", "error")
+        return redirect(url_for("staff_accounts"))
+
+    role = request.form.get("role", "")
+    if role not in ROLE_LABELS:
+        abort(400)
+
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        backend_auth.update_user_role(access_token, ss_user_id, role)
+        flash("Đã cập nhật role.", "success")
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("staff_accounts"))
 
 
 if __name__ == "__main__":

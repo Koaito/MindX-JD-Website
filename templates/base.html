@@ -41,6 +41,11 @@
       <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">
         <span class="nav-ic">◨</span> Dashboard
       </a>
+
+      <span class="nav-label">Quản trị</span>
+      <a href="{{ url_for('staff_accounts') }}" class="{{ 'active' if request.endpoint in ['staff_accounts','staff_account_add'] else '' }}">
+        <span class="nav-ic">🔑</span> Tài khoản team SS
+      </a>
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}

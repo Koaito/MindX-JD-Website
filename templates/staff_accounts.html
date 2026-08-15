@@ -4,20 +4,40 @@
 
 <header class="page-head">
   <div>
-    <span class="eyebrow">Career Hub / Team SS</span>
+    <span class="eyebrow">Career Hub / Quản trị</span>
     <h1>Tài khoản team SS</h1>
     <p class="lede">
-      Danh sách toàn bộ tài khoản đăng nhập qua backend (không gồm học viên).
-      Tài khoản mới được tạo thủ công qua backend (CLI/script) — trang này chỉ
-      dùng để xem và, nếu bạn là admin, nâng/hạ role cho tài khoản đã có sẵn.
+      Danh sách toàn bộ tài khoản đăng nhập qua backend (gồm cả học viên tự đăng ký).
+      Chỉ tài khoản <strong>admin</strong> mới tạo được tài khoản mới hoặc đổi role người khác.
     </p>
   </div>
+  {% if current_user.role == "admin" %}
+  <a class="btn btn-primary" href="{{ url_for('staff_account_add') }}">＋ Thêm tài khoản</a>
+  {% endif %}
 </header>
 
 {% if current_user.role != "admin" %}
 <div class="flash flash-error" style="margin-bottom: 16px;">
   Bạn đang xem ở chế độ chỉ đọc (role hiện tại: <strong>{{ current_user.role }}</strong>) —
-  chỉ tài khoản <strong>admin</strong> mới đổi được role của người khác.
+  chỉ tài khoản <strong>admin</strong> mới tạo tài khoản mới hoặc đổi role người khác.
+</div>
+{% endif %}
+
+{% if new_account %}
+<div class="card" style="border-color: var(--accent); margin-bottom: 20px;">
+  <h4>✅ Đã tạo tài khoản cho {{ new_account.full_name }}</h4>
+  <p style="margin-bottom: 12px;">
+    Gửi thông tin dưới đây cho {{ new_account.full_name }} qua kênh nội bộ (Slack/nói miệng)
+    — mật khẩu tạm <strong>chỉ hiện đúng 1 lần ở đây</strong>, tải lại trang là mất, không có cách lấy lại.
+  </p>
+  <div class="demo-hint">
+    Email: {{ new_account.email }}<br>
+    Role: {{ role_labels.get(new_account.role, new_account.role) }}<br>
+    Mật khẩu tạm: {{ new_account.temp_password }}
+  </div>
+  <p class="muted" style="margin-top: 10px; font-size: 12.5px;">
+    Tài khoản bắt buộc đổi mật khẩu ngay lần đăng nhập đầu tiên.
+  </p>
 </div>
 {% endif %}
 
@@ -42,13 +62,13 @@
         <td><strong>{{ u.full_name }}</strong></td>
         <td class="muted">{{ u.email }}</td>
         <td>
-          <span class="fit-chip">{{ u.role }}</span>
+          <span class="fit-chip">{{ role_labels.get(u.role, u.role) }}</span>
           {% if u.must_change_password %}
             <span class="muted">(chưa đổi mật khẩu tạm)</span>
           {% endif %}
         </td>
         <td>{{ "Đang hoạt động" if u.is_active else "Đã vô hiệu hoá" }}</td>
-        <td class="muted">{{ u.last_login_at or "Chưa từng đăng nhập" }}</td>
+        <td class="muted">{{ u.last_login_at | format_date("%d/%m/%Y %H:%M") if u.last_login_at else "Chưa từng đăng nhập" }}</td>
         {% if current_user.role == "admin" %}
         <td>
           {% if u.ss_user_id == current_user.id %}
@@ -56,8 +76,8 @@
           {% else %}
             <form method="post" action="{{ url_for('staff_account_update_role', ss_user_id=u.ss_user_id) }}" class="status-inline">
               <select name="role" onchange="this.form.submit()">
-                {% for r in role_hierarchy.keys() %}
-                  <option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ r }}</option>
+                {% for r in roles %}
+                  <option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ role_labels.get(r, r) }}</option>
                 {% endfor %}
               </select>
             </form>
