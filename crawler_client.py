@@ -257,7 +257,11 @@ def list_jobs(q="", industry="", level="", location="", status="", limit=200, of
 
 
 def count_jobs():
-    return len(list_jobs(limit=1000))
+    """Dùng field `total` backend trả sẵn trong response phân trang —
+    KHÔNG cố lấy limit=1000 rồi đếm len() (backend chặn limit tối đa
+    200, gửi 1000 sẽ bị 422 'Input should be less than or equal to 200')."""
+    data = _request("GET", "/jobs", params={"limit": 1}) or {}
+    return data.get("total", 0)
 
 
 def is_duplicate_candidate(job: dict) -> bool:
@@ -339,11 +343,26 @@ def list_companies(q="", city="", limit=200, offset=0):
 
 
 def count_companies():
-    return len(list_companies(limit=1000))
+    """Dùng field `total` backend trả sẵn — xem giải thích ở count_jobs()."""
+    data = _request("GET", "/companies", params={"limit": 1}) or {}
+    return data.get("total", 0)
 
 
 def list_company_cities():
-    return sorted({c["city"] for c in list_companies(limit=1000) if c["city"]})
+    """Cần liệt kê MỌI company để gom danh sách thành phố — backend giới
+    hạn tối đa 200 record/lần (limit<=200), nên lặp trang (offset) thay
+    vì gửi 1 lần limit=1000 (sẽ bị backend từ chối 422)."""
+    cities = set()
+    offset = 0
+    while True:
+        batch = list_companies(limit=200, offset=offset)
+        if not batch:
+            break
+        cities.update(c["city"] for c in batch if c["city"])
+        if len(batch) < 200:
+            break
+        offset += 200
+    return sorted(cities)
 
 
 def get_company(company_id):

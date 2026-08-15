@@ -813,7 +813,16 @@ def contact_delete(company_id, contact_id):
 def dashboard():
     try:
         jobs = db_data.list_jobs()
-        companies = db_data.list_companies(limit=1000)
+        companies = []
+        offset = 0
+        while True:
+            batch = db_data.list_companies(limit=200, offset=offset)
+            if not batch:
+                break
+            companies.extend(batch)
+            if len(batch) < 200:
+                break
+            offset += 200
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         jobs, companies = [], []
