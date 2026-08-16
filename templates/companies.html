@@ -45,6 +45,7 @@
         <th>Thành phố</th>
         <th>Quy mô</th>
         <th>Tiềm năng</th>
+        <th>Website</th>
         <th></th>
       </tr>
     </thead>
@@ -59,11 +60,15 @@
         <td class="muted">{{ c.company_size or '—' }}</td>
         <td><span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span></td>
         <td>
-          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem</a>
-          <a class="btn btn-text" href="{{ url_for('company_edit', company_id=c.id) }}">Sửa</a>
           {% if c.website %}
           <a class="btn btn-text" href="{{ c.website }}" target="_blank" rel="noopener">Website ↗</a>
+          {% else %}
+          <span class="muted">—</span>
           {% endif %}
+        </td>
+        <td>
+          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem</a>
+          <a class="btn btn-text" href="{{ url_for('company_edit', company_id=c.id) }}">Sửa</a>
         </td>
       </tr>
       {% endfor %}

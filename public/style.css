@@ -348,6 +348,7 @@ a { color: inherit; text-decoration: none; }
 /* ---------------- Buttons ---------------- */
 
 .btn {
+  display: inline-block;
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
