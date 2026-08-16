@@ -533,6 +533,11 @@ a { color: inherit; text-decoration: none; }
 .status-Chưa-xác-minh { background: var(--amber-soft); color: var(--amber); }
 .status-Đã-gửi-cho-học-viên { background: var(--blue-soft); color: var(--blue); }
 
+.potential-Cao { background: var(--teal-soft); color: var(--teal); }
+.potential-Trung-bình { background: var(--amber-soft); color: var(--amber); }
+.potential-Thấp { background: #F1EDF0; color: #8A6E80; }
+.potential-Chưa-đánh-giá { background: #EDEFEC; color: var(--muted); }
+
 /* ---------------- Contact table ---------------- */
 
 .contact-table-wrap {
@@ -580,9 +585,7 @@ a { color: inherit; text-decoration: none; }
   border-radius: 999px;
 }
 
-.fit-cao { background: var(--teal-soft); color: var(--teal); }
-.fit-trung-bình { background: var(--amber-soft); color: var(--amber); }
-.fit-thấp { background: #F1EDF0; color: #8A6E80; }
+
 
 .status-inline select {
   font-size: 12.5px;

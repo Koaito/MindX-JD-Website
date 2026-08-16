@@ -78,6 +78,7 @@ WORK_TYPES = list(db_data.WORK_TYPE_MAP.values())
 SALARY_TYPES = list(db_data.SALARY_TYPE_MAP.values())
 
 CONTACT_STATUSES = list(db_data.CONTACT_STATUS_MAP.values())
+PARTNERSHIP_POTENTIALS = list(db_data.PARTNERSHIP_POTENTIAL_MAP.values())
 
 # Số card/hàng mỗi trang cho danh sách job và công ty — 20 là điểm cân bằng
 # phổ biến ở các trang tuyển dụng (TopCV/VietnamWorks ~20-25, Indeed ~15,
@@ -850,10 +851,10 @@ def company_add():
             company = _call_authed(db_data.create_company, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_company.html", company=request.form)
+            return render_template("add_company.html", company=request.form, partnership_potentials=PARTNERSHIP_POTENTIALS)
         flash(f"Đã thêm công ty {company['company']}.", "success")
         return redirect(url_for("company_detail", company_id=company["id"]))
-    return render_template("add_company.html", company=None)
+    return render_template("add_company.html", company=None, partnership_potentials=PARTNERSHIP_POTENTIALS)
 
 
 @app.route("/companies/<string:company_id>/edit", methods=["GET", "POST"])
@@ -867,10 +868,10 @@ def company_edit(company_id):
             updated = _call_authed(db_data.update_company, company_id, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_company.html", company=company, edit_id=company_id)
+            return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS)
         flash(f"Đã cập nhật công ty {updated['company']}.", "success")
         return redirect(url_for("company_detail", company_id=company_id))
-    return render_template("add_company.html", company=company, edit_id=company_id)
+    return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS)
 
 
 @app.route("/companies/<string:company_id>")

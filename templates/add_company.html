@@ -41,6 +41,11 @@
     <label>Link LinkedIn công ty
       <input type="url" name="linkedin_company" placeholder="https://linkedin.com/company/..." value="{{ company.linkedin_company if company else '' }}">
     </label>
+    <label>Tiềm năng hợp tác
+      <select name="partnership_potential">
+        {% for p in partnership_potentials %}<option value="{{ p }}" {{ 'selected' if company and company.partnership_potential == p }}>{{ p }}</option>{% endfor %}
+      </select>
+    </label>
   </div>
 
   <div class="form-actions">

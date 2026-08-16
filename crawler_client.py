@@ -124,6 +124,14 @@ CONTACT_STATUS_MAP = {"UNCONTACTED": "Chưa liên hệ", "EMAIL_SENT": "Đã g�
                        "RESPONDED": "Đã phản hồi", "IN_PARTNERSHIP": "Đang hợp tác"}
 CONTACT_STATUS_MAP_REV = {v: k for k, v in CONTACT_STATUS_MAP.items()}
 
+# Đánh giá tiềm năng hợp tác của company — staff tự chấm tay qua UI add/edit
+# company (xem sql/migration_add_partnership_potential.sql). UNVERIFIED =
+# "chưa đánh giá" (mặc định), KHÔNG phải "tiềm năng thấp" — cố ý đặt tên
+# tiếng Việt khác hẳn "Thấp" để staff không nhầm 2 khái niệm này.
+PARTNERSHIP_POTENTIAL_MAP = {"HIGH": "Cao", "MEDIUM": "Trung bình",
+                              "LOW": "Thấp", "UNVERIFIED": "Chưa đánh giá"}
+PARTNERSHIP_POTENTIAL_MAP_REV = {v: k for k, v in PARTNERSHIP_POTENTIAL_MAP.items()}
+
 
 def _to_int(value):
     try:
@@ -196,6 +204,10 @@ def _normalize_company(raw: dict) -> dict | None:
         "city": raw.get("province_name") or "",
         "fanpage": raw.get("fanpage_url") or "",
         "linkedin_company": raw.get("linkedin_url") or "",
+        "partnership_potential": PARTNERSHIP_POTENTIAL_MAP.get(
+            raw.get("partnership_potential") or "UNVERIFIED",
+            raw.get("partnership_potential") or "UNVERIFIED",
+        ),
         "date_collected": raw.get("created_at"),
         "jobs": jobs,
     }
@@ -407,6 +419,9 @@ def _company_payload(form):
         "province_name": (form.get("city") or "").strip() or None,
         "fanpage_url": (form.get("fanpage") or "").strip() or None,
         "linkedin_url": (form.get("linkedin_company") or "").strip() or None,
+        "partnership_potential": PARTNERSHIP_POTENTIAL_MAP_REV.get(
+            form.get("partnership_potential", ""), form.get("partnership_potential") or None,
+        ),
     }
 
 
