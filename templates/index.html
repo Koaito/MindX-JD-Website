@@ -38,10 +38,11 @@
   </select>
 
   <select name="status">
-    <option value="">Mọi trạng thái</option>
-    {% for s in statuses %}
+    <option value="" {{ 'selected' if not filters.status }}>Đang tuyển</option>
+    {% for s in statuses if s != 'Đang tuyển' %}
       <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
     {% endfor %}
+    <option value="ALL" {{ 'selected' if filters.status == 'ALL' }}>Tất cả trạng thái</option>
   </select>
 
   <button type="submit" class="btn btn-ghost">Lọc</button>

@@ -600,15 +600,29 @@ def jobs_index():
     status = request.args.get("status", "")
     page, per_page = _paginate_args(JOBS_PER_PAGE)
 
+    # `status` rỗng (chưa chọn gì trong dropdown, kể cả lần đầu vào
+    # trang) TRƯỚC ĐÂY = không lọc gì -> trộn lẫn cả job OPEN/EXPIRED/
+    # CLOSED trong danh sách mặc định, học viên phải tự chọn "Đang
+    # tuyển" mới lọc sạch được job chết. Giờ đổi mặc định: rỗng ->
+    # ngầm hiểu là OPEN (đang tuyển) — muốn xem EXPIRED/CLOSED phải chủ
+    # động chọn dropdown, kể cả chọn hẳn "Tất cả trạng thái" (option
+    # riêng, value="ALL") nếu muốn xem trộn lẫn như hành vi cũ.
+    if status == "ALL":
+        status_filter = ""  # value đặc biệt -> KHÔNG lọc gì, xem cả 3 trạng thái
+    elif status:
+        status_filter = status  # đã chọn cụ thể (Hết hạn/Đã đóng/Đang tuyển)
+    else:
+        status_filter = "Đang tuyển"  # mặc định khi chưa chọn gì
+
     try:
-        total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status)
+        total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status_filter)
         total_pages = max(1, math.ceil(total_jobs / per_page))
         # Trang xin quá số trang thực tế (vd sửa tay ?page=999) -> kéo về
         # trang cuối cùng có dữ liệu thay vì trả trang trắng.
         if page > total_pages:
             page = total_pages
         jobs = db_data.list_jobs(
-            q=q, industry=industry, level=level, location=location, status=status,
+            q=q, industry=industry, level=level, location=location, status=status_filter,
             limit=per_page, offset=(page - 1) * per_page,
         )
     except CrawlerAPIError as exc:
