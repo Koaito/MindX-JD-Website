@@ -37,10 +37,12 @@
 
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h4>Người liên hệ HR ({{ contacts|length }})</h4>
+        <h4>Người liên hệ HR ({{ contacts|selectattr('is_active')|list|length }})</h4>
         <a class="btn btn-primary" href="{{ url_for('contact_add', company_id=company.id) }}">＋ Thêm người liên hệ</a>
       </div>
-      {% if contacts %}
+      {% set active_contacts = contacts|selectattr('is_active')|list %}
+      {% set inactive_contacts = contacts|rejectattr('is_active')|list %}
+      {% if active_contacts %}
       <div class="contact-table-wrap">
         <table class="contact-table">
           <thead>
@@ -49,8 +51,8 @@
             </tr>
           </thead>
           <tbody>
-            {% for c in contacts %}
-            <tr {{ 'style=opacity:.5' if not c.is_active }}>
+            {% for c in active_contacts %}
+            <tr>
               <td><strong>{{ c.contact_name }}</strong></td>
               <td class="muted">{{ c.title or '—' }}</td>
               <td class="muted">{{ c.email or '—' }}</td>
@@ -66,7 +68,7 @@
               </td>
               <td>
                 <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
-                <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này?');" style="display:inline;">
+                <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở mục Đã xoá bên dưới, chưa mất hẳn dữ liệu)');" style="display:inline;">
                   <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
                 </form>
               </td>
@@ -77,6 +79,36 @@
       </div>
       {% else %}
       <p>Chưa có người liên hệ nào — thêm HR/hiring manager để bắt đầu theo dõi liên hệ.</p>
+      {% endif %}
+
+      {% if inactive_contacts %}
+      <details style="margin-top: 16px;">
+        <summary class="muted" style="cursor: pointer;">Đã xoá ({{ inactive_contacts|length }})</summary>
+        <div class="contact-table-wrap" style="margin-top: 8px;">
+          <table class="contact-table">
+            <thead>
+              <tr>
+                <th>Tên</th><th>Chức danh</th><th>Email</th><th>SĐT</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in inactive_contacts %}
+              <tr style="opacity:.5">
+                <td><strong>{{ c.contact_name }}</strong></td>
+                <td class="muted">{{ c.title or '—' }}</td>
+                <td class="muted">{{ c.email or '—' }}</td>
+                <td class="muted">{{ c.phone or '—' }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('contact_hard_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá HẲN người liên hệ này? Không thể khôi phục lại được.');" style="display:inline;">
+                    <button class="btn btn-text btn-danger-text" type="submit">Xoá hẳn</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
       {% endif %}
     </section>
   </div>

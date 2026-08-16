@@ -954,6 +954,21 @@ def contact_delete(company_id, contact_id):
     return redirect(url_for("company_detail", company_id=company_id))
 
 
+@app.route("/companies/<string:company_id>/contacts/<string:contact_id>/hard-delete", methods=["POST"])
+@staff_required
+def contact_hard_delete(company_id, contact_id):
+    """Xoá THẬT (mới 08/2026) — chỉ hiện nút này ở UI cho contact ĐÃ
+    xoá mềm (xem company_detail.html), nhưng backend vẫn tự kiểm tra
+    lại (409 nếu chưa soft-delete / còn job_contact_links) nên route
+    này AN TOÀN dù staff cố tình gọi thẳng URL bỏ qua UI."""
+    try:
+        _call_authed(db_data.hard_delete_contact, company_id, contact_id)
+        flash("Đã xoá hẳn người liên hệ (không thể khôi phục).", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("company_detail", company_id=company_id))
+
+
 def _list_all_companies():
     """Lấy TOÀN BỘ công ty (không chỉ 1 trang) — backend giới hạn cứng
     limit tối đa 200/lần gọi (api/routers/companies.py: le=200), nên

@@ -442,7 +442,16 @@ def update_company(access_token, company_id, form) -> dict:
 # ---------------------------------------------------------------------------
 
 def list_contacts(access_token, company_id):
-    raw = _request("GET", f"/companies/{company_id}/contacts", access_token=access_token) or []
+    """include_inactive=True (mới 08/2026) — lấy CẢ contact đã soft-delete
+    (is_active=false), không chỉ contact đang active. Trước đây gọi mặc
+    định include_inactive=False -> contact đã xoá mềm biến mất hoàn
+    toàn khỏi UI dù DB vẫn giữ, staff không có cách nào xem lại / xoá
+    cứng chúng. Template (company_detail.html) tự tách 2 nhóm dựa vào
+    field is_active trong dict trả về."""
+    raw = _request(
+        "GET", f"/companies/{company_id}/contacts",
+        access_token=access_token, params={"include_inactive": "true"},
+    ) or []
     return [_normalize_contact(c) for c in raw]
 
 
@@ -491,3 +500,13 @@ def update_contact_status(access_token, company_id, contact_id, status_vn):
 def delete_contact(access_token, company_id, contact_id):
     """Xoá MỀM phía backend (is_active=false) — không phải xoá thật."""
     _request("DELETE", f"/companies/{company_id}/contacts/{contact_id}", access_token=access_token)
+
+
+def hard_delete_contact(access_token, company_id, contact_id):
+    """Xoá THẬT (mới 08/2026) — chỉ dùng làm bước 2, backend chặn 409
+    nếu contact CHƯA soft-delete trước (xem thiết kế 2 bước ở lịch sử
+    trao đổi), hoặc 409 nếu contact đang có job_contact_links (đã từng
+    gắn với job cụ thể — xoá sẽ mất lịch sử liên hệ theo job đó).
+    CrawlerAPIError từ 2 case 409 này có message đủ rõ để flash thẳng
+    cho staff, không cần app.py tự diễn giải thêm."""
+    _request("DELETE", f"/companies/{company_id}/contacts/{contact_id}/hard", access_token=access_token)
