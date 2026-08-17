@@ -357,6 +357,20 @@ def resend_verification():
     return redirect(url_for("login"))
 
 
+@app.route("/verify-email")
+def verify_email():
+    """Backend redirect(302) tới đây SAU KHI đã tự xử lý token (xem
+    GET /auth/verify-email phía api/routers/auth.py — route đó KHÔNG
+    còn trả HTML tĩnh nữa, chỉ redirect kèm ?status=...). Route này
+    KHÔNG tự gọi backend gì cả, chỉ đọc status trên URL rồi hiển thị
+    đúng theme của site — mọi việc xác thực/hết hạn/hợp lệ đã xong ở
+    phía backend trước khi tới đây."""
+    status = request.args.get("status", "invalid")
+    if status not in ("success", "expired", "invalid"):
+        status = "invalid"
+    return render_template("verify_email.html", status=status)
+
+
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     """Bước 1/2 của luồng quên mật khẩu — nhập email, gọi POST

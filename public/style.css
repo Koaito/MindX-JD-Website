@@ -243,6 +243,27 @@ a { color: inherit; text-decoration: none; }
 
 .auth-foot a { color: var(--accent); font-weight: 600; }
 
+/* Trang /verify-email (templates/verify_email.html) — cùng khung
+   .auth-card như login/register/forgot-password, chỉ thêm 1 icon tròn
+   báo trạng thái. Màu dùng lại đúng 3 token đã có sẵn cho status-chip
+   (teal=tốt, amber=cảnh báo, accent=lỗi), không thêm màu mới. */
+.verify-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.verify-icon-success { background: var(--teal-soft); color: var(--teal); }
+.verify-icon-warn { background: var(--amber-soft); color: var(--amber); }
+.verify-icon-error { background: var(--accent-soft); color: #C4401F; }
+
 .demo-hint {
   margin-top: 16px;
   font-size: 12px;

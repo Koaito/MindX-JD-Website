@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Xác thực email — MindX Career Hub{% endblock %}
+{% block content %}
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <span class="eyebrow">Career Hub / Tài khoản</span>
+
+    {% if status == 'success' %}
+      <div class="verify-icon verify-icon-success">✓</div>
+      <h1>Xác thực thành công</h1>
+      <p class="lede">Tài khoản của bạn đã được kích hoạt — bây giờ có thể đăng nhập để lưu job yêu thích và ứng tuyển.</p>
+      <a class="btn btn-primary btn-block" href="{{ url_for('login') }}">Đăng nhập ngay</a>
+
+    {% elif status == 'expired' %}
+      <div class="verify-icon verify-icon-warn">!</div>
+      <h1>Liên kết đã hết hạn</h1>
+      <p class="lede">Link xác thực chỉ có hiệu lực trong 24 giờ. Nhập email đã đăng ký để nhận link mới.</p>
+      <form method="post" action="{{ url_for('resend_verification') }}">
+        <label>Email
+          <input type="email" name="email" required autofocus>
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Gửi lại email xác thực</button>
+      </form>
+
+    {% else %}
+      <div class="verify-icon verify-icon-error">✕</div>
+      <h1>Liên kết không hợp lệ</h1>
+      <p class="lede">Liên kết đã được dùng trước đó hoặc không đúng. Thử đăng ký lại hoặc xin gửi lại email xác thực từ trang đăng nhập.</p>
+      <a class="btn btn-ghost btn-block" href="{{ url_for('register') }}">Đăng ký lại</a>
+    {% endif %}
+
+    <p class="auth-foot">Đã xác thực rồi? <a href="{{ url_for('login') }}">Quay lại đăng nhập</a></p>
+  </div>
+</div>
+
+{% endblock %}
