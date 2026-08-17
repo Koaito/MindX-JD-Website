@@ -614,6 +614,29 @@ a { color: inherit; text-decoration: none; }
   background: #FBFCFB;
 }
 
+/* Chặn 2 nút hành động trong 1 ô (Xem/Sửa, Sửa/Xóa) xuống dòng —
+   nguyên nhân THẬT SỰ khiến hàng bảng bị kéo cao gấp đôi (2 dòng nút
+   xếp chồng), kéo theo border dòng bị đẩy xa khỏi nội dung ngắn ở các
+   cột khác trong CÙNG hàng (xem lịch sử trao đổi 08/2026 — không phải
+   lỗi vertical-align, đó chỉ là bước fix trước; đây mới là nguồn gây
+   hàng cao/thấp không đều). table-layout mặc định (auto) sẽ tự co hẹp
+   CÁC CỘT KHÁC (vốn chấp nhận xuống dòng) để nhường đủ chỗ ngang cho
+   cột này luôn nằm 1 dòng. */
+.actions-cell { white-space: nowrap; }
+
+/* Cột "Đổi role" ở staff_accounts.html: dropdown + nút Vô hiệu hoá là
+   2 <form> riêng (submit tới 2 route khác nhau) nên không gộp làm 1
+   nút được, nhưng vẫn cho NẰM CẠNH NHAU thay vì xếp chồng dọc — lý do
+   tương tự .actions-cell, hàng nào có cột này càng xếp chồng càng cao
+   vọt so với hàng khác. flex-wrap: wrap chỉ để phòng hộ ở màn hình rất
+   hẹp, bình thường luôn đủ chỗ nằm 1 hàng. */
+.role-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ---------------- Detail page ---------------- */
 
 .detail-grid {
