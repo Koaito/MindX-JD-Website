@@ -408,22 +408,9 @@ a { color: inherit; text-decoration: none; }
 /* ---------------- Job ticket cards ---------------- */
 
 .job-grid {
-  /* Flexbox thay vì CSS Grid — lý do: Grid auto-fill/auto-fit chỉ khác
-     nhau khi có CỘT TRỐNG TOÀN BỘ lưới (vd tổng job ít hơn số cột màn
-     hình cho phép); khi hàng CUỐI thiếu card (vd 20 job, màn hình xếp
-     được 3 cột -> hàng cuối dư 2), Grid vẫn để hở vì track cột dùng
-     chung dọc suốt lưới, không co giãn riêng theo từng hàng — auto-fill
-     hay auto-fit đều bị y hệt. Flexbox + flex-wrap giải quyết đúng gốc:
-     card hàng cuối tự giãn (flex-grow) lấp đầy chiều rộng còn lại, dù
-     dư bao nhiêu card cũng không để hở, ở mọi kích cỡ màn hình. */
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
-}
-
-.job-grid > .ticket {
-  flex: 1 1 320px;
-  min-width: 320px;
 }
 
 .ticket {
@@ -506,21 +493,6 @@ a { color: inherit; text-decoration: none; }
   border-top: 1px solid var(--border);
 }
 
-.ticket-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.ticket-actions .btn-text {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 12px;
-}
-
 .status-chip {
   font-size: 11px;
   font-weight: 600;
@@ -565,16 +537,7 @@ a { color: inherit; text-decoration: none; }
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
   font-size: 13.5px;
-  /* Đổi từ "middle" sang "top" (chốt vấn đề gốc, xem lịch sử trao đổi
-     08/2026): các hàng trong bảng này có chiều cao KHÔNG đều nhau (badge
-     dài xuống 2 dòng, cột "Đổi role" hàng thì 1 dòng chữ hàng thì 2 phần
-     tử xếp chồng dropdown+nút...). "middle" canh mọi cột theo TÂM của
-     hàng cao nhất -> hàng nào nội dung ngắn bị trôi lệch giữa khoảng
-     trống so với hàng bên cạnh, nhìn như so le. "top" neo mọi cột về
-     cùng 1 mép trên cố định bất kể hàng cao hay thấp -> luôn thẳng
-     hàng, đúng kiểu bảng dữ liệu chuẩn (Notion/Airtable/GitHub đều dùng
-     top-align cho lý do này). */
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .contact-table tr:last-child td { border-bottom: none; }
@@ -593,15 +556,6 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
-  /* Chặn xuống dòng (vd "Chưa đánh giá" 3 từ trong cột hẹp) — badge
-     xuống dòng là 1 trong các nguyên nhân khiến hàng bảng cao thấp
-     không đều, xem lịch sử trao đổi 08/2026 (vertical-align: top ở
-     .contact-table td xử lý PHẦN CÒN LẠI của vấn đề, cái này chặn bớt
-     1 nguồn gây lệch chiều cao ngay từ đầu). Table dùng table-layout
-     mặc định (auto) nên cột sẽ tự nới rộng theo đúng bề ngang cần
-     thiết khi chữ không được phép xuống dòng, không cần set width tay.
-  */
-  white-space: nowrap;
 }
 
 
@@ -792,90 +746,4 @@ a { color: inherit; text-decoration: none; }
   .form-grid { grid-template-columns: 1fr; }
   .kpi-row { grid-template-columns: 1fr 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
-}
-
-/* ---------------- Pagination (danh sách job / công ty) ---------------- */
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 28px;
-}
-
-.page-btn {
-  display: inline-block;
-  padding: 8px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-a.page-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.page-btn.is-disabled {
-  color: var(--muted);
-  border-color: var(--border);
-  opacity: 0.55;
-  cursor: default;
-}
-
-.page-status {
-  color: var(--ink-soft);
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 110px;
-  text-align: center;
-}
-
-.page-jump {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 8px;
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
-}
-
-.page-jump-label {
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.page-jump-input {
-  width: 56px;
-  padding: 7px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 14px;
-  text-align: center;
-}
-
-.page-jump-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.page-jump-btn {
-  padding: 7px 14px;
-  cursor: pointer;
-}
-
-@media (max-width: 480px) {
-  .pagination { gap: 10px; flex-wrap: wrap; }
-  .page-status { min-width: auto; }
-  .page-jump { margin-left: 0; padding-left: 0; border-left: none; width: 100%; justify-content: center; }
 }
