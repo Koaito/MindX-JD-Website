@@ -36,6 +36,9 @@
       <a href="{{ url_for('company_add') }}" class="{{ 'active' if request.endpoint == 'company_add' else '' }}">
         <span class="nav-ic">＋</span> Thêm công ty
       </a>
+      <a href="{{ url_for('contacts_index') }}" class="{{ 'active' if request.endpoint == 'contacts_index' else '' }}">
+        <span class="nav-ic">☎</span> Danh sách contact
+      </a>
 
       <span class="nav-label">Báo cáo</span>
       <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">

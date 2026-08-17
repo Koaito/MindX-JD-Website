@@ -216,7 +216,7 @@ def _normalize_company(raw: dict) -> dict | None:
 def _normalize_contact(raw: dict) -> dict | None:
     if raw is None:
         return None
-    return {
+    result = {
         "id": raw.get("contact_id"),
         "company_id": raw.get("company_id"),
         "contact_name": raw.get("contact_name") or "",
@@ -231,6 +231,13 @@ def _normalize_contact(raw: dict) -> dict | None:
         "status_raw": raw.get("contact_status") or "UNCONTACTED",
         "is_active": raw.get("is_active", True),
     }
+    # company_name chỉ có mặt khi raw đến từ GET /contacts (danh sách gộp
+    # mọi công ty, xem list_all_contacts() bên dưới) — GET
+    # /companies/{company_id}/contacts (list_contacts()) không trả field
+    # này vì company_id đã biết sẵn từ path.
+    if "company_name" in raw:
+        result["company_name"] = raw.get("company_name") or ""
+    return result
 
 
 def _build_parsed_content(form) -> dict:
@@ -440,6 +447,32 @@ def update_company(access_token, company_id, form) -> dict:
 # ---------------------------------------------------------------------------
 # Company contacts (người liên hệ HR) — bảng CON của company, route riêng
 # ---------------------------------------------------------------------------
+
+def list_all_contacts(access_token, *, status_raw="", company_id="", search=""):
+    """GET /contacts — danh sách contact GỘP TẤT CẢ công ty (khác
+    list_contacts() bên dưới chỉ trả theo 1 company_id), kèm company_name.
+    Dùng cho trang "Danh sách contact" tổng hợp (route /contacts,
+    contacts_index() trong app.py).
+
+    Mặc định CHỈ trả contact đang active (include_inactive=False) — khác
+    list_contacts() (luôn include_inactive=True) vì trang tổng hợp này là
+    view "đang cần làm việc", không phải nơi coi lịch sử đã xoá mềm; muốn
+    xem lại contact đã xoá vẫn vào đúng company_detail.html như cũ.
+
+    status_raw: mã tiếng Anh (vd 'UNCONTACTED'), KHÔNG phải nhãn tiếng
+    Việt hiển thị trên UI — app.py tự tra CONTACT_STATUS_MAP_REV trước
+    khi gọi hàm này, giống pattern update_contact_status().
+    """
+    params = {}
+    if status_raw:
+        params["contact_status"] = status_raw
+    if company_id:
+        params["company_id"] = company_id
+    if search:
+        params["search"] = search
+    raw = _request("GET", "/contacts", access_token=access_token, params=params) or []
+    return [_normalize_contact(c) for c in raw]
+
 
 def list_contacts(access_token, company_id):
     """include_inactive=True (mới 08/2026) — lấy CẢ contact đã soft-delete

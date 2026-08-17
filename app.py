@@ -906,6 +906,45 @@ def company_detail(company_id):
 
 
 # ---------------------------------------------------------------------------
+# Danh sách contact tổng hợp (GỘP TẤT CẢ công ty) — khác company_detail.html
+# vốn chỉ hiện contact của 1 company_id. Route riêng /contacts, KHÔNG lồng
+# dưới /companies/<company_id>/... như các route contact CRUD bên dưới.
+# ---------------------------------------------------------------------------
+
+@app.route("/contacts")
+@staff_required
+def contacts_index():
+    status_vn = request.args.get("status", "")
+    company_id = request.args.get("company_id", "")
+    search = request.args.get("q", "").strip()
+
+    status_raw = db_data.CONTACT_STATUS_MAP_REV.get(status_vn, "") if status_vn else ""
+
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        contacts = db_data.list_all_contacts(
+            access_token, status_raw=status_raw, company_id=company_id, search=search,
+        )
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        contacts = []
+
+    try:
+        # limit cao để dropdown filter có đủ công ty chọn — trang này
+        # không phân trang company như companies_index() vì chỉ dùng cho
+        # dropdown, không phải danh sách chính hiển thị.
+        companies = db_data.list_companies(limit=500)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        companies = []
+
+    return render_template(
+        "contacts.html", contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
+        filters={"status": status_vn, "company_id": company_id, "q": search},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Contact routes (người liên hệ HR — bảng con của company, route
 # /companies/<company_id>/contacts/... khớp đúng backend)
 # ---------------------------------------------------------------------------
