@@ -632,7 +632,7 @@ a { color: inherit; text-decoration: none; }
    hẹp, bình thường luôn đủ chỗ nằm 1 hàng. */
 .role-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   flex-wrap: wrap;
 }
