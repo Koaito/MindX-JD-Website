@@ -380,6 +380,32 @@ def list_companies(q="", city="", limit=200, offset=0):
     return [_normalize_company(c) for c in items]
 
 
+# Backend GET /companies giới hạn limit tối đa 200/lần gọi (api/routers/
+# companies.py: Query(50, ge=1, le=200)) — gọi list_companies(limit=500)
+# thẳng sẽ bị 422 "Input should be less than or equal to 200". Dùng hàm
+# này ở bất kỳ đâu cần TOÀN BỘ danh sách công ty một lần (vd đổ vào
+# dropdown chọn công ty) thay vì bịa 1 con số limit lớn hơn 200.
+_MAX_COMPANIES_PAGE = 200
+_ALL_COMPANIES_SAFETY_CAP = 5000  # chặn vòng lặp vô hạn nếu backend trả total sai
+
+
+def list_all_companies():
+    """Lấy TOÀN BỘ công ty bằng cách tự phân trang theo đúng limit tối đa
+    backend cho phép (200/lần), gộp lại thành 1 list — không lọc q/city vì
+    chỉ dùng cho dropdown chọn công ty (cần thấy hết, không phải danh sách
+    chính đang được filter)."""
+    total = count_companies()
+    all_items: list = []
+    offset = 0
+    while offset < total and offset < _ALL_COMPANIES_SAFETY_CAP:
+        page = list_companies(limit=_MAX_COMPANIES_PAGE, offset=offset)
+        if not page:
+            break
+        all_items.extend(page)
+        offset += _MAX_COMPANIES_PAGE
+    return all_items
+
+
 def count_companies(q="", city=""):
     """Dùng field `total` backend trả sẵn — xem giải thích ở count_jobs().
     Nhận đúng bộ filter như list_companies() để khớp danh sách đang lọc."""

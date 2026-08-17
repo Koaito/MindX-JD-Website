@@ -2,11 +2,13 @@
 {% block title %}{{ 'Sửa người liên hệ' if edit_id else 'Thêm người liên hệ' }} — MindX Career Hub{% endblock %}
 {% block content %}
 
-<a class="back-link" href="{{ url_for('company_detail', company_id=company.id) }}">← {{ company.company }}</a>
+<a class="back-link" href="{{ url_for('company_detail', company_id=company.id) if company else url_for('contacts_index') }}">
+  ← {{ company.company if company else 'Danh sách contact' }}
+</a>
 
 <header class="page-head">
   <div>
-    <span class="eyebrow">Career Hub / Doanh nghiệp / {{ company.company }}</span>
+    <span class="eyebrow">Career Hub / Doanh nghiệp{% if company %} / {{ company.company }}{% endif %}</span>
     <h1>{{ 'Sửa người liên hệ' if edit_id else 'Thêm người liên hệ mới' }}</h1>
     <p class="lede">Chỉ nhập thông tin công khai (email/SĐT công việc công khai, LinkedIn công khai…). Không thu thập dữ liệu cá nhân nhạy cảm.</p>
   </div>
@@ -14,6 +16,16 @@
 
 <form class="form-card" method="post">
   <div class="form-grid">
+    {% if not company %}
+    <label>Công ty *
+      <select name="company_id" required>
+        <option value="">— Chọn công ty —</option>
+        {% for c in companies %}
+          <option value="{{ c.id }}" {{ 'selected' if contact and contact.get('company_id') == c.id }}>{{ c.company }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
     <label>Tên người liên hệ *
       <input type="text" name="contact_name" required value="{{ contact.contact_name if contact else '' }}">
     </label>
@@ -36,7 +48,7 @@
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu người liên hệ' }}</button>
-    <a class="btn btn-text" href="{{ url_for('company_detail', company_id=company.id) }}">Hủy</a>
+    <a class="btn btn-text" href="{{ url_for('company_detail', company_id=company.id) if company else url_for('contacts_index') }}">Hủy</a>
   </div>
 </form>
 

@@ -930,10 +930,10 @@ def contacts_index():
         contacts = []
 
     try:
-        # limit cao để dropdown filter có đủ công ty chọn — trang này
-        # không phân trang company như companies_index() vì chỉ dùng cho
-        # dropdown, không phải danh sách chính hiển thị.
-        companies = db_data.list_companies(limit=500)
+        # list_all_companies() tự phân trang dưới giới hạn 200/lần của
+        # backend — trước đây gọi list_companies(limit=500) thẳng bị lỗi
+        # 422 "Input should be less than or equal to 200".
+        companies = db_data.list_all_companies()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         companies = []
@@ -948,6 +948,37 @@ def contacts_index():
 # Contact routes (người liên hệ HR — bảng con của company, route
 # /companies/<company_id>/contacts/... khớp đúng backend)
 # ---------------------------------------------------------------------------
+
+@app.route("/contacts/add", methods=["GET", "POST"])
+@staff_required
+def contact_add_any():
+    """Thêm contact KHÔNG cần vào từng trang company trước — chọn công ty
+    ngay trên form qua dropdown. Khác contact_add(company_id) bên dưới
+    (route cũ /companies/<company_id>/contacts/add, company đã biết sẵn
+    từ URL, dùng khi thêm contact ngay trong lúc đang xem 1 company cụ
+    thể) — 2 route cùng tồn tại, phục vụ 2 lối vào khác nhau, không thay
+    thế nhau."""
+    try:
+        companies = db_data.list_all_companies()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        companies = []
+
+    if request.method == "POST":
+        company_id = request.form.get("company_id", "")
+        if not company_id:
+            flash("Cần chọn công ty.", "error")
+            return render_template("add_contact.html", company=None, companies=companies, contact=request.form)
+        try:
+            _call_authed(db_data.create_contact, company_id, request.form)
+        except CrawlerAPIError as exc:
+            flash(str(exc), "error")
+            return render_template("add_contact.html", company=None, companies=companies, contact=request.form)
+        flash("Đã thêm người liên hệ.", "success")
+        return redirect(url_for("contacts_index"))
+
+    return render_template("add_contact.html", company=None, companies=companies, contact=None)
+
 
 @app.route("/companies/<string:company_id>/contacts/add", methods=["GET", "POST"])
 @staff_required
