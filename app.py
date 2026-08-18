@@ -76,6 +76,7 @@ LOCATIONS = ["Hà Nội", "TP.HCM", "Remote", "Hybrid"]
 JOB_STATUSES = list(db_data.JOB_STATUS_MAP.values())
 WORK_TYPES = list(db_data.WORK_TYPE_MAP.values())
 SALARY_TYPES = list(db_data.SALARY_TYPE_MAP.values())
+SALARY_PERIODS = list(db_data.SALARY_PERIOD_MAP.values())
 
 CONTACT_STATUSES = list(db_data.CONTACT_STATUS_MAP.values())
 PARTNERSHIP_POTENTIALS = list(db_data.PARTNERSHIP_POTENTIAL_MAP.values())
@@ -746,7 +747,7 @@ def job_add():
                 companies = []
             return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                                     locations=LOCATIONS, statuses=JOB_STATUSES,
-                                    work_types=WORK_TYPES, salary_types=SALARY_TYPES,
+                                    work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                                     companies=companies, job=request.form)
         flash(f"Đã thêm job “{job['position']}” tại {job['company']}.", "success")
         return redirect(url_for("jobs_index"))
@@ -762,7 +763,7 @@ def job_add():
         companies = []
     return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                             locations=LOCATIONS, statuses=JOB_STATUSES,
-                            work_types=WORK_TYPES, salary_types=SALARY_TYPES,
+                            work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                             companies=companies, job=None)
 
 
@@ -779,13 +780,13 @@ def job_edit(job_id):
             flash(str(exc), "error")
             return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                                     locations=LOCATIONS, statuses=JOB_STATUSES,
-                                    work_types=WORK_TYPES, salary_types=SALARY_TYPES,
+                                    work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                                     job=job, edit_id=job_id)
         flash(f"Đã cập nhật job “{updated['position']}”.", "success")
         return redirect(url_for("job_detail", job_id=job_id))
     return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
                             locations=LOCATIONS, statuses=JOB_STATUSES,
-                            work_types=WORK_TYPES, salary_types=SALARY_TYPES,
+                            work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                             job=job, edit_id=job_id)
 
 

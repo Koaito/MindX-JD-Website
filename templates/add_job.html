@@ -88,6 +88,16 @@
         {% for st in salary_types %}<option value="{{ st }}" {{ 'selected' if job and job.get('salary_type') == st }}>{{ st }}</option>{% endfor %}
       </select>
     </label>
+    <label>Chu kỳ trả lương
+      {# Mới thêm 08/2026 — trước đây KHÔNG có ô này, mọi job nhập tay
+         lương NĂM qua form bị backend mặc định hiểu nhầm là lương/tháng
+         (sai lệch 12 lần), y hệt bug từng gặp ở job crawl "/năm". Mặc
+         định "Tháng" khi tạo mới, khớp hành vi cũ trước khi có field
+         này (không đổi hành vi cho job không đụng tới ô này). #}
+      <select name="salary_period">
+        {% for sp in salary_periods %}<option value="{{ sp }}" {{ 'selected' if (job and job.get('salary_period') == sp) or (not job and sp == 'Tháng') }}>{{ sp }}</option>{% endfor %}
+      </select>
+    </label>
     <label>Lương tối thiểu
       <input type="number" name="salary_min" min="0" value="{{ job.salary_min if job else '' }}">
     </label>

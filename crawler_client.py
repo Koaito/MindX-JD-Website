@@ -120,6 +120,16 @@ SALARY_TYPE_MAP = {"RANGE": "Khoảng lương", "EXACT": "Mức cố định", "
                     "STARTING_FROM": "Từ", "NEGOTIABLE": "Thỏa thuận", "UNPAID": "Không lương"}
 SALARY_TYPE_MAP_REV = {v: k for k, v in SALARY_TYPE_MAP.items()}
 
+# salary_period (thêm 08/2026, xem sql/migration_add_salary_period.sql
+# + README.md mục "Bug đã sửa: lương '/năm' bị hiểu nhầm thành
+# lương/tháng"): chu kỳ trả lương của salary_min/salary_max. Trước đây
+# form KHÔNG có ô này -> mọi job nhập tay lương NĂM qua web bị backend
+# mặc định hiểu nhầm là lương/tháng (sai lệch 12 lần), y hệt bug từng
+# gặp ở job crawl. "MONTH" là default cả ở đây lẫn ở backend, khớp hành
+# vi trước khi có field này (không làm lệch job cũ).
+SALARY_PERIOD_MAP = {"MONTH": "Tháng", "YEAR": "Năm"}
+SALARY_PERIOD_MAP_REV = {v: k for k, v in SALARY_PERIOD_MAP.items()}
+
 CONTACT_STATUS_MAP = {"UNCONTACTED": "Chưa liên hệ", "EMAIL_SENT": "Đã gửi email",
                        "RESPONDED": "Đã phản hồi", "IN_PARTNERSHIP": "Đang hợp tác"}
 CONTACT_STATUS_MAP_REV = {v: k for k, v in CONTACT_STATUS_MAP.items()}
@@ -148,11 +158,16 @@ def _fmt_salary(raw: dict) -> str:
     smin, smax = raw.get("salary_min"), raw.get("salary_max")
     stype = SALARY_TYPE_MAP.get(raw.get("salary_type") or "", raw.get("salary_type") or "")
     currency = raw.get("currency") or "VNĐ"
+    # Chỉ gắn "/ Năm" khi period = YEAR — period = MONTH (mặc định, đa số
+    # job) KHÔNG hiện "/ Tháng" để đỡ rối, khớp cách các trang tuyển dụng
+    # (TopCV, VietnamWorks...) vẫn hay bỏ ngỏ "/tháng" nhưng LUÔN ghi rõ
+    # "/năm" vì đó là trường hợp cần lưu ý (xem README bug salary_period).
+    period_suffix = " / Năm" if (raw.get("salary_period") or "MONTH") == "YEAR" else ""
     if not smin and not smax:
         return stype or "Thỏa thuận"
     if smin and smax:
-        return f"{smin:,.0f} - {smax:,.0f} {currency} ({stype})".strip()
-    return f"{(smin or smax):,.0f} {currency} ({stype})".strip()
+        return f"{smin:,.0f} - {smax:,.0f} {currency}{period_suffix} ({stype})".strip()
+    return f"{(smin or smax):,.0f} {currency}{period_suffix} ({stype})".strip()
 
 
 def _normalize_job(raw: dict) -> dict | None:
@@ -178,6 +193,8 @@ def _normalize_job(raw: dict) -> dict | None:
         "salary_max": raw.get("salary_max"),
         "salary_type": SALARY_TYPE_MAP.get(raw.get("salary_type") or "", raw.get("salary_type") or ""),
         "salary_type_raw": raw.get("salary_type") or "NEGOTIABLE",
+        "salary_period": SALARY_PERIOD_MAP.get(raw.get("salary_period") or "MONTH", raw.get("salary_period") or "MONTH"),
+        "salary_period_raw": raw.get("salary_period") or "MONTH",
         "currency": raw.get("currency") or "VNĐ",
         "benefits": parsed.get("perks") or "",
         "deadline": raw.get("deadline"),
@@ -327,6 +344,7 @@ def create_job(access_token, form, company_id) -> dict:
         "salary_min": _to_int(form.get("salary_min")),
         "salary_max": _to_int(form.get("salary_max")),
         "salary_type": SALARY_TYPE_MAP_REV.get(form.get("salary_type", ""), form.get("salary_type") or "NEGOTIABLE"),
+        "salary_period": SALARY_PERIOD_MAP_REV.get(form.get("salary_period", ""), form.get("salary_period") or "MONTH"),
         "deadline": form.get("deadline") or None,
     }
     parsed = _build_parsed_content(form)
@@ -347,6 +365,7 @@ def update_job(access_token, job_id, form) -> dict:
         "salary_min": _to_int(form.get("salary_min")),
         "salary_max": _to_int(form.get("salary_max")),
         "salary_type": SALARY_TYPE_MAP_REV.get(form.get("salary_type", ""), form.get("salary_type") or "NEGOTIABLE"),
+        "salary_period": SALARY_PERIOD_MAP_REV.get(form.get("salary_period", ""), form.get("salary_period") or "MONTH"),
         "deadline": form.get("deadline") or None,
         "ss_team_notes": (form.get("note") or "").strip() or None,
     }
