@@ -15,18 +15,22 @@
   gap: 16px;
 }
 
-/* Scoped to the main /viec-lam listing page only (templates/index.html) —
-   intentionally NOT touching the shared .job-grid rule above, which is
-   also used by my_applications.html and saved_jobs.html. Those pages keep
-   their original auto-fit/320px behavior untouched. This modifier just
-   caps the main listing at 3 columns on wide screens to match the
-   requested layout, without affecting the other two pages. */
+/* Column count is intentionally NOT pinned to a fixed number at any
+   breakpoint (no "3 columns above 1100px" rule) — auto-fit lets the
+   browser decide 1/2/3/4+ columns purely from available width vs each
+   card's minmax(). That means the "how many cards short is the last
+   row, and how much should they stretch to fill it" question can't be
+   answered in CSS alone (CSS has no way to read auto-fit's own resolved
+   column count). That part is handled by JS instead — see
+   fillLastJobGridRow() in public/app.js, which measures the grid's
+   actual computed column count at runtime (on load + resize) and sets
+   grid-column-end: span N directly on however many trailing cards are
+   short, for however many columns are actually showing right now. This
+   keeps the layout correct at every viewport width without hardcoding
+   breakpoints here that would need to be kept in sync with a column
+   count decided by auto-fit. */
 .job-grid.job-grid-3col {
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-}
-
-@media (min-width: 1100px) {
-  .job-grid.job-grid-3col { grid-template-columns: repeat(3, 1fr); }
 }
 
 .ticket {

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Test last-row fill</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+  .test-block { margin-bottom: 50px; }
+  .test-block h2 { font-size: 14px; font-family: monospace; }
+  .resizable {
+    resize: horizontal;
+    overflow: auto;
+    border: 2px dashed #888;
+    padding: 16px;
+    min-width: 300px;
+    max-width: 100%;
+  }
+  .ticket { min-height: 60px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+</style>
+<link rel="stylesheet" href="public/style.css">
+</head>
+<body>
+
+<div class="test-block">
+  <h2>5 cards (thường dư 2 khi 3 cột) — kéo cạnh phải ô để đổi bề rộng</h2>
+  <div class="resizable">
+    <div class="job-grid job-grid-3col" id="g1">
+      <article class="ticket">1</article>
+      <article class="ticket">2</article>
+      <article class="ticket">3</article>
+      <article class="ticket">4</article>
+      <article class="ticket">5</article>
+    </div>
+  </div>
+</div>
+
+<div class="test-block">
+  <h2>7 cards (dư 1 khi 3 cột, dư 1 khi 2 cột, dư 3 khi 4 cột)</h2>
+  <div class="resizable">
+    <div class="job-grid job-grid-3col" id="g2">
+      <article class="ticket">1</article>
+      <article class="ticket">2</article>
+      <article class="ticket">3</article>
+      <article class="ticket">4</article>
+      <article class="ticket">5</article>
+      <article class="ticket">6</article>
+      <article class="ticket">7</article>
+    </div>
+  </div>
+</div>
+
+<div class="test-block">
+  <h2>20 cards (trường hợp thật: JOBS_PER_PAGE=20)</h2>
+  <div class="resizable" style="width: 1200px;">
+    <div class="job-grid job-grid-3col" id="g3"></div>
+  </div>
+</div>
+
+<div class="test-block">
+  <h2>1 card duy nhất (phải full width)</h2>
+  <div class="resizable" style="width: 1200px;">
+    <div class="job-grid job-grid-3col" id="g4">
+      <article class="ticket">1</article>
+    </div>
+  </div>
+</div>
+
+<script>
+  var g3 = document.getElementById('g3');
+  for (var i = 1; i <= 20; i++) {
+    var el = document.createElement('article');
+    el.className = 'ticket';
+    el.textContent = i;
+    g3.appendChild(el);
+  }
+</script>
+<script src="public/app.js"></script>
+<!-- Mở file này trực tiếp bằng "Live Server" hoặc `python3 -m http.server` trong thư mục public/ để CSS/JS load đúng. Xóa file này sau khi test xong, không phải 1 phần của app thật. -->
+</body>
+</html>

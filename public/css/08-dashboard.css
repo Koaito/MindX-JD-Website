@@ -7,11 +7,26 @@
    shared @media block in 10-pagination-responsive.css — check there too
    if changing behavior below ~900px. */
 
+/* auto-fit + a per-card max-width (not just minmax's min) is what makes
+   this actually look "full width" on ultra-wide screens: without the cap,
+   auto-fit's 1fr tracks stretch each card to fill 100% of .content-full's
+   now-unbounded width, so 5 cards each balloon into a huge slab with
+   giant empty padding — same underlying width, but reads as "not
+   stretched" because nothing scales to fill the space sensibly. Capping
+   each card's own width and letting the row wrap/space itself instead
+   is what matches the 3-per-row job grid's "fills the row, doesn't
+   balloon" feel. */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 260px));
   gap: 14px;
   margin-bottom: 22px;
+  /* Without justify-content, a grid with max-width'd tracks (260px cap
+     above) leaves its leftover row space as one dead gap on the right,
+     stuck flush-left — same "wasted right-side space" complaint as the
+     job grid, just on a different axis. This spreads that leftover
+     space evenly between/around the cards instead. */
+  justify-content: space-between;
 }
 
 .kpi-card {
