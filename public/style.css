@@ -83,14 +83,18 @@ html.sidebar-collapsed .brand { justify-content: center; }
 html.sidebar-collapsed .auth-box { justify-content: center; }
 html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-left: 6px; padding-right: 6px; }
 
-/* Toggle button (« / ») pinned to the bottom of the sidebar. */
+/* Toggle button (« / ») pinned to the top of the sidebar, right below
+   the MX brand mark — always inside the sidebar's visible viewport-height
+   area, unlike the bottom of .sidebar-foot which can get clipped by
+   `.sidebar { overflow: hidden }` once a longer (logged-in) nav list
+   pushes total content past 100vh. */
 .sidebar-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   width: 100%;
-  margin-top: 12px;
+  margin-bottom: 20px;
   padding: 8px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.12);

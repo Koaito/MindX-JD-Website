@@ -31,6 +31,11 @@
       </div>
     </div>
 
+    <button type="button" class="sidebar-toggle" id="sidebarToggle" title="Thu gọn / mở rộng sidebar">
+      <span class="sidebar-toggle-ic" id="sidebarToggleIc">«</span>
+      <span class="nav-text" id="sidebarToggleLabel">Thu gọn</span>
+    </button>
+
     <nav class="nav">
       <span class="nav-label">Việc làm</span>
       <a href="{{ url_for('jobs_index') }}" class="{{ 'active' if request.endpoint in ['jobs_index','job_detail'] else '' }}" title="Danh sách job">
@@ -62,7 +67,7 @@
 
       <span class="nav-label">Quản trị</span>
       <a href="{{ url_for('staff_accounts') }}" class="{{ 'active' if request.endpoint in ['staff_accounts','staff_account_add'] else '' }}" title="Tài khoản team SS">
-        <span class="nav-ic">👥︎</span> <span class="nav-text">Tài khoản team SS</span>
+        <span class="nav-ic">👥</span> <span class="nav-text">Tài khoản team SS</span>
       </a>
       {% endif %}
 
@@ -95,10 +100,6 @@
         <a class="btn btn-primary btn-block" href="{{ url_for('login') }}" title="Đăng nhập"><span class="btn-text-label">Đăng nhập</span></a>
         <a class="btn btn-ghost btn-block" href="{{ url_for('register') }}" title="Đăng ký"><span class="btn-text-label">Đăng ký</span></a>
       {% endif %}
-      <button type="button" class="sidebar-toggle" id="sidebarToggle" title="Thu gọn / mở rộng sidebar">
-        <span class="sidebar-toggle-ic" id="sidebarToggleIc">«</span>
-        <span class="nav-text" id="sidebarToggleLabel">Thu gọn</span>
-      </button>
     </div>
   </aside>
 
