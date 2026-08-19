@@ -30,7 +30,7 @@
    breakpoints here that would need to be kept in sync with a column
    count decided by auto-fit. */
 .job-grid.job-grid-3col {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 .ticket {
