@@ -407,8 +407,13 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
 /* ---------------- Content ---------------- */
 
 .content {
-  padding: 40px 48px 64px;
-  max-width: 1180px;
+  padding: 40px 56px 64px;
+  /* Was 1180px — on wide/ultrawide screens that left huge empty gutters
+     on both sides of the content column (reported: "2 bên trống quá
+     nhiều"). Raised so content fills far more of the available width;
+     still capped (rather than 100%) so grids/cards don't stretch to an
+     unreadable/absurd width on very large monitors. */
+  max-width: 1600px;
   /* Centers the content column within the available space — as the
      sidebar collapses/expands and that space changes, content re-centers
      automatically instead of staying pinned to the left edge. */
@@ -769,7 +774,13 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
-  max-width: 820px;
+  /* Was 820px, a second (narrower) cap stacked inside the already-capped
+     .content — on wide screens this doubled up the empty side margins
+     specifically on form pages (add job/company/contact...). Widened so
+     the form fills most of .content's width; still capped well below
+     .content's 1600px so a 2-column .form-grid row doesn't stretch each
+     input into an awkwardly long, hard-to-scan text box. */
+  max-width: 1040px;
   /* Card has a max-width narrower than .content, so without auto
      margins it sits flush-left with a large empty gap on the right. */
   margin-left: auto;
