@@ -1,0 +1,73 @@
+/* ---------------- Contact table ---------------- */
+/* Used by: templates/contacts.html, company_detail.html (applicant/CRM
+   tables). Independent of the job-cards grid in 04 — safe to restyle
+   the table without touching job listing pages. */
+
+.contact-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.contact-table { width: 100%; border-collapse: collapse; }
+
+.contact-table th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 12px 14px;
+  background: #FAFBFA;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.contact-table tr:last-child td { border-bottom: none; }
+
+/* Standalone cell values (e.g. <td class="muted">) keep the table's normal font size,
+   so they line up with sibling cells regardless of content length ("—" vs long text). */
+.contact-table td.muted,
+.contact-table td span.muted:only-child { color: var(--muted); }
+
+/* A muted line stacked under a heading (e.g. company name + industry) stays small/blocky. */
+.contact-table td strong + .muted { display: block; font-size: 11.5px; color: var(--muted); }
+
+.note-row td {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  background: #FBFCFB;
+  padding: 8px 14px 12px;
+}
+
+.fit-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+/* Give the "Tiềm năng" column enough room for its widest chip
+   (Chưa đánh giá) so it never has to wrap and get clipped. */
+.col-potential { min-width: 110px; }
+
+
+
+.status-inline select {
+  font-size: 12.5px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  box-sizing: border-box;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+

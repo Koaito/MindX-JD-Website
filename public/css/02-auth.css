@@ -1,0 +1,150 @@
+/* ---------------- Auth pages ---------------- */
+/* Used by: login.html, register.html, forgot_password.html,
+   reset_password.html, change_password.html, verify_email.html.
+   .save-btn / .applicant-list / .access-note here are also reused on
+   job/company detail and saved-jobs pages — check 04/05/06 before
+   renaming any of those three. */
+
+.auth-shell {
+  max-width: 420px;
+  margin: 40px auto;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+}
+
+.auth-card h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0 0 6px;
+}
+
+.auth-card .lede { margin-bottom: 22px; }
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.auth-card input, .auth-card select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+}
+
+.auth-card .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Grid tracks default to min-width:auto, so a wide input/select can
+   overflow its own 1fr column and visually stick out past the card edge. */
+.auth-card .two-col > label { min-width: 0; }
+.auth-card input, .auth-card select { width: 100%; }
+
+.auth-foot {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.auth-foot a { color: var(--accent); font-weight: 600; }
+
+/* Trang /verify-email (templates/verify_email.html) — cùng khung
+   .auth-card như login/register/forgot-password, chỉ thêm 1 icon tròn
+   báo trạng thái. Màu dùng lại đúng 3 token đã có sẵn cho status-chip
+   (teal=tốt, amber=cảnh báo, accent=lỗi), không thêm màu mới. */
+.verify-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.verify-icon-success { background: var(--teal-soft); color: var(--teal); }
+.verify-icon-warn { background: var(--amber-soft); color: var(--amber); }
+.verify-icon-error { background: var(--accent-soft); color: #C4401F; }
+
+.demo-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  background: #F5F7F5;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+}
+
+.save-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.save-btn.saved {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #C4401F;
+  font-weight: 600;
+}
+
+.applicant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.applicant-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.applicant-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.applicant-list .muted { font-size: 12px; color: var(--muted); }
+
+.access-note {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  color: var(--ink-soft);
+}
+

@@ -1,0 +1,78 @@
+/* ---------------- Forms ---------------- */
+/* Used by: templates/add_job.html, add_company.html, add_contact.html,
+   staff_account_add.html (any page rendering .form-card). Independent
+   of 02-auth.css even though both style <input>/<select> — auth pages
+   use .auth-card, these use .form-card, so the two never collide. */
+
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  /* Was 820px, a second (narrower) cap stacked inside the already-capped
+     .content — on wide screens this doubled up the empty side margins
+     specifically on form pages (add job/company/contact...). Widened so
+     the form fills most of .content's width; still capped well below
+     .content's 1600px so a 2-column .form-grid row doesn't stretch each
+     input into an awkwardly long, hard-to-scan text box. */
+  max-width: 1040px;
+  /* Card has a max-width narrower than .content, so without auto
+     margins it sits flush-left with a large empty gap on the right. */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.form-section {
+  font-family: var(--font-display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin: 22px 0 12px;
+}
+.form-section:first-child { margin-top: 0; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+}
+
+/* Same overflow fix as .two-col above: a <select> with a long option
+   (company name) can overflow its 1fr column and stick out past the
+   card edge instead of wrapping/truncating within it. */
+.form-grid > label { min-width: 0; }
+.form-card input, .form-card select, .form-card textarea { width: 100%; }
+
+.form-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.form-card label.full { grid-column: 1 / -1; margin-top: 14px; }
+.form-card label.checkbox-label { flex-direction: row; align-items: center; gap: 8px; }
+
+.form-card input, .form-card select, .form-card textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+}
+
+.form-card textarea { resize: vertical; }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+

@@ -1,0 +1,63 @@
+/* ---------------- Dashboard ---------------- */
+/* Used by: templates/dashboard.html only (Career Hub / Báo cáo page) —
+   .kpi-row (the 5 top stat cards) and .chart-grid/.bar-row (the "Job
+   theo ngành/level/địa điểm/trạng thái" panels). Safe to change the KPI
+   card column count or chart layout here without touching any other
+   page. Note: .kpi-row's own responsive column count is also set in the
+   shared @media block in 10-pagination-responsive.css — check there too
+   if changing behavior below ~900px. */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-num {
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: var(--accent);
+}
+
+.kpi-label { font-size: 12.5px; color: var(--ink-soft); }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+}
+
+.bar-label { color: var(--ink-soft); }
+
+.bar-track {
+  height: 9px;
+  background: #EFF2F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.bar-fill-alt { background: var(--teal); }
+
+.bar-value { font-family: var(--font-mono); text-align: right; color: var(--muted); }
+

@@ -1,0 +1,60 @@
+/* ---------------- Misc ---------------- */
+/* Used by: every page — .empty-state ("no results" panels), .flash-*
+   (server-rendered flash messages), and .toast-* (async JS feedback
+   from public/app.js after save/unsave actions). */
+
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.flash-stack { margin-bottom: 16px; }
+
+.flash {
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+}
+
+.flash-success { background: var(--teal-soft); color: var(--teal); border: 1px solid #BFE5DD; }
+
+/* Was previously missing entirely — error flashes (e.g. "Team SS
+   accounts can't save jobs") had no styling and blended in unstyled. */
+.flash-error { background: #FBE7E4; color: #B23A22; border: 1px solid #F2C9C1; }
+
+/* ---------------- Toasts (async save/unsave feedback, see app.js) ---------------- */
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+  max-width: 320px;
+}
+
+.toast {
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(16, 30, 26, 0.14);
+  border: 1px solid transparent;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast-success { background: var(--teal-soft); color: var(--teal); border-color: #BFE5DD; }
+.toast-error { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

@@ -1,0 +1,54 @@
+/* Used by: every page (base.html). Only global CSS variables, the CSS
+   reset, <body>, <a>, and the top-level .shell grid live here — nothing
+   page-specific. Change a --variable and it affects the whole site by
+   design; don't add component-specific rules to this file. */
+:root {
+  --bg: #EEF2F0;
+  --surface: #FFFFFF;
+  --ink: #101E1A;
+  --ink-soft: #52625C;
+  --muted: #8A968F;
+  --border: #DCE4DF;
+  --accent: #FF5A36;
+  --accent-soft: #FFE6DC;
+  --teal: #0F766E;
+  --teal-soft: #D9F0EB;
+  --amber: #B9790A;
+  --amber-soft: #FBEBD0;
+  --blue: #2454B8;
+  --blue-soft: #E1E9FA;
+  --radius: 14px;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --sidebar-width: 248px;
+}
+
+/* Set by the anti-FOUC script in base.html (before first paint) when the
+   user's last choice, read from localStorage, was "collapsed" — keeps
+   the sidebar from flashing wide then snapping narrow on reload. */
+html.sidebar-collapsed {
+  --sidebar-width: 76px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
+  transition: grid-template-columns 0.18s ease;
+}
+

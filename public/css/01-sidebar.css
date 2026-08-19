@@ -1,0 +1,213 @@
+/* ---------------- Sidebar ---------------- */
+/* Used by: every page (base.html renders .sidebar in the shell). Safe to
+   edit for nav/branding changes; won't affect page content areas. */
+
+.sidebar {
+  background: var(--ink);
+  color: #EAF2EF;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  transition: padding 0.18s ease;
+}
+
+html.sidebar-collapsed .sidebar {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Text that disappears when the sidebar is collapsed — icons stay. */
+html.sidebar-collapsed .nav-label,
+html.sidebar-collapsed .nav-text,
+html.sidebar-collapsed .brand-text,
+html.sidebar-collapsed .auth-info,
+html.sidebar-collapsed .sidebar-foot .btn-block .btn-text-label,
+html.sidebar-collapsed .auth-box-guest p {
+  display: none;
+}
+
+html.sidebar-collapsed .nav a { justify-content: center; }
+html.sidebar-collapsed .brand { justify-content: center; }
+html.sidebar-collapsed .auth-box { justify-content: center; }
+html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-left: 6px; padding-right: 6px; }
+
+/* Toggle button (« / ») pinned to the top of the sidebar, right below
+   the MX brand mark — always inside the sidebar's visible viewport-height
+   area, unlike the bottom of .sidebar-foot which can get clipped by
+   `.sidebar { overflow: hidden }` once a longer (logged-in) nav list
+   pushes total content past 100vh. */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 26px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: #9FB0AA;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover { background: rgba(255,255,255,0.06); color: #EAF2EF; }
+.sidebar-toggle-ic { font-size: 13px; line-height: 1; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-shrink: 0;
+}
+
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #10120C;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.brand-text strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.brand-text span {
+  font-size: 12px;
+  color: #9FB0AA;
+}
+
+/* flex: 1 lets .nav claim exactly the leftover space between the fixed
+   top block (brand + toggle) and the fixed bottom block (.sidebar-foot),
+   and overflow-y: auto scrolls ONLY the nav list when it doesn't fit —
+   instead of the whole flex column overflowing past .sidebar's 100vh and
+   getting silently clipped by `overflow: hidden` (which is what made the
+   toggle button, and then the logout button, "disappear" after login).
+   This also future-proofs the sidebar: any new nav links or footer
+   buttons added later just extend the scrollable middle section — they
+   can never overlap or push .sidebar-foot off-screen again. */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.18) transparent;
+}
+
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+
+.nav-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7C8D87;
+  margin: 18px 10px 6px;
+}
+
+.nav-label:first-child { margin-top: 0; }
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  color: #C9D6D1;
+}
+
+.nav a:hover { background: rgba(255,255,255,0.06); }
+
+.nav a.active {
+  background: var(--accent);
+  color: #14150F;
+  font-weight: 600;
+}
+
+.nav-ic { width: 18px; text-align: center; opacity: 0.85; }
+
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+
+.sidebar-foot p {
+  font-size: 12px;
+  color: #8A9C95;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+
+.stat-pill { display: none; }
+
+.auth-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #16130E;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.auth-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.auth-info strong { font-size: 13px; color: #EAF2EF; }
+.auth-info span { font-size: 11px; color: #8FA29B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth-box-guest p {
+  font-size: 12.5px;
+  color: #9FB0AA;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.btn-block { display: block; width: 100%; text-align: center; margin-bottom: 8px; }
+.btn-block:last-child { margin-bottom: 0; }
+

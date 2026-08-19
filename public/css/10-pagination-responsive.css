@@ -1,0 +1,105 @@
+/* ---------------- Phân trang (templates/_pagination.html) ---------------- */
+/* Used by: any page that {% include "_pagination.html" %} (job listing,
+   contacts, etc). The @media (max-width: 900px) block at the bottom of
+   this file is SHARED/GLOBAL — it also collapses the sidebar, detail
+   grid, form grid, kpi-row and chart-grid for small screens. It's kept
+   here (not duplicated per-file) so there's one single source of truth
+   for the mobile breakpoint; if you add a new grid elsewhere that also
+   needs to collapse on mobile, add its rule to THIS block rather than
+   creating a second @media (max-width: 900px) in another file. */
+/* Trước đây KHÔNG có rule nào cho toàn bộ nhóm class .pagination/.page-*
+   -> các link/span/input/button con render theo layout mặc định của
+   trình duyệt, dính sát nhau trên 1 dòng, ô nhập "Tới trang" bé xíu theo
+   kích thước mặc định của <input type="number"> — đúng lỗi đã thấy trên
+   UI thật (08/2026). */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page-btn:hover { border-color: var(--ink); }
+
+.page-btn.is-disabled {
+  color: var(--muted);
+  cursor: default;
+  background: #F5F7F5;
+}
+.page-btn.is-disabled:hover { border-color: var(--border); }
+
+.page-status {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+}
+
+.page-jump-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.page-jump-input {
+  width: 56px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.page-jump-btn {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .content { padding: 24px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
+  /* Sidebar collapse doesn't apply once .shell drops to a single column —
+     always show full nav text/labels below the breakpoint. */
+  html.sidebar-collapsed .nav-label,
+  html.sidebar-collapsed .nav-text,
+  html.sidebar-collapsed .brand-text,
+  html.sidebar-collapsed .auth-info,
+  html.sidebar-collapsed .auth-box-guest p {
+    display: initial;
+  }
+  html.sidebar-collapsed .nav a,
+  html.sidebar-collapsed .brand,
+  html.sidebar-collapsed .auth-box { justify-content: flex-start; }
+}

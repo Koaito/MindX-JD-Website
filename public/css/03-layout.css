@@ -1,0 +1,128 @@
+/* ---------------- Content ---------------- */
+/* Used by: every page — the .content wrapper, .page-head header, .btn-*
+   button variants, and .filter-bar. Shared building blocks: a button
+   style change here affects buttons everywhere. For a page-specific
+   button/filter tweak, add a scoped modifier class instead of editing
+   the base .btn/.filter-bar rules. */
+
+.content {
+  padding: 40px 56px 64px;
+  /* Was 1180px — on wide/ultrawide screens that left huge empty gutters
+     on both sides of the content column (reported: "2 bên trống quá
+     nhiều"). Raised so content fills far more of the available width;
+     still capped (rather than 100%) so grids/cards don't stretch to an
+     unreadable/absurd width on very large monitors. */
+  max-width: 1600px;
+  /* Centers the content column within the available space — as the
+     sidebar collapses/expands and that space changes, content re-centers
+     automatically instead of staying pinned to the left edge. */
+  margin: 0 auto;
+}
+
+/* Opt-in per page via {% block content_class %}content-full{% endblock %}
+   (see base.html) — for pages made almost entirely of grids (job cards,
+   KPI/report cards) rather than paragraph text, capping width doesn't
+   help readability, so these are allowed to fill the entire available
+   space next to the sidebar instead of stopping at 1600px. */
+.content.content-full {
+  max-width: none;
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.page-head h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  margin: 8px 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  color: var(--ink-soft);
+  max-width: 640px;
+  margin: 0;
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+
+.back-link:hover { color: var(--accent); }
+
+/* ---------------- Buttons ---------------- */
+
+.btn {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary { background: var(--accent); color: #16130E; }
+.btn-primary:hover { background: #E64D28; }
+
+.btn-ghost { background: var(--surface); border-color: var(--border); color: var(--ink); }
+.btn-ghost:hover { border-color: var(--ink); }
+
+.btn-text { background: none; color: var(--ink-soft); padding: 10px 6px; }
+.btn-text:hover { color: var(--accent); }
+
+.btn-danger { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
+.btn-danger-text { color: #B23A22; }
+
+/* ---------------- Filter bar ---------------- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px;
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+
+.filter-bar input[type="text"] {
+  flex: 1 1 220px;
+}
+
+.filter-bar input, .filter-bar select {
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.result-count {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 8px 2px 20px;
+}
+
