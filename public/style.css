@@ -94,7 +94,7 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   justify-content: center;
   gap: 6px;
   width: 100%;
-  margin-bottom: 20px;
+  margin-bottom: 26px;
   padding: 8px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.12);
@@ -103,6 +103,7 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   font-family: var(--font-body);
   font-size: 12.5px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .sidebar-toggle:hover { background: rgba(255,255,255,0.06); color: #EAF2EF; }
@@ -112,7 +113,8 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 36px;
+  margin-bottom: 22px;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -145,11 +147,30 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   color: #9FB0AA;
 }
 
+/* flex: 1 lets .nav claim exactly the leftover space between the fixed
+   top block (brand + toggle) and the fixed bottom block (.sidebar-foot),
+   and overflow-y: auto scrolls ONLY the nav list when it doesn't fit —
+   instead of the whole flex column overflowing past .sidebar's 100vh and
+   getting silently clipped by `overflow: hidden` (which is what made the
+   toggle button, and then the logout button, "disappear" after login).
+   This also future-proofs the sidebar: any new nav links or footer
+   buttons added later just extend the scrollable middle section — they
+   can never overlap or push .sidebar-foot off-screen again. */
 .nav {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.18) transparent;
 }
+
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
 
 .nav-label {
   font-size: 11px;
@@ -185,6 +206,7 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   margin-top: auto;
   padding-top: 20px;
   border-top: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
 }
 
 .sidebar-foot p {
