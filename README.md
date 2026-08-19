@@ -58,15 +58,19 @@ Người dùng (trình duyệt)
 | `crawler_client.py` | Client gọi API job/company/contact/stats — chuẩn hoá field backend sang tên field template dùng (`job.company`, `job.position`...) |
 | `env_loader.py` | Đọc file `.env` khi chạy local (`python app.py`) — Vercel không dùng, set env trực tiếp trên dashboard |
 | `templates/*.html` | Giao diện các trang (Jinja2), gồm `_pagination.html` dùng chung cho trang job/công ty |
-| `public/style.css` | CSS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
+| `public/style.css`, `public/app.js` | CSS + JS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
 | `vercel.json` | Cấu hình deploy Vercel (`maxDuration: 30` cho `app.py`) |
 | `.env.example` | Mẫu 3 biến môi trường cần set: `CRAWLER_API_URL`, `CRAWLER_API_KEY`, `FLASK_SECRET_KEY` |
 
 **Không còn trong repo** (đã xoá 08/2026, dọn dẹp cùng đợt chuyển sang backend API thật):
 `supabase_client.py`, `seed_supabase.py`, `supabase_schema.sql`, `data.py`.
 
-**Còn sót lại, nên dọn:** thư mục `static/style.css` — không còn được Flask serve (đã đổi sang
-`public/`), giữ lại dễ gây nhầm khi có người sửa nhầm file không có tác dụng.
+**Đã xoá thư mục `static/` (08/2026):** Flask chỉ serve file tĩnh từ `public/` (`static_folder="public"`
+trong `app.py`, khớp Vercel), nhưng `static/style.css` và `static/app.js` vẫn tồn tại song song và
+**thực ra chứa những bản sửa mới hơn** (grid `auto-fit`, fix input/select tràn khỏi ô grid, style
+toast, `.jd-bullets`, `.col-potential`...) — các fix này chưa từng lên production vì nằm nhầm thư
+mục. Đã merge đúng phần khác biệt có giá trị vào `public/style.css`, chuyển `app.js` sang `public/`,
+và xoá hẳn `static/` để không còn 2 bản trùng gây nhầm lẫn về sau.
 
 ## 3. Vai trò & phân quyền
 

@@ -73,14 +73,14 @@ Người dùng (trình duyệt)
 | `crawler_client.py` | Client gọi API job/company/contact — chuẩn hoá field backend sang tên field template dùng (`job.company`, `job.position`...) |
 | `env_loader.py` | Đọc file `.env` khi chạy local (`python app.py`) — Vercel không dùng, set env trực tiếp trên dashboard |
 | `templates/*.html` | Giao diện các trang (Jinja2) |
-| `public/style.css` | CSS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
+| `public/style.css`, `public/app.js` | CSS + JS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
 | `vercel.json` | Cấu hình deploy Vercel (`maxDuration: 30` cho `app.py`) |
 | `.env.example` | Mẫu 3 biến môi trường cần set: `CRAWLER_API_URL`, `CRAWLER_API_KEY`, `FLASK_SECRET_KEY` |
 
 **Không còn trong repo** (đã xoá 08/2026, dọn dẹp cùng đợt chuyển sang
 backend API thật): `supabase_client.py`, `seed_supabase.py`,
-`supabase_schema.sql`, `data.py`, `static/` (thư mục cũ, còn sót file
-nhưng không còn được Flask serve — xem mục 8).
+`supabase_schema.sql`, `data.py`, `static/` (thư mục cũ — xem mục 8 để
+biết vì sao xoá và những gì đã được cứu/merge trước khi xoá).
 
 ---
 
