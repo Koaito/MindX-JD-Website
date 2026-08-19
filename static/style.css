@@ -234,6 +234,12 @@ a { color: inherit; text-decoration: none; }
   gap: 14px;
 }
 
+/* Grid tracks default to min-width:auto, so a wide input/select can
+   overflow its own 1fr column and visually overlap the next field
+   (reported bug: password fields overlapping on register page). */
+.auth-card .two-col > label { min-width: 0; }
+.auth-card input, .auth-card select { width: 100%; }
+
 .auth-foot {
   margin-top: 18px;
   font-size: 13px;
@@ -409,7 +415,9 @@ a { color: inherit; text-decoration: none; }
 
 .job-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* auto-fit (not auto-fill) collapses empty tracks, so a leftover card
+     in the last row stretches to fill the row instead of leaving a gap. */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
 }
 
@@ -506,6 +514,16 @@ a { color: inherit; text-decoration: none; }
 .status-Chưa-xác-minh { background: var(--amber-soft); color: var(--amber); }
 .status-Đã-gửi-cho-học-viên { background: var(--blue-soft); color: var(--blue); }
 
+/* Real job statuses from JOB_STATUS_MAP (crawler_client.py) — the classes
+   above never matched actual data, so "Đang tuyển" rendered as plain text. */
+.status-Đang-tuyển {
+  background: var(--teal-soft);
+  color: var(--teal);
+  border: 1px solid var(--teal);
+  font-weight: 700;
+}
+.status-Đã-đóng { background: #EDEFEC; color: var(--muted); }
+
 .potential-Cao { background: var(--teal-soft); color: var(--teal); }
 .potential-Trung-bình { background: var(--amber-soft); color: var(--amber); }
 .potential-Thấp { background: #F1EDF0; color: #8A6E80; }
@@ -552,10 +570,18 @@ a { color: inherit; text-decoration: none; }
 }
 
 .fit-chip {
+  display: inline-block;
   font-size: 11px;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Give the "Tiềm năng" column enough room for the widest chip
+   (Chưa đánh giá) so it never has to wrap and get clipped. */
+.col-potential {
+  min-width: 110px;
 }
 
 
@@ -594,6 +620,14 @@ a { color: inherit; text-decoration: none; }
 
 .card p { margin: 0; color: var(--ink-soft); white-space: pre-line; }
 
+.jd-bullets {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+}
+.jd-bullets li { margin-bottom: 6px; line-height: 1.5; }
+.jd-bullets li:last-child { margin-bottom: 0; }
+
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; font-size: 13px; text-align: right; }
@@ -601,6 +635,8 @@ a { color: inherit; text-decoration: none; }
 
 .inline-form { display: flex; gap: 8px; margin-bottom: 10px; }
 .inline-form select { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
+
+.action-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------------- Forms ---------------- */
 
@@ -627,6 +663,11 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: 1fr 1fr;
   gap: 14px 18px;
 }
+
+/* Same fix as .two-col: prevent inputs/selects from overflowing their
+   grid column and overlapping the field next to them. */
+.form-grid > label { min-width: 0; }
+.form-card input, .form-card select, .form-card textarea { width: 100%; }
 
 .form-card label {
   display: flex;
@@ -727,6 +768,108 @@ a { color: inherit; text-decoration: none; }
   color: var(--ink-soft);
 }
 
+/* ---------------- Toasts (async feedback) ---------------- */
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+  max-width: 320px;
+}
+
+.toast {
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(16, 30, 26, 0.14);
+  border: 1px solid transparent;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast-success { background: var(--teal-soft); color: var(--teal); border-color: #BFE5DD; }
+.toast-error { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------- Pagination ---------------- */
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.page-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.page-btn.is-disabled {
+  color: var(--muted);
+  background: #F5F7F5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.page-status {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.page-jump-label {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.page-jump-input {
+  width: 56px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .pagination { justify-content: center; }
+  .page-jump { margin-left: 0; width: 100%; justify-content: center; }
+}
+
 .flash-stack { margin-bottom: 16px; }
 
 .flash {
@@ -734,9 +877,15 @@ a { color: inherit; text-decoration: none; }
   border-radius: 9px;
   font-size: 13.5px;
   margin-bottom: 8px;
+  border: 1px solid transparent;
+  font-weight: 500;
 }
 
-.flash-success { background: var(--teal-soft); color: var(--teal); }
+.flash-success { background: var(--teal-soft); color: var(--teal); border-color: #BFE5DD; }
+
+/* Was previously missing entirely — error flashes (e.g. "Team SS accounts
+   can't save jobs") had no styling and blended in unstyled. */
+.flash-error { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
 
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }

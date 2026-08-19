@@ -33,7 +33,9 @@
         {% if job.jd_link %}
         <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
         {% endif %}
-        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}"
+              class="save-job-form" data-json-action="{{ url_for('job_toggle_save_json', job_id=job.id) }}"
+              data-remove-on-unsave="true">
           <button class="save-btn saved" type="submit">🔖 Bỏ lưu</button>
         </form>
       </div>

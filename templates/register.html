@@ -33,6 +33,7 @@
             {% for i in industries %}
               <option value="{{ i }}" {{ 'selected' if form.get('track') == i }}>{{ i }}</option>
             {% endfor %}
+            <option value="Khác / Chưa xác định" {{ 'selected' if form.get('track') == 'Khác / Chưa xác định' }}>Khác / Chưa xác định</option>
           </select>
         </label>
       </div>

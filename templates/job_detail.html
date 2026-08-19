@@ -18,13 +18,13 @@
     {% if job.description %}
     <section class="card">
       <h4>Mô tả công việc</h4>
-      <p>{{ job.description }}</p>
+      {{ job.description|to_bullets }}
     </section>
     {% endif %}
     {% if job.requirements %}
     <section class="card">
       <h4>Yêu cầu ứng viên</h4>
-      <p>{{ job.requirements }}</p>
+      {{ job.requirements|to_bullets }}
     </section>
     {% endif %}
     {% if job.skills %}
@@ -38,7 +38,7 @@
     {% if job.benefits %}
     <section class="card">
       <h4>Quyền lợi</h4>
-      <p>{{ job.benefits }}</p>
+      {{ job.benefits|to_bullets }}
     </section>
     {% endif %}
     {% if job.note %}
@@ -61,10 +61,12 @@
         </select>
         <button class="btn btn-ghost" type="submit">Lưu</button>
       </form>
-      <a class="btn btn-ghost" href="{{ url_for('job_edit', job_id=job.id) }}">Sửa thông tin job</a>
-      <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');">
-        <button class="btn btn-danger" type="submit">Đóng job</button>
-      </form>
+      <div class="action-row">
+        <a class="btn btn-ghost" href="{{ url_for('job_edit', job_id=job.id) }}">Sửa thông tin job</a>
+        <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');">
+          <button class="btn btn-danger" type="submit">Đóng job</button>
+        </form>
+      </div>
     </section>
 
     <section class="card">
@@ -94,7 +96,9 @@
             {{ '✅ Đã ứng tuyển' if already_applied else '📨 Ứng tuyển ngay' }}
           </button>
         </form>
-        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}" style="margin-top: 8px;">
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}" style="margin-top: 8px;"
+              class="save-job-form" data-json-action="{{ url_for('job_toggle_save_json', job_id=job.id) }}"
+              data-saved-label="🔖 Bỏ lưu job này" data-unsaved-label="🔖 Lưu job này" data-swap-emphasis="true">
           <button class="btn {{ 'btn-primary' if job.id not in saved_job_ids else 'btn-ghost' }} btn-block" type="submit">
             {{ '🔖 Lưu job này' if job.id not in saved_job_ids else '🔖 Bỏ lưu job này' }}
           </button>

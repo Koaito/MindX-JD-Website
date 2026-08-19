@@ -91,7 +91,9 @@
         <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
         {% endif %}
         {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}">
+        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}"
+              class="save-job-form" data-json-action="{{ url_for('job_toggle_save_json', job_id=job.id) }}"
+              data-saved-label="🔖 Đã lưu" data-unsaved-label="🔖 Lưu job">
           <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
             {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
           </button>

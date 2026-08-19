@@ -7,7 +7,8 @@ from env_loader import load_env_file
 
 load_env_file()
 
-from flask import Flask, render_template, request, redirect, url_for, flash, abort, session
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session, jsonify
+from markupsafe import Markup, escape
 from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, current_user,
@@ -239,6 +240,29 @@ def format_date(value, fmt="%d/%m/%Y"):
         return value.strftime(fmt)  # phòng khi value lỡ đã là date/datetime thật
     except AttributeError:
         return "—"
+
+
+@app.template_filter("to_bullets")
+def to_bullets(value):
+    """Jinja filter — JD description/requirements từ crawler thường là 1
+    khối text nhiều dòng (mỗi dòng 1 ý), hiện tại chỉ show bằng
+    white-space:pre-line (giữ xuống dòng nhưng không có gạch đầu dòng,
+    khó đọc). Filter này tách theo dòng và render thành <ul><li> thật.
+
+    Tự escape() từng dòng (KHÔNG tin dữ liệu crawl là an toàn) rồi mới
+    ghép HTML — trả về Markup để Jinja không escape lần 2 phần <ul>/<li>
+    mà mình tự dựng.
+    Nếu chỉ có 1 dòng hoặc rỗng, trả lại y nguyên dạng <p> để không tạo
+    list rỗng/1 dòng trông kỳ.
+    """
+    if not value:
+        return ""
+    lines = [ln.strip(" \t-•*") for ln in value.splitlines()]
+    lines = [ln for ln in lines if ln]
+    if len(lines) <= 1:
+        return Markup("<p>{}</p>").format(value)
+    items = "".join("<li>{}</li>".format(escape(ln)) for ln in lines)
+    return Markup("<ul class=\"jd-bullets\">{}</ul>").format(Markup(items))
 
 
 @app.context_processor
@@ -513,6 +537,30 @@ def job_toggle_save(job_id):
         else:
             flash(str(exc), "error")
     return redirect(request.referrer or url_for("jobs_index"))
+
+
+@app.route("/jobs/<job_id>/toggle-save.json", methods=["POST"])
+@login_required
+def job_toggle_save_json(job_id):
+    """Same toggle-save logic as job_toggle_save, but returns JSON instead of
+    redirecting, so the button can update in place without a full page
+    reload (issue: every save/unsave click reloaded the whole page).
+    The form-based route above is kept as-is for no-JS fallback."""
+    if current_user.is_staff:
+        return jsonify(ok=False, message="Tài khoản team SS không dùng để lưu job."), 403
+
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        backend_auth.save_job(access_token, job_id)
+        return jsonify(ok=True, saved=True, message="Đã lưu job vào danh sách của bạn.")
+    except BackendAuthError as exc:
+        if exc.status_code == 409:
+            try:
+                backend_auth.unsave_job(access_token, job_id)
+                return jsonify(ok=True, saved=False, message="Đã bỏ lưu job.")
+            except BackendAuthError as exc2:
+                return jsonify(ok=False, message=str(exc2)), 400
+        return jsonify(ok=False, message=str(exc)), 400
 
 
 @app.route("/saved-jobs")

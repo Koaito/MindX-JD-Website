@@ -71,9 +71,7 @@
             <span>{{ 'Team SS' if current_user.is_staff else current_user.email }}</span>
           </div>
         </div>
-        {% if current_user.is_staff %}
         <a class="btn btn-ghost btn-block" href="{{ url_for('change_password') }}">Đổi mật khẩu</a>
-        {% endif %}
         <a class="btn btn-ghost btn-block" href="{{ url_for('logout') }}">Đăng xuất</a>
       {% else %}
         <div class="auth-box auth-box-guest">
@@ -98,5 +96,7 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
