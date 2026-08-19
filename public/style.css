@@ -420,6 +420,15 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   margin: 0 auto;
 }
 
+/* Opt-in per page via {% block content_class %}content-full{% endblock %}
+   (see base.html) — for pages made almost entirely of grids (job cards,
+   KPI/report cards) rather than paragraph text, capping width doesn't
+   help readability, so these are allowed to fill the entire available
+   space next to the sidebar instead of stopping at 1600px. */
+.content.content-full {
+  max-width: none;
+}
+
 .page-head {
   display: flex;
   justify-content: space-between;

@@ -42,6 +42,22 @@
 {% endif %}
 
 {% if users %}
+<div class="filter-bar" id="staffFilterBar">
+  <input type="text" id="staffSearchInput" placeholder="Tìm theo họ tên, email…">
+  <select id="staffRoleFilter">
+    <option value="">Tất cả role</option>
+    {% for r in roles %}
+    <option value="{{ r }}">{{ role_labels.get(r, r) }}</option>
+    {% endfor %}
+  </select>
+  <select id="staffStatusFilter">
+    <option value="">Tất cả trạng thái</option>
+    <option value="active">Đang hoạt động</option>
+    <option value="inactive">Đã vô hiệu hoá</option>
+  </select>
+</div>
+<p class="result-count" id="staffResultCount"></p>
+
 <div class="contact-table-wrap">
   <table class="contact-table">
     <thead>
@@ -56,9 +72,9 @@
         {% endif %}
       </tr>
     </thead>
-    <tbody>
+    <tbody id="staffTableBody">
       {% for u in users %}
-      <tr>
+      <tr data-name="{{ u.full_name|lower }}" data-email="{{ u.email|lower }}" data-role="{{ u.role }}" data-status="{{ 'active' if u.is_active else 'inactive' }}">
         <td><strong>{{ u.full_name }}</strong></td>
         <td class="muted">{{ u.email }}</td>
         <td>
@@ -103,6 +119,44 @@
     </tbody>
   </table>
 </div>
+
+<script>
+(function () {
+  "use strict";
+  // Lọc phía client — danh sách tài khoản team SS được backend trả về
+  // toàn bộ 1 lần (không phân trang), nên không cần gọi lại server mỗi
+  // lần lọc, chỉ ẩn/hiện <tr> theo data-attribute đã gắn sẵn.
+  var searchInput = document.getElementById("staffSearchInput");
+  var roleFilter = document.getElementById("staffRoleFilter");
+  var statusFilter = document.getElementById("staffStatusFilter");
+  var countEl = document.getElementById("staffResultCount");
+  var rows = Array.prototype.slice.call(document.querySelectorAll("#staffTableBody tr"));
+  if (!rows.length) return;
+
+  function applyFilters() {
+    var q = (searchInput.value || "").trim().toLowerCase();
+    var role = roleFilter.value;
+    var status = statusFilter.value;
+    var visible = 0;
+
+    rows.forEach(function (row) {
+      var matchesQ = !q || row.dataset.name.indexOf(q) !== -1 || row.dataset.email.indexOf(q) !== -1;
+      var matchesRole = !role || row.dataset.role === role;
+      var matchesStatus = !status || row.dataset.status === status;
+      var show = matchesQ && matchesRole && matchesStatus;
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+
+    countEl.textContent = "Hiển thị " + visible + " / " + rows.length + " tài khoản";
+  }
+
+  searchInput.addEventListener("input", applyFilters);
+  roleFilter.addEventListener("change", applyFilters);
+  statusFilter.addEventListener("change", applyFilters);
+  applyFilters();
+})();
+</script>
 {% else %}
 <div class="empty-state">
   <p>Không tải được danh sách tài khoản (xem thông báo lỗi phía trên nếu có).</p>

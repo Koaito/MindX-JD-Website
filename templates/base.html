@@ -103,7 +103,7 @@
     </div>
   </aside>
 
-  <main class="content">
+  <main class="content {% block content_class %}{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="flash-stack">
