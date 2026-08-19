@@ -199,6 +199,7 @@ def _normalize_job(raw: dict) -> dict | None:
         "benefits": parsed.get("perks") or "",
         "deadline": raw.get("deadline"),
         "jd_link": raw.get("source_url") or "",
+        "source": raw.get("source_name") or "",
         "date_collected": raw.get("created_at"),
         "status": JOB_STATUS_MAP.get(raw.get("job_status") or "", raw.get("job_status") or ""),
         "status_raw": raw.get("job_status") or "OPEN",
