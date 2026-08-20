@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ student.full_name }} — Hoạt động học viên — MindX Career Hub{% endblock %}
+{% block content %}
+
+<a class="back-link" href="{{ url_for('student_activity_index') }}">← Hoạt động học viên</a>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị / Hoạt động học viên</span>
+    <h1>{{ student.full_name }}</h1>
+    <p class="lede">
+      {{ student.email }}{% if student.phone %} · {{ student.phone }}{% endif %}{% if student.track %} · {{ student.track }}{% endif %}
+    </p>
+  </div>
+</header>
+
+<div class="card student-summary-card">
+  <dl class="kv">
+    <dt>Đã ứng tuyển</dt><dd>{{ applications|length }} job</dd>
+    <dt>Đã lưu</dt><dd>{{ saved_jobs|length }} job</dd>
+    <dt>Ngày đăng ký</dt><dd>{{ student.created_at|format_date }}</dd>
+  </dl>
+</div>
+
+<div class="activity-section-head">
+  <h2>📨 Đã ứng tuyển ({{ applications|length }})</h2>
+</div>
+{% if applications %}
+<div class="job-grid">
+  {% for a in applications %}
+  <article class="ticket">
+    <div class="ticket-stub">
+      <span class="ticket-code">JOB-{{ a.job_id[:8]|upper }}</span>
+      {% if a.job_status %}<span class="status-chip status-{{ a.job_status|replace(' ', '-') }}">{{ a.job_status }}</span>{% endif %}
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-top">
+        <h3><a href="{{ url_for('job_detail', job_id=a.job_id) }}">{{ a.job_title }}</a></h3>
+      </div>
+      <p class="ticket-company">{{ a.company_name }}</p>
+      {% if a.note %}<p class="ticket-note">Ghi chú của học viên: {{ a.note }}</p>{% endif %}
+      <div class="ticket-meta">
+        <span>📨 Đã ứng tuyển: {{ a.applied_at|format_date }}</span>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Học viên này chưa ứng tuyển job nào.</p>
+</div>
+{% endif %}
+
+<div class="activity-section-head">
+  <h2>🔖 Đã lưu ({{ saved_jobs|length }})</h2>
+</div>
+{% if saved_jobs %}
+<div class="job-grid">
+  {% for s in saved_jobs %}
+  <article class="ticket">
+    <div class="ticket-stub">
+      <span class="ticket-code">JOB-{{ s.job_id[:8]|upper }}</span>
+      {% if s.job_status %}<span class="status-chip status-{{ s.job_status|replace(' ', '-') }}">{{ s.job_status }}</span>{% endif %}
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-top">
+        <h3><a href="{{ url_for('job_detail', job_id=s.job_id) }}">{{ s.job_title }}</a></h3>
+      </div>
+      <p class="ticket-company">{{ s.company_name }}</p>
+      <div class="ticket-meta">
+        <span>🔖 Đã lưu: {{ s.created_at|format_date }}</span>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Học viên này chưa lưu job nào.</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Hoạt động học viên — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Hoạt động học viên</h1>
+    <p class="lede">
+      Chọn 1 học viên để xem job họ đã ứng tuyển và đã lưu — dùng để chủ động
+      hỗ trợ (nhắc deadline, gợi ý job phù hợp...) thay vì chờ học viên hỏi.
+    </p>
+  </div>
+</header>
+
+{% if students %}
+<div class="filter-bar" id="studentFilterBar">
+  <input type="text" id="studentSearchInput" placeholder="Tìm theo họ tên, email…">
+</div>
+<p class="result-count" id="studentResultCount"></p>
+
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Họ tên</th>
+        <th>Email</th>
+        <th>Điện thoại</th>
+        <th>Ngày đăng ký</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="studentTableBody">
+      {% for s in students %}
+      <tr data-name="{{ s.full_name|lower }}" data-email="{{ s.email|lower }}">
+        <td><strong>{{ s.full_name }}</strong></td>
+        <td class="muted">{{ s.email }}</td>
+        <td class="muted">{{ s.phone or "—" }}</td>
+        <td class="muted">{{ s.created_at|format_date }}</td>
+        <td>
+          <a class="btn btn-text" href="{{ url_for('student_activity_detail', ss_user_id=s.ss_user_id) }}">
+            Xem hoạt động →
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Lọc phía client, cùng cách làm với /staff-accounts (staff_accounts.html)
+  // — danh sách học viên trả về toàn bộ 1 lần, không phân trang.
+  var searchInput = document.getElementById("studentSearchInput");
+  var countEl = document.getElementById("studentResultCount");
+  var rows = Array.prototype.slice.call(document.querySelectorAll("#studentTableBody tr"));
+  if (!rows.length) return;
+
+  function applyFilter() {
+    var q = (searchInput.value || "").trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var show = !q || row.dataset.name.indexOf(q) !== -1 || row.dataset.email.indexOf(q) !== -1;
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    countEl.textContent = "Hiển thị " + visible + " / " + rows.length + " học viên";
+  }
+
+  searchInput.addEventListener("input", applyFilter);
+  applyFilter();
+})();
+</script>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có học viên nào đăng ký, hoặc không tải được danh sách (xem thông báo lỗi phía trên nếu có).</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -87,6 +87,23 @@
       {% endif %}
     </section>
 
+    <section class="card">
+      <h4>Học viên đã lưu job này ({{ savers|length }})</h4>
+      {% if savers %}
+      <ul class="applicant-list">
+        {% for s in savers %}
+        <li>
+          <strong>{{ s.student.full_name }}</strong>
+          <span class="muted">{{ s.student.email }}{% if s.student.phone %} · {{ s.student.phone }}{% endif %}</span>
+          <span class="muted">Đã lưu: {{ s.created_at|format_date }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Chưa có học viên nào lưu job này.</p>
+      {% endif %}
+    </section>
+
     {% else %}
 
     <section class="card">

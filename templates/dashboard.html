@@ -32,7 +32,16 @@
     <span class="kpi-num">{{ total_applications if total_applications is not none else '—' }}</span>
     <span class="kpi-label">Lượt ứng tuyển</span>
   </div>
+  <div class="kpi-card">
+    <span class="kpi-num">{{ total_saved_jobs if total_saved_jobs is not none else '—' }}</span>
+    <span class="kpi-label">Lượt lưu job</span>
+  </div>
 </div>
+
+<p class="muted" style="margin: -10px 0 22px; font-size: 12.5px;">
+  Xem chi tiết ứng tuyển/lưu job theo từng học viên tại
+  <a href="{{ url_for('student_activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
+</p>
 
 <div class="chart-grid">
   <section class="card">

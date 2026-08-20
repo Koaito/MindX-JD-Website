@@ -25,3 +25,4 @@
 @import url('css/08-dashboard.css');             /* /bao-cao dashboard: KPI cards + charts */
 @import url('css/09-misc-toasts.css');           /* Empty states, flash messages, toasts */
 @import url('css/10-pagination-responsive.css'); /* Pagination + the shared @media breakpoint */
+@import url('css/11-student-activity.css');      /* /student-activity: theo dõi học viên lưu/ứng tuyển JD */

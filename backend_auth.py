@@ -179,13 +179,19 @@ def update_user_active_status(access_token: str, ss_user_id: str, is_active: boo
 
 # ---------------------------------------------------------------------------
 # /me/... — ứng tuyển & lưu job của CHÍNH học viên đang đăng nhập
-# + GET /jobs/{id}/applications (staff xem ai đã ứng tuyển 1 job)
+# + GET /jobs/{id}/applications, GET /jobs/{id}/saved-jobs (staff xem ai
+#   đã ứng tuyển/lưu 1 job — chiều "1 job có ai")
+# + GET /auth/users/{id}/applications, GET /auth/users/{id}/saved-jobs
+#   (staff xem 1 học viên đã ứng tuyển/lưu job nào — chiều ngược lại,
+#   "1 học viên có gì", thêm 08/2026 cho trang /student-activity)
 #
 # Đặt ở ĐÂY (không phải crawler_client.py) vì mọi route này đều bắt buộc
 # Authorization: Bearer <access_token> — crawler_client.py hiện chỉ gửi
 # X-API-Key, không gửi JWT (crawler_client.py thuộc phạm vi việc khác
 # đang sửa job/company/contact, không đụng vào để tránh xung đột khi
-# merge). ss_user_id KHÔNG cần truyền — backend tự lấy từ chính JWT.
+# merge). ss_user_id KHÔNG cần truyền cho /me/* — backend tự lấy từ
+# chính JWT; CÓ truyền cho 2 route staff-only cuối (staff xem NGƯỜI
+# KHÁC, không phải chính mình).
 # ---------------------------------------------------------------------------
 
 def apply_to_job(access_token: str, job_id: str, note: str = "") -> dict:
@@ -226,6 +232,33 @@ def list_job_applicants(access_token: str, job_id: str) -> list:
     """GET /jobs/{id}/applications (đòi role ss_team+) — staff xem ai đã
     ứng tuyển 1 job, kèm sẵn full_name/email người ứng tuyển."""
     return _request("GET", f"/jobs/{job_id}/applications", access_token=access_token)
+
+
+def list_job_savers(access_token: str, job_id: str) -> list:
+    """Thêm 08/2026 — GET /jobs/{id}/saved-jobs (đòi role ss_team+),
+    mirror ĐÚNG list_job_applicants() ở trên nhưng cho chiều 'lưu'
+    (bookmark) thay vì 'ứng tuyển'. Dùng ở job_detail.html, cạnh khối
+    'Học viên đã ứng tuyển' đã có sẵn — xem app.py::job_detail()."""
+    return _request("GET", f"/jobs/{job_id}/saved-jobs", access_token=access_token)
+
+
+def list_applications_of_user(access_token: str, ss_user_id: str) -> list:
+    """Thêm 08/2026 — GET /auth/users/{id}/applications (đòi role
+    ss_team+), chiều "1 học viên đã ứng tuyển job nào" (khác
+    list_my_applications(), dùng cho CHÍNH học viên xem đơn của mình).
+    Trả cùng field như list_my_applications() (job_title/job_status/
+    company_name...) vì cùng response_model JobApplicationOut ở backend
+    — dùng cho trang /student-activity/<id> (xem app.py)."""
+    return _request("GET", f"/auth/users/{ss_user_id}/applications", access_token=access_token)
+
+
+def list_saved_jobs_of_user(access_token: str, ss_user_id: str) -> list:
+    """Thêm 08/2026 — GET /auth/users/{id}/saved-jobs (đòi role
+    ss_team+), mirror ĐÚNG list_applications_of_user() ở trên nhưng cho
+    chiều 'lưu'. Trước đây saved_jobs cố ý riêng tư 100%, không route
+    nào cho staff xem theo học viên — xem lịch sử trao đổi + comment ở
+    backend db.list_saved_jobs_for_job() để biết lý do đảo ngược."""
+    return _request("GET", f"/auth/users/{ss_user_id}/saved-jobs", access_token=access_token)
 
 
 # ---------------------------------------------------------------------------

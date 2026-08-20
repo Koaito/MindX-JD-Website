@@ -1,0 +1,39 @@
+/* ---------------- Student activity (Quản trị / Hoạt động học viên) ---------------- */
+/* Used by: templates/student_activity.html (danh sách học viên,
+   /student-activity), templates/student_activity_detail.html (chi tiết
+   1 học viên, /student-activity/<id>) — thêm 08/2026 để SS team/admin
+   theo dõi học viên đang lưu/ứng tuyển JD nào (trước đây không có màn
+   hình nào cho việc này, xem lịch sử trao đổi).
+
+   Reuse tối đa component đã có (bảng dùng .contact-table, thẻ dùng
+   .card, ticket job dùng .job-grid/.ticket của 04-job-cards.css) — file
+   này CHỈ chứa phần thật sự mới: heading 2 khối trên trang chi tiết và
+   khối tóm tắt học viên ở đầu trang chi tiết. Không đụng vào các file
+   css khác để tránh ảnh hưởng ngược lên trang khác. */
+
+.activity-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 28px 0 12px;
+}
+
+.activity-section-head:first-of-type { margin-top: 0; }
+
+.activity-section-head h2 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  margin: 0;
+}
+
+.activity-section-head .muted { font-size: 12.5px; }
+
+.student-summary-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.student-summary-card .kv { min-width: 220px; }

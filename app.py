@@ -723,6 +723,7 @@ def job_detail(job_id):
         job["is_duplicate_candidate"] = False
 
     applicants = None
+    savers = None
     already_applied = False
     if current_user.is_authenticated:
         access_token, _ = _auth_tokens_from_session()
@@ -744,13 +745,32 @@ def job_detail(job_id):
                 )
                 for a in raw_applicants
             ]
+            # Thêm 08/2026 — mirror ĐÚNG khối applicants ở trên nhưng
+            # cho chiều "lưu" (GET /jobs/{id}/saved-jobs, xem
+            # backend_auth.list_job_savers()) — xem lịch sử trao đổi để
+            # biết lý do saved_jobs từ chỗ riêng tư 100% chuyển sang cho
+            # staff xem được.
+            try:
+                raw_savers = backend_auth.list_job_savers(access_token, job["id"])
+            except BackendAuthError as exc:
+                flash(str(exc), "error")
+                raw_savers = []
+            savers = [
+                SimpleNamespace(
+                    saved_job_id=s["saved_job_id"],
+                    job_id=s["job_id"],
+                    created_at=s["created_at"],
+                    student=SimpleNamespace(full_name=s["full_name"], email=s["email"], phone=s.get("phone")),
+                )
+                for s in raw_savers
+            ]
         else:
             try:
                 my_apps = backend_auth.list_my_applications(access_token)
                 already_applied = any(a["job_id"] == job["id"] for a in my_apps)
             except BackendAuthError:
                 already_applied = False
-    return render_template("job_detail.html", job=job, applicants=applicants,
+    return render_template("job_detail.html", job=job, applicants=applicants, savers=savers,
                             already_applied=already_applied, statuses=JOB_STATUSES)
 
 
@@ -1165,9 +1185,14 @@ def dashboard():
     # qua từng job. Lỗi backend tạm thời thì hiện None (ẩn ở template)
     # thay vì làm sập cả trang dashboard.
     total_applications = None
+    total_saved_jobs = None
     try:
         stats = db_data.get_stats()
         total_applications = stats.get("total_applications")
+        # Thêm 08/2026 cùng lúc với /student-activity (theo dõi học
+        # viên lưu/ứng tuyển JD) — backend đã bổ sung total_saved_jobs
+        # cân xứng total_applications ở trên, xem db.get_stats_summary().
+        total_saved_jobs = stats.get("total_saved_jobs")
     except CrawlerAPIError:
         pass
 
@@ -1175,6 +1200,7 @@ def dashboard():
         "dashboard.html",
         total_jobs=len(jobs), total_contacts=len(companies),
         total_students=total_students, total_applications=total_applications,
+        total_saved_jobs=total_saved_jobs,
         jobs_by_industry=jobs_by_industry, jobs_by_level=jobs_by_level,
         jobs_by_status=jobs_by_status, jobs_by_location=jobs_by_location,
         contacts_by_city=companies_by_city,
@@ -1293,6 +1319,86 @@ def staff_account_update_active_status(ss_user_id):
     except BackendAuthError as exc:
         flash(str(exc), "error")
     return redirect(url_for("staff_accounts"))
+
+
+# ---------------------------------------------------------------------------
+# Hoạt động học viên — theo dõi học viên đang lưu/ứng tuyển JD nào
+# (thêm 08/2026, đọc: ss_team+, giống hệt mức quyền của /staff-accounts).
+#
+# Trước đây SS team/admin chỉ xem được ứng tuyển theo CHIỀU "1 job có ai
+# ứng tuyển" (job_detail.html) và hoàn toàn không xem được saved_jobs.
+# Mục này bổ sung CHIỀU NGƯỢC LẠI, "1 học viên đã ứng tuyển/lưu job
+# nào" — 2 route:
+#   /student-activity            — danh sách toàn bộ học viên (role=
+#                                   'user'), tái dùng GET /auth/users đã
+#                                   có sẵn (KHÔNG gọi thêm API nào khác
+#                                   ở đây — quan trọng để trang danh
+#                                   sách luôn nhẹ dù số học viên tăng
+#                                   lên nhiều trong tương lai, không bị
+#                                   N+1 request).
+#   /student-activity/<id>       — chi tiết 1 học viên, CHỈ lúc này mới
+#                                   gọi 2 API mới GET /auth/users/{id}/
+#                                   applications và .../saved-jobs (lazy
+#                                   — đúng học viên nào đang xem mới gọi
+#                                   cho học viên đó).
+# ---------------------------------------------------------------------------
+
+@app.route("/student-activity")
+@staff_required
+def student_activity_index():
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        all_users = backend_auth.list_users(access_token)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        all_users = []
+
+    # Chỉ role='user' mới có JD để ứng tuyển/lưu — ss_team/admin không
+    # phải đối tượng cần theo dõi ở màn hình này (khác /staff-accounts,
+    # liệt kê MỌI role vì đó là màn hình quản lý tài khoản nói chung).
+    students = [u for u in all_users if u.get("role") == "user"]
+
+    return render_template("student_activity.html", students=students)
+
+
+@app.route("/student-activity/<string:ss_user_id>")
+@staff_required
+def student_activity_detail(ss_user_id):
+    access_token, _ = _auth_tokens_from_session()
+
+    # GET /auth/users/{id}/applications và .../saved-jobs (2 route mới,
+    # xem backend_auth.py) không trả kèm full_name/email của chính học
+    # viên đang xem (chỉ trả thông tin JOB) — cần tra riêng qua GET
+    # /auth/users để hiện tên ở đầu trang. list_users() đã gọi ở trang
+    # danh sách phía trên, nhưng đây là 1 request GET riêng (người dùng
+    # có thể vào thẳng URL này qua link ngoài), nên gọi lại — chấp nhận
+    # thêm 1 lần gọi API, không đáng kể so với lợi ích trang list ở trên
+    # không bị N+1.
+    student = None
+    try:
+        all_users = backend_auth.list_users(access_token)
+        student = next((u for u in all_users if u["ss_user_id"] == ss_user_id and u.get("role") == "user"), None)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+    if student is None:
+        abort(404)
+
+    try:
+        applications = backend_auth.list_applications_of_user(access_token, ss_user_id)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        applications = []
+
+    try:
+        saved_jobs = backend_auth.list_saved_jobs_of_user(access_token, ss_user_id)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        saved_jobs = []
+
+    return render_template(
+        "student_activity_detail.html", student=student,
+        applications=applications, saved_jobs=saved_jobs,
+    )
 
 
 if __name__ == "__main__":
