@@ -263,7 +263,7 @@ def format_date(value, fmt="%d/%m/%Y"):
         return "—"
 
 
-def _jobs_by_month(jobs, date_field, months_back=6):
+def _jobs_by_month(jobs, date_field, months_back=6, only_past=False):
     """Đếm số job theo tháng, dựa trên field ngày chỉ định (date_field
     là 'date_collected' hoặc 'deadline') — dùng cho biểu đồ "JD theo
     tháng" trên dashboard (so sánh JD mới thêm vs JD hết hạn).
@@ -277,6 +277,13 @@ def _jobs_by_month(jobs, date_field, months_back=6):
     (count=0) — để biểu đồ không bị "nhảy cóc" thiếu tháng giữa chừng.
     Job có date_field rỗng/không parse được bị bỏ qua (không tính vào
     tháng nào), KHÔNG làm crash việc tính toán các job còn lại.
+
+    only_past=True: chỉ đếm job có date_field THỰC SỰ đã qua so với
+    hôm nay (d < today) — dùng cho cột "JD hết hạn" để không tính nhầm
+    những job deadline còn ở tương lai (job vẫn đang mở, chưa hết hạn)
+    vào biểu đồ. Ví dụ job deadline 12/09/2026 trong khi hôm nay mới là
+    20/08/2026 sẽ KHÔNG được tính, dù deadline đó "rơi vào tháng
+    09/2026" theo lịch — vì job đó trên thực tế chưa hết hạn.
     """
     today = datetime.now().date()
     # Danh sách months_back tháng gần nhất, cũ nhất trước — tính lùi từ
@@ -297,6 +304,8 @@ def _jobs_by_month(jobs, date_field, months_back=6):
         d = _parse_any_date(job.get(date_field))
         if d is None:
             continue
+        if only_past and d >= today:
+            continue  # deadline còn ở hiện tại/tương lai -> job chưa thực sự hết hạn, bỏ qua
         key = (d.year, d.month)
         if key in counts_by_key:
             counts_by_key[key] += 1
@@ -1234,10 +1243,12 @@ def dashboard():
         jobs_by_location[j["location"]] = jobs_by_location.get(j["location"], 0) + 1
 
     # JD theo tháng (6 tháng gần nhất) — so sánh JD mới thêm vào hệ
-    # thống (date_collected) vs JD hết hạn (deadline) mỗi tháng. Dùng
-    # cho biểu đồ cột kép Chart.js ở đầu trang dashboard.
+    # thống (date_collected) vs JD đã THỰC SỰ hết hạn tính đến hôm nay
+    # (deadline, only_past=True — job có deadline còn ở tương lai vẫn
+    # đang mở, không tính vào đây). Dùng cho biểu đồ cột kép Chart.js ở
+    # đầu trang dashboard.
     monthly_labels, monthly_new = _jobs_by_month(jobs, "date_collected", months_back=6)
-    _, monthly_expired = _jobs_by_month(jobs, "deadline", months_back=6)
+    _, monthly_expired = _jobs_by_month(jobs, "deadline", months_back=6, only_past=True)
 
     companies_by_city = {}
     for c in companies:
