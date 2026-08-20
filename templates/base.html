@@ -91,7 +91,7 @@
           <div class="auth-avatar">{{ current_user.full_name[0]|upper }}</div>
           <div class="auth-info">
             <strong>{{ current_user.full_name }}</strong>
-            <span>{{ 'Team SS' if current_user.is_staff else current_user.email }}</span>
+            <span>{{ role_labels.get(current_user.role, current_user.email) if current_user.is_staff else current_user.email }}</span>
           </div>
         </div>
         <a class="btn btn-ghost btn-block" href="{{ url_for('change_password') }}" title="Đổi mật khẩu"><span class="btn-text-label">Đổi mật khẩu</span></a>

@@ -339,6 +339,15 @@ def to_bullets(value):
 
 
 @app.context_processor
+def inject_role_labels():
+    """Cho mọi template dùng được ROLE_LABELS (vd base.html hiện đúng
+    nhãn vai trò trong sidebar — 'Admin'/'Team SS'/'Học viên' — thay vì
+    hardcode 1 chữ cố định cho mọi is_staff=True, gây admin cũng hiện
+    nhầm thành 'Team SS')."""
+    return {"role_labels": ROLE_LABELS}
+
+
+@app.context_processor
 def inject_saved_job_ids():
     """Set các job_id (string UUID) mà học viên hiện tại đã lưu — dùng
     để tô nút '🔖 Đã lưu' trên mọi trang có danh sách job. Gọi GET
