@@ -17,7 +17,7 @@
      side at full .content width) while still leaving SOME margin so a
      2-column .form-grid row doesn't stretch each input into an
      awkwardly long, hard-to-scan text box. */
-  max-width: 1340px;
+  max-width: 1740px;
   /* Card has a max-width narrower than .content, so without auto
      margins it sits flush-left with a large empty gap on the right. */
   margin-left: auto;
