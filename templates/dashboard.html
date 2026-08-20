@@ -43,6 +43,55 @@
   <a href="{{ url_for('student_activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
 </p>
 
+<section class="card" style="margin-bottom: 22px;">
+  <h4>JD theo tháng — mới thêm vs hết hạn (6 tháng gần nhất)</h4>
+  <div style="position: relative; height: 320px;">
+    <canvas id="monthlyJdChart"></canvas>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("monthlyJdChart");
+  if (!canvas || typeof Chart === "undefined") return; // CDN chặn/lỗi mạng -> ẩn lặng lẽ, không làm hỏng phần còn lại của trang
+
+  var labels = {{ monthly_labels | tojson }};
+  var newCounts = {{ monthly_new | tojson }};
+  var expiredCounts = {{ monthly_expired | tojson }};
+
+  new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "JD mới thêm",
+          data: newCounts,
+          backgroundColor: "#FF5A36" // var(--accent)
+        },
+        {
+          label: "JD hết hạn",
+          data: expiredCounts,
+          backgroundColor: "#0F766E" // var(--teal)
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      },
+      plugins: {
+        legend: { position: "top" }
+      }
+    }
+  });
+})();
+</script>
+
 <div class="chart-grid">
   <section class="card">
     <h4>Job theo ngành</h4>

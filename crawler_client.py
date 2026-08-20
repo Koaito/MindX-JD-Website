@@ -314,6 +314,35 @@ def count_jobs(q="", industry="", level="", location="", status=""):
     return data.get("total", 0)
 
 
+# Backend GET /jobs giới hạn limit tối đa 200/lần gọi, cùng kiểu với
+# GET /companies (xem _MAX_COMPANIES_PAGE ở list_all_companies() bên
+# dưới) — gọi list_jobs(limit=1000) thẳng sẽ bị 422 "Input should be
+# less than or equal to 200". Dùng hàm này ở bất kỳ đâu cần TOÀN BỘ
+# job một lần (vd tính thống kê trên dashboard theo tháng — cần biết
+# deadline/date_collected của từng job, không phải chỉ 1 con số total)
+# thay vì bịa 1 con số limit lớn hơn 200.
+_MAX_JOBS_PAGE = 200
+_ALL_JOBS_SAFETY_CAP = 5000  # chặn vòng lặp vô hạn nếu backend trả total sai
+
+
+def list_all_jobs(q="", industry="", level="", location="", status=""):
+    """Lấy TOÀN BỘ job khớp filter bằng cách tự phân trang theo đúng
+    limit tối đa backend cho phép (200/lần), gộp lại thành 1 list — dùng
+    khi cần dữ liệu chi tiết (không chỉ đếm) của mọi job, ví dụ nhóm job
+    theo tháng deadline/date_collected cho dashboard."""
+    total = count_jobs(q=q, industry=industry, level=level, location=location, status=status)
+    all_items: list = []
+    offset = 0
+    while offset < total and offset < _ALL_JOBS_SAFETY_CAP:
+        page = list_jobs(q=q, industry=industry, level=level, location=location,
+                          status=status, limit=_MAX_JOBS_PAGE, offset=offset)
+        if not page:
+            break
+        all_items.extend(page)
+        offset += _MAX_JOBS_PAGE
+    return all_items
+
+
 def get_stats() -> dict:
     """GET /stats — tổng job, tổng công ty, tổng đơn ứng tuyển (total_applications,
     thêm 08/2026)... Chỉ cần API key, không cần access_token. Dùng cho dashboard."""

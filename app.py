@@ -213,6 +213,27 @@ def parse_date(value):
         return None
 
 
+def _parse_any_date(value):
+    """Như parse_date(), nhưng chấp nhận CẢ 2 dạng ngày mà API job trả
+    về: 'YYYY-MM-DD' (deadline) và ISO 8601 đầy đủ có 'T'+timezone
+    (date_collected/created_at) — cùng logic parse với filter
+    format_date() bên dưới, chỉ khác là trả về date object để tính toán
+    (group theo tháng...) thay vì string đã format sẵn để hiển thị.
+    Trả None nếu rỗng hoặc không parse được."""
+    if not value or not isinstance(value, str):
+        return None
+    text = value.replace("Z", "+00:00")  # fromisoformat không tự hiểu hậu tố "Z"
+    for parser in (
+        lambda s: datetime.fromisoformat(s),
+        lambda s: datetime.strptime(s, "%Y-%m-%d"),
+    ):
+        try:
+            return parser(text).date()
+        except ValueError:
+            continue
+    return None
+
+
 @app.template_filter("format_date")
 def format_date(value, fmt="%d/%m/%Y"):
     """Jinja filter — parse an toàn 1 chuỗi ngày/giờ trả về TỪ API (JSON
@@ -240,6 +261,49 @@ def format_date(value, fmt="%d/%m/%Y"):
         return value.strftime(fmt)  # phòng khi value lỡ đã là date/datetime thật
     except AttributeError:
         return "—"
+
+
+def _jobs_by_month(jobs, date_field, months_back=6):
+    """Đếm số job theo tháng, dựa trên field ngày chỉ định (date_field
+    là 'date_collected' hoặc 'deadline') — dùng cho biểu đồ "JD theo
+    tháng" trên dashboard (so sánh JD mới thêm vs JD hết hạn).
+
+    Trả về 2 list cùng độ dài months_back, THEO THỨ TỰ THỜI GIAN TĂNG
+    DẦN (tháng cũ nhất trước, tháng hiện tại cuối cùng):
+      - labels: ['MM/YYYY', ...] để hiện trên trục X
+      - counts: [int, ...] số job có date_field rơi vào tháng đó
+
+    Luôn trả đủ months_back tháng kể cả khi tháng đó không có job nào
+    (count=0) — để biểu đồ không bị "nhảy cóc" thiếu tháng giữa chừng.
+    Job có date_field rỗng/không parse được bị bỏ qua (không tính vào
+    tháng nào), KHÔNG làm crash việc tính toán các job còn lại.
+    """
+    today = datetime.now().date()
+    # Danh sách months_back tháng gần nhất, cũ nhất trước — tính lùi từ
+    # tháng hiện tại bằng cách trừ số tháng qua năm/tháng (không dùng
+    # timedelta vì độ dài tháng không cố định).
+    month_keys = []
+    y, m = today.year, today.month
+    for _ in range(months_back):
+        month_keys.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    month_keys.reverse()
+
+    counts_by_key = {key: 0 for key in month_keys}
+    for job in jobs:
+        d = _parse_any_date(job.get(date_field))
+        if d is None:
+            continue
+        key = (d.year, d.month)
+        if key in counts_by_key:
+            counts_by_key[key] += 1
+
+    labels = ["%02d/%d" % (m, y) for (y, m) in month_keys]
+    counts = [counts_by_key[key] for key in month_keys]
+    return labels, counts
 
 
 @app.template_filter("to_bullets")
@@ -1151,7 +1215,12 @@ def _list_all_companies():
 @staff_required
 def dashboard():
     try:
-        jobs = db_data.list_jobs()
+        # list_all_jobs() (không phải list_jobs()) — backend giới hạn
+        # 200 job/request, nhưng dashboard cần TOÀN BỘ job (không chỉ
+        # 200 job đầu) để mọi số liệu/biểu đồ khớp đúng tổng thật, đặc
+        # biệt là biểu đồ JD theo tháng bên dưới (cần biết deadline/
+        # date_collected của từng job, kể cả các job ngoài 200 đầu).
+        jobs = db_data.list_all_jobs()
         companies = _list_all_companies()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
@@ -1163,6 +1232,12 @@ def dashboard():
     jobs_by_location = {}
     for j in jobs:
         jobs_by_location[j["location"]] = jobs_by_location.get(j["location"], 0) + 1
+
+    # JD theo tháng (6 tháng gần nhất) — so sánh JD mới thêm vào hệ
+    # thống (date_collected) vs JD hết hạn (deadline) mỗi tháng. Dùng
+    # cho biểu đồ cột kép Chart.js ở đầu trang dashboard.
+    monthly_labels, monthly_new = _jobs_by_month(jobs, "date_collected", months_back=6)
+    _, monthly_expired = _jobs_by_month(jobs, "deadline", months_back=6)
 
     companies_by_city = {}
     for c in companies:
@@ -1204,6 +1279,14 @@ def dashboard():
         jobs_by_industry=jobs_by_industry, jobs_by_level=jobs_by_level,
         jobs_by_status=jobs_by_status, jobs_by_location=jobs_by_location,
         contacts_by_city=companies_by_city,
+        # Biểu đồ JD theo tháng (Chart.js, xem templates/dashboard.html)
+        # — encode sẵn thành JSON string ở đây (không phải trong
+        # template) vì |tojson trong Jinja tự escape để an toàn nhúng
+        # vào <script>, dùng nhất quán với cách các trang khác truyền
+        # dữ liệu list/dict cho JS.
+        monthly_labels=monthly_labels,
+        monthly_new=monthly_new,
+        monthly_expired=monthly_expired,
     )
 
 
