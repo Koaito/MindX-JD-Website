@@ -121,84 +121,12 @@
       });
   });
 
-  // ---- Fill the empty cell left by a short final row in the job grid ----
-  //
-  // .job-grid-3col (templates/index.html only — see public/css/04-job-
-  // cards.css) uses `grid-template-columns: repeat(auto-fit, minmax(...))`
-  // so the column count is decided by the BROWSER purely from available
-  // width — it can render 1, 2, 3, 4+ columns depending on viewport size,
-  // sidebar collapsed/expanded state, zoom level, etc. There's no single
-  // "3 columns" breakpoint to hardcode in CSS. When the number of cards
-  // on the page isn't a multiple of whatever that column count happens
-  // to be right now, the final row falls short and leaves empty grid
-  // cell(s) on the right (the gap reported on the /viec-lam listing).
-  //
-  // CSS alone can't fix this generically: nth-child math (e.g. 3n+1)
-  // only matches a column count you've hardcoded in advance, so it
-  // silently breaks the moment auto-fit resolves to a different column
-  // count than the one you wrote the selector for. This instead measures
-  // the grid's ACTUAL resolved column count at runtime and stretches
-  // however many trailing cards are short to fill the row evenly —
-  // correct at every viewport width, with nothing to keep in sync.
-  function fillLastJobGridRow() {
-    var grids = document.querySelectorAll(".job-grid.job-grid-3col");
-    grids.forEach(function (grid) {
-      var cards = Array.prototype.slice.call(grid.children);
-      if (!cards.length) return;
-
-      // Undo any span from a previous run first (e.g. after a resize that
-      // changed the column count) — otherwise a leftover span from a wider
-      // layout would incorrectly carry over into a narrower one.
-      cards.forEach(function (card) {
-        card.style.gridColumnEnd = "";
-      });
-
-      // grid-template-columns computes to a space-separated list of
-      // resolved track widths (e.g. "360px 360px 360px") regardless of
-      // whether the CSS used auto-fit/minmax or fixed values — splitting
-      // on whitespace gives the actual current column count.
-      var colCount = window.getComputedStyle(grid).gridTemplateColumns.split(" ").length;
-      if (colCount <= 1) return; // single column: every card already fills the row
-
-      var remainder = cards.length % colCount;
-      if (remainder === 0) return; // last row is already full, nothing to fill
-
-      var shortCards = cards.slice(cards.length - remainder);
-      // grid-column-end: span N only accepts a whole number, so when
-      // colCount doesn't divide evenly by remainder (e.g. 3 columns
-      // short by 2 cards -> 1.5 each, not a valid span) the extra
-      // column(s) get distributed one-at-a-time starting from the first
-      // short card: floor(colCount/remainder) as the base span for
-      // every short card, then +1 for as many of the leading cards as
-      // there are leftover columns. E.g. 3 cols / 2 cards -> base=1,
-      // leftover=1 -> [span 2, span 1]. 4 cols / 3 cards -> base=1,
-      // leftover=1 -> [span 2, span 1, span 1].
-      var baseSpan = Math.floor(colCount / remainder);
-      var leftoverCols = colCount - baseSpan * remainder;
-      shortCards.forEach(function (card, i) {
-        var span = baseSpan + (i < leftoverCols ? 1 : 0);
-        card.style.gridColumnEnd = "span " + span;
-      });
-    });
-  }
-
-  function initJobGridFill() {
-    if (!document.querySelector(".job-grid.job-grid-3col")) return;
-    fillLastJobGridRow();
-
-    // Debounced resize listener — recalculates whenever the browser
-    // reflows the grid into a different column count (window resize,
-    // sidebar collapse/expand changing available width, zoom, etc).
-    var resizeTimer;
-    window.addEventListener("resize", function () {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(fillLastJobGridRow, 120);
-    });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initJobGridFill);
-  } else {
-    initJobGridFill();
-  }
+  // NOTE: .job-grid / .job-grid-3col (/viec-lam) and .kpi-row (/dashboard)
+  // used to need a JS pass here to stretch a short trailing row of cards
+  // to fill empty space — CSS Grid's auto-fit/minmax() fixes the column
+  // count from the widest row, so a shorter last row left visible empty
+  // cells on the right. They're flexbox now (see public/css/04-job-
+  // cards.css and public/css/08-dashboard.css): flex-wrap + flex-grow
+  // makes every row, including a short last one, fill its own width
+  // natively. No JS needed for this anymore.
 })();

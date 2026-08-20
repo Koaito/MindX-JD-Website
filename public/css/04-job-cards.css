@@ -6,31 +6,34 @@
    ONLY the main /viec-lam listing (index.html) belong in the scoped
    .job-grid-3col modifier below, not in the shared .job-grid rule. */
 
+/* Flexbox, not CSS Grid — deliberately. With `flex-wrap: wrap` and each
+   card `flex: 1 1 <basis>`, every row (INCLUDING a short trailing row)
+   independently divides its own leftover space among the cards actually
+   on it. A grid's `auto-fit`/`minmax()` can't do this: the number of
+   tracks is fixed for the whole grid from the widest row, so a shorter
+   last row (e.g. 2 cards left over on a grid that fits 4 per row) leaves
+   genuine empty cells on the right — that's what previously required a
+   JS pass (fillLastJobGridRow) to fix by measuring the resolved column
+   count and manually stretching the short row's cards with
+   grid-column-end. Flexbox needs none of that: no JS, no resize
+   listener, no risk of a layout flash before JS runs. Cards are not
+   guaranteed pixel-perfect column alignment across rows the way grid
+   tracks are, but with uniform card content that's not visually
+   noticeable and the tradeoff is worth the simplicity. */
 .job-grid {
-  display: grid;
-  /* auto-fit (not auto-fill) collapses empty tracks, so the grid never
-     leaves a gap of empty space on the right — cards always stretch to
-     fill the full width of the row while still wrapping responsively. */
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
-/* Column count is intentionally NOT pinned to a fixed number at any
-   breakpoint (no "3 columns above 1100px" rule) — auto-fit lets the
-   browser decide 1/2/3/4+ columns purely from available width vs each
-   card's minmax(). That means the "how many cards short is the last
-   row, and how much should they stretch to fill it" question can't be
-   answered in CSS alone (CSS has no way to read auto-fit's own resolved
-   column count). That part is handled by JS instead — see
-   fillLastJobGridRow() in public/app.js, which measures the grid's
-   actual computed column count at runtime (on load + resize) and sets
-   grid-column-end: span N directly on however many trailing cards are
-   short, for however many columns are actually showing right now. This
-   keeps the layout correct at every viewport width without hardcoding
-   breakpoints here that would need to be kept in sync with a column
-   count decided by auto-fit. */
-.job-grid.job-grid-3col {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+.job-grid > * {
+  flex: 1 1 320px;
+}
+
+/* /viec-lam listing (templates/index.html) only — same mechanism as
+   .job-grid above, just a smaller basis so more cards fit per row. */
+.job-grid.job-grid-3col > * {
+  flex-basis: 300px;
 }
 
 .ticket {

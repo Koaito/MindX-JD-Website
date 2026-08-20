@@ -88,7 +88,11 @@
   .content { padding: 24px; }
   .detail-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
-  .kpi-row { grid-template-columns: 1fr 1fr; }
+  /* .kpi-row is flexbox (public/css/08-dashboard.css) — force 2-per-row
+     on mobile by giving each card a basis just over half the row width,
+     since flex-basis (not grid-template-columns) is what controls its
+     column count now. */
+  .kpi-row > * { flex-basis: 45%; }
   .chart-grid { grid-template-columns: 1fr; }
   /* Sidebar collapse doesn't apply once .shell drops to a single column —
      always show full nav text/labels below the breakpoint. */

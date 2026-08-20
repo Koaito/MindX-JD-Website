@@ -7,26 +7,26 @@
    shared @media block in 10-pagination-responsive.css — check there too
    if changing behavior below ~900px. */
 
-/* Same auto-fit + minmax pattern as .job-grid (public/css/04-job-cards.
-   css) — 1fr as the max means each card stretches to evenly fill
-   whatever width is left in the row, same as the job cards. The max-
-   width cap in the previous version of this rule (260px + justify-
-   content: space-between) was wrong: with a fixed 5 cards, auto-fit
-   only ever creates 5 tracks (no wrapping happens on typical screens
-   since there's room for all 5), so capping each track's max width left
-   genuine unused space in the row, and space-between then pushed that
-   leftover space into gaps BETWEEN cards — cards visibly bunched at the
-   two edges with the middle looking hollow, not "full width" at all.
-   minmax(170px, 1fr) instead lets every card grow to fill the entire
-   row edge-to-edge, same as the job-grid cards do. 170px (not larger)
-   keeps all 5 cards on one row down to ~1280px-wide screens after
-   sidebar+padding; a bigger minmax would start wrapping to 2 rows on
-   common laptop widths (1280–1440px). */
+/* Flexbox, not CSS Grid — same reasoning as .job-grid in public/css/04-
+   job-cards.css. With 6 cards, a grid's auto-fit could resolve to e.g.
+   4 tracks on typical screens: row 1 fills all 4, row 2 only has the
+   remaining 2 cards but is still divided into those same 4 fixed
+   tracks, leaving 2 empty cells on the right (the "KPI row 2 stops
+   halfway" gap). Flexbox sizes each row's leftover space independently,
+   so a short second row of 2 cards still splits 100% of the row width
+   between just those 2 — no JS needed to detect/fix a short trailing
+   row. 170px basis (not larger) keeps all 6 cards on one row down to
+   ~1280px-wide screens after sidebar+padding; a bigger basis would
+   start wrapping to 2 rows on common laptop widths (1280–1440px). */
 .kpi-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 22px;
+}
+
+.kpi-row > * {
+  flex: 1 1 170px;
 }
 
 .kpi-card {
