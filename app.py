@@ -1089,8 +1089,23 @@ def contacts_index():
         flash(str(exc), "error")
         companies = []
 
+    # staff_members: dropdown "gán phụ trách" trên mỗi dòng contact (thêm
+    # 08/2026) — chỉ ss_team/admin mới được gán (khớp _validate_assignee()
+    # phía backend), tái dùng GET /auth/users đã gọi sẵn ở nhiều trang
+    # quản trị khác (staff_accounts, student_activity), không route riêng.
+    try:
+        all_users = backend_auth.list_users(access_token)
+        staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        staff_members = []
+    # staff_by_id: tra tên hiển thị cho c.assigned_ss_user (chỉ là UUID)
+    # trong template — dùng chung ở cả contacts.html lẫn staff_activity*.html.
+    staff_by_id = {u["ss_user_id"]: u for u in staff_members}
+
     return render_template(
         "contacts.html", contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
+        staff_members=staff_members, staff_by_id=staff_by_id,
         filters={"status": status_vn, "company_id": company_id, "q": search},
     )
 
@@ -1201,6 +1216,33 @@ def contact_hard_delete(company_id, contact_id):
         flash("Đã xoá hẳn người liên hệ (không thể khôi phục).", "success")
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
+    return redirect(url_for("company_detail", company_id=company_id))
+
+
+@app.route("/companies/<string:company_id>/contacts/<string:contact_id>/assign", methods=["POST"])
+@staff_required
+def contact_assign(company_id, contact_id):
+    """Gán (hoặc bỏ gán, khi select để trống) người phụ trách 1 contact
+    — thêm 08/2026, dùng ở contacts.html (dropdown inline, cùng cách
+    làm với contact_update_status() ở trên) và staff_activity_detail.html
+    (đổi người phụ trách ngay tại trang xem hoạt động 1 staff).
+
+    next: URL quay lại sau khi submit — mặc định company_detail, nhưng
+    contacts.html/staff_activity_detail.html truyền request.referrer qua
+    hidden input để user quay lại ĐÚNG trang đang đứng (danh sách contact
+    tổng hợp, hoặc trang staff-activity của người vừa được gán) thay vì
+    luôn nhảy về company_detail như các route contact khác."""
+    try:
+        _call_authed(
+            db_data.assign_contact, company_id, contact_id,
+            request.form.get("assigned_ss_user", ""),
+        )
+        flash("Đã cập nhật người phụ trách.", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+    next_url = request.form.get("next", "")
+    if next_url and next_url.startswith("/"):
+        return redirect(next_url)
     return redirect(url_for("company_detail", company_id=company_id))
 
 
@@ -1501,6 +1543,94 @@ def student_activity_detail(ss_user_id):
     return render_template(
         "student_activity_detail.html", student=student,
         applications=applications, saved_jobs=saved_jobs,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Hoạt động team SS/admin — theo dõi 1 thành viên đã tự thêm job/company/
+# contact nào, và đang được giao phụ trách contact nào (thêm 08/2026).
+#
+# Mirror ĐÚNG cấu trúc 2-route của /student-activity ở trên (xem comment
+# khối đó để biết lý do tách index/detail: trang danh sách KHÔNG gọi
+# thêm API nào ngoài GET /auth/users để luôn nhẹ dù số staff tăng lên,
+# việc đếm/liệt kê job-company-contact CHỈ xảy ra khi bấm vào xem 1
+# người cụ thể). Khác /student-activity ở việc lọc role != 'user' (staff
+# thay vì học viên), và trang chi tiết có 4 mục thay vì 2 (job đã tạo,
+# company đã tạo, contact đã tạo, contact được giao phụ trách) — 2 mục
+# cuối dùng 2 field ĐỘC LẬP nhau của company_contacts (created_by vs
+# assigned_ss_user, xem crawler_client.list_all_contacts()).
+# ---------------------------------------------------------------------------
+
+@app.route("/staff-activity")
+@staff_required
+def staff_activity_index():
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        all_users = backend_auth.list_users(access_token)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        all_users = []
+
+    staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
+
+    return render_template("staff_activity.html", staff_members=staff_members)
+
+
+@app.route("/staff-activity/<string:ss_user_id>")
+@staff_required
+def staff_activity_detail(ss_user_id):
+    access_token, _ = _auth_tokens_from_session()
+
+    staff_member = None
+    all_users = []
+    try:
+        all_users = backend_auth.list_users(access_token)
+        staff_member = next(
+            (u for u in all_users if u["ss_user_id"] == ss_user_id and u.get("role") in ("ss_team", "admin")),
+            None,
+        )
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+    if staff_member is None:
+        abort(404)
+
+    # staff_members: dropdown "gán phụ trách" ngay trên trang này (đổi
+    # người phụ trách 1 contact mà không cần rời trang) — cùng danh sách
+    # dùng ở contacts.html. staff_by_id: tra tên "người tạo" hiển thị ở
+    # mục "Contact đang phụ trách" bên dưới (người tạo có thể KHÁC người
+    # đang xem trang này, vì đây là 2 field độc lập).
+    staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
+    staff_by_id = {u["ss_user_id"]: u for u in all_users}
+
+    try:
+        jobs_created = db_data.list_all_jobs(created_by=ss_user_id)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        jobs_created = []
+
+    try:
+        companies_created = db_data.list_all_companies(created_by=ss_user_id)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        companies_created = []
+
+    try:
+        contacts_created = db_data.list_all_contacts(access_token, created_by=ss_user_id)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        contacts_created = []
+
+    try:
+        contacts_assigned = db_data.list_all_contacts(access_token, assigned_ss_user=ss_user_id)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        contacts_assigned = []
+
+    return render_template(
+        "staff_activity_detail.html", staff_member=staff_member,
+        staff_members=staff_members, staff_by_id=staff_by_id,
+        jobs_created=jobs_created, companies_created=companies_created,
+        contacts_created=contacts_created, contacts_assigned=contacts_assigned,
     )
 
 

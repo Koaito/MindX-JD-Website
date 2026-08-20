@@ -58,6 +58,29 @@
    (Chưa đánh giá) so it never has to wrap and get clipped. */
 .col-potential { min-width: 110px; }
 
+/* Role chip (staff_activity.html "Vai trò" column) + "Bạn" badge next to
+   your own name in the same table — small, neutral, reuses .fit-chip's
+   sizing but its own color (not tied to partnership-potential meaning). */
+.role-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.you-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 
 
 .status-inline select {

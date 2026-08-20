@@ -1,0 +1,20 @@
+{# Partial "gán phụ trách" dùng chung — cần truyền vào (từ template gọi,
+   qua {% include %} với context):
+     c             : 1 dict contact (từ crawler_client._normalize_contact,
+                     cần có .id, .company_id, .assigned_ss_user)
+     staff_members : list user dict (role ss_team/admin) cho dropdown
+     next_url      : URL quay lại sau khi submit (thường request.path
+                     của trang đang đứng)
+   Route đích: contact_assign(company_id, contact_id) trong app.py —
+   PATCH .../assign phía backend, cho phép bỏ gán về NULL tường minh
+   khi chọn "— Chưa gán —" (value rỗng), khác PATCH thường (update_contact)
+   vốn không ghi đè field không gửi lên. #}
+<form method="post" action="{{ url_for('contact_assign', company_id=c.company_id, contact_id=c.id) }}" class="status-inline">
+  <input type="hidden" name="next" value="{{ next_url }}">
+  <select name="assigned_ss_user" onchange="this.form.submit()">
+    <option value="">— Chưa gán —</option>
+    {% for u in staff_members %}
+      <option value="{{ u.ss_user_id }}" {{ 'selected' if c.assigned_ss_user == u.ss_user_id }}>{{ u.full_name }}</option>
+    {% endfor %}
+  </select>
+</form>

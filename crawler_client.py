@@ -204,6 +204,13 @@ def _normalize_job(raw: dict) -> dict | None:
         "status": JOB_STATUS_MAP.get(raw.get("job_status") or "", raw.get("job_status") or ""),
         "status_raw": raw.get("job_status") or "OPEN",
         "note": raw.get("ss_team_notes") or "",
+        # created_by/updated_by (thêm 08/2026, trang /staff-activity) — ai
+        # tự nhập tay job này qua web. NULL với job crawl tự động (chỉ
+        # job POST /jobs thủ công mới có, xem api/routers/jobs.py). Giữ
+        # nguyên UUID string hoặc None, KHÔNG có bảng map hiển thị vì
+        # đây là id, template tự tra tên qua danh sách staff khi cần.
+        "created_by": raw.get("created_by"),
+        "updated_by": raw.get("updated_by"),
     }
 
 
@@ -228,6 +235,10 @@ def _normalize_company(raw: dict) -> dict | None:
         ),
         "date_collected": raw.get("created_at"),
         "jobs": jobs,
+        # created_by/updated_by — cùng ý nghĩa với _normalize_job(), xem
+        # comment ở đó. NULL với company crawl tự động.
+        "created_by": raw.get("created_by"),
+        "updated_by": raw.get("updated_by"),
     }
 
 
@@ -248,6 +259,13 @@ def _normalize_contact(raw: dict) -> dict | None:
         "status": CONTACT_STATUS_MAP.get(raw.get("contact_status") or "", raw.get("contact_status") or ""),
         "status_raw": raw.get("contact_status") or "UNCONTACTED",
         "is_active": raw.get("is_active", True),
+        # created_by — ai tự thêm contact này (xem _normalize_job() cho
+        # ý nghĩa chung). assigned_ss_user — ai đang PHỤ TRÁCH contact
+        # này (khác created_by, có thể là người khác — xem
+        # assign_contact() bên dưới), NULL nếu chưa gán ai.
+        "created_by": raw.get("created_by"),
+        "updated_by": raw.get("updated_by"),
+        "assigned_ss_user": raw.get("assigned_ss_user"),
     }
     # company_name chỉ có mặt khi raw đến từ GET /contacts (danh sách gộp
     # mọi công ty, xem list_all_contacts() bên dưới) — GET
@@ -276,7 +294,7 @@ def _build_parsed_content(form) -> dict:
 # Jobs
 # ---------------------------------------------------------------------------
 
-def list_jobs(q="", industry="", level="", location="", status="", limit=200, offset=0):
+def list_jobs(q="", industry="", level="", location="", status="", created_by="", limit=200, offset=0):
     params = {"limit": limit, "offset": offset}
     if q:
         params["keyword"] = q
@@ -288,12 +306,18 @@ def list_jobs(q="", industry="", level="", location="", status="", limit=200, of
         params["province"] = location
     if status:
         params["status"] = JOB_STATUS_MAP_REV.get(status, status)
+    if created_by:
+        # Lọc job do 1 thành viên ss_team/admin cụ thể TỰ NHẬP TAY (thêm
+        # 08/2026, trang /staff-activity) — job crawl tự động có
+        # created_by NULL nên không bao giờ khớp filter này, xem
+        # api/routers/jobs.py::list_jobs().
+        params["created_by"] = created_by
     data = _request("GET", "/jobs", params=params) or {}
     items = data.get("items", data if isinstance(data, list) else [])
     return [_normalize_job(j) for j in items]
 
 
-def count_jobs(q="", industry="", level="", location="", status=""):
+def count_jobs(q="", industry="", level="", location="", status="", created_by=""):
     """Dùng field `total` backend trả sẵn trong response phân trang —
     KHÔNG cố lấy limit=1000 rồi đếm len() (backend chặn limit tối đa
     200, gửi 1000 sẽ bị 422 'Input should be less than or equal to 200').
@@ -310,6 +334,8 @@ def count_jobs(q="", industry="", level="", location="", status=""):
         params["province"] = location
     if status:
         params["status"] = JOB_STATUS_MAP_REV.get(status, status)
+    if created_by:
+        params["created_by"] = created_by
     data = _request("GET", "/jobs", params=params) or {}
     return data.get("total", 0)
 
@@ -325,17 +351,19 @@ _MAX_JOBS_PAGE = 200
 _ALL_JOBS_SAFETY_CAP = 5000  # chặn vòng lặp vô hạn nếu backend trả total sai
 
 
-def list_all_jobs(q="", industry="", level="", location="", status=""):
+def list_all_jobs(q="", industry="", level="", location="", status="", created_by=""):
     """Lấy TOÀN BỘ job khớp filter bằng cách tự phân trang theo đúng
     limit tối đa backend cho phép (200/lần), gộp lại thành 1 list — dùng
     khi cần dữ liệu chi tiết (không chỉ đếm) của mọi job, ví dụ nhóm job
-    theo tháng deadline/date_collected cho dashboard."""
-    total = count_jobs(q=q, industry=industry, level=level, location=location, status=status)
+    theo tháng deadline/date_collected cho dashboard, hoặc "mọi job 1
+    staff đã tự nhập tay" cho trang /staff-activity (created_by=uid)."""
+    total = count_jobs(q=q, industry=industry, level=level, location=location,
+                        status=status, created_by=created_by)
     all_items: list = []
     offset = 0
     while offset < total and offset < _ALL_JOBS_SAFETY_CAP:
         page = list_jobs(q=q, industry=industry, level=level, location=location,
-                          status=status, limit=_MAX_JOBS_PAGE, offset=offset)
+                          status=status, created_by=created_by, limit=_MAX_JOBS_PAGE, offset=offset)
         if not page:
             break
         all_items.extend(page)
@@ -418,12 +446,17 @@ def update_job_status(access_token, job_id, status_vn):
 # Companies
 # ---------------------------------------------------------------------------
 
-def list_companies(q="", city="", limit=200, offset=0):
+def list_companies(q="", city="", created_by="", limit=200, offset=0):
     params = {"limit": limit, "offset": offset}
     if q:
         params["keyword"] = q
     if city:
         params["province"] = city
+    if created_by:
+        # Lọc công ty do 1 thành viên ss_team/admin cụ thể TỰ THÊM TAY
+        # (thêm 08/2026, trang /staff-activity) — company crawl tự động
+        # có created_by NULL nên không bao giờ khớp filter này.
+        params["created_by"] = created_by
     data = _request("GET", "/companies", params=params) or {}
     items = data.get("items", data if isinstance(data, list) else [])
     return [_normalize_company(c) for c in items]
@@ -438,16 +471,21 @@ _MAX_COMPANIES_PAGE = 200
 _ALL_COMPANIES_SAFETY_CAP = 5000  # chặn vòng lặp vô hạn nếu backend trả total sai
 
 
-def list_all_companies():
+def list_all_companies(created_by=""):
     """Lấy TOÀN BỘ công ty bằng cách tự phân trang theo đúng limit tối đa
-    backend cho phép (200/lần), gộp lại thành 1 list — không lọc q/city vì
-    chỉ dùng cho dropdown chọn công ty (cần thấy hết, không phải danh sách
-    chính đang được filter)."""
-    total = count_companies()
+    backend cho phép (200/lần), gộp lại thành 1 list.
+
+    created_by mặc định rỗng (không lọc) — hành vi gốc không đổi cho
+    mọi lời gọi cũ (list_all_companies() không tham số vẫn trả về TOÀN
+    BỘ công ty, dùng cho dropdown chọn công ty — cần thấy hết). Truyền
+    created_by=uid khi cần biến thể có lọc, vd "mọi công ty 1 staff đã
+    tự thêm tay" cho trang /staff-activity — cùng 1 hàm, không tách
+    riêng hàm mới để tránh trùng lặp logic phân trang."""
+    total = count_companies(created_by=created_by)
     all_items: list = []
     offset = 0
     while offset < total and offset < _ALL_COMPANIES_SAFETY_CAP:
-        page = list_companies(limit=_MAX_COMPANIES_PAGE, offset=offset)
+        page = list_companies(created_by=created_by, limit=_MAX_COMPANIES_PAGE, offset=offset)
         if not page:
             break
         all_items.extend(page)
@@ -455,7 +493,7 @@ def list_all_companies():
     return all_items
 
 
-def count_companies(q="", city=""):
+def count_companies(q="", city="", created_by=""):
     """Dùng field `total` backend trả sẵn — xem giải thích ở count_jobs().
     Nhận đúng bộ filter như list_companies() để khớp danh sách đang lọc."""
     params = {"limit": 1}
@@ -463,6 +501,8 @@ def count_companies(q="", city=""):
         params["keyword"] = q
     if city:
         params["province"] = city
+    if created_by:
+        params["created_by"] = created_by
     data = _request("GET", "/companies", params=params) or {}
     return data.get("total", 0)
 
@@ -523,11 +563,12 @@ def update_company(access_token, company_id, form) -> dict:
 # Company contacts (người liên hệ HR) — bảng CON của company, route riêng
 # ---------------------------------------------------------------------------
 
-def list_all_contacts(access_token, *, status_raw="", company_id="", search=""):
+def list_all_contacts(access_token, *, status_raw="", company_id="", search="",
+                       created_by="", assigned_ss_user=""):
     """GET /contacts — danh sách contact GỘP TẤT CẢ công ty (khác
     list_contacts() bên dưới chỉ trả theo 1 company_id), kèm company_name.
     Dùng cho trang "Danh sách contact" tổng hợp (route /contacts,
-    contacts_index() trong app.py).
+    contacts_index() trong app.py) và trang /staff-activity/<id>.
 
     Mặc định CHỈ trả contact đang active (include_inactive=False) — khác
     list_contacts() (luôn include_inactive=True) vì trang tổng hợp này là
@@ -537,6 +578,13 @@ def list_all_contacts(access_token, *, status_raw="", company_id="", search=""):
     status_raw: mã tiếng Anh (vd 'UNCONTACTED'), KHÔNG phải nhãn tiếng
     Việt hiển thị trên UI — app.py tự tra CONTACT_STATUS_MAP_REV trước
     khi gọi hàm này, giống pattern update_contact_status().
+
+    created_by / assigned_ss_user (thêm 08/2026, trang /staff-activity):
+    2 filter ĐỘC LẬP nhau — created_by = ai TẠO contact, assigned_ss_user
+    = ai đang PHỤ TRÁCH contact (có thể là người khác created_by). Không
+    có response `total` (route backend không phân trang, xem
+    api/routers/contacts.py::list_all_contacts) — dùng len() nếu cần đếm,
+    chấp nhận được vì kết quả đã lọc theo 1 người nên luôn nhỏ.
     """
     params = {}
     if status_raw:
@@ -545,6 +593,10 @@ def list_all_contacts(access_token, *, status_raw="", company_id="", search=""):
         params["company_id"] = company_id
     if search:
         params["search"] = search
+    if created_by:
+        params["created_by"] = created_by
+    if assigned_ss_user:
+        params["assigned_ss_user"] = assigned_ss_user
     raw = _request("GET", "/contacts", access_token=access_token, params=params) or []
     return [_normalize_contact(c) for c in raw]
 
@@ -579,6 +631,10 @@ def create_contact(access_token, company_id, form) -> dict:
         "social_link": (form.get("contact_link") or "").strip() or None,
         "phone_number": (form.get("phone") or "").strip() or None,
         "found_source": (form.get("source") or "").strip() or None,
+        # assigned_ss_user (thêm 08/2026) — gán người phụ trách NGAY lúc
+        # tạo, optional (form không có ô này thì bỏ trống -> NULL, gán
+        # sau qua assign_contact()/route /assign như thường lệ).
+        "assigned_ss_user": (form.get("assigned_ss_user") or "").strip() or None,
     }
     raw = _request("POST", f"/companies/{company_id}/contacts", access_token=access_token, json=payload)
     return _normalize_contact(raw)
@@ -601,6 +657,23 @@ def update_contact_status(access_token, company_id, contact_id, status_vn):
     raw = _request(
         "PATCH", f"/companies/{company_id}/contacts/{contact_id}",
         access_token=access_token, json={"contact_status": code},
+    )
+    return _normalize_contact(raw)
+
+
+def assign_contact(access_token, company_id, contact_id, assigned_ss_user):
+    """PATCH /companies/{company_id}/contacts/{contact_id}/assign (thêm
+    08/2026) — gán (hoặc BỎ gán khi assigned_ss_user rỗng/None) người
+    phụ trách 1 contact. Route RIÊNG khỏi update_contact_status() ở trên
+    vì backend cần phân biệt "field không gửi lên" (giữ nguyên) với
+    "gửi lên NULL tường minh" (bỏ gán) — xem ContactAssignUpdate trong
+    api/schemas.py và docstring assign_contact() ở db.py backend.
+
+    assigned_ss_user: ss_user_id (UUID) của thành viên ss_team/admin, hoặc
+    "" / None để bỏ gán — cả 2 đều gửi JSON null lên backend."""
+    raw = _request(
+        "PATCH", f"/companies/{company_id}/contacts/{contact_id}/assign",
+        access_token=access_token, json={"assigned_ss_user": assigned_ss_user or None},
     )
     return _normalize_contact(raw)
 

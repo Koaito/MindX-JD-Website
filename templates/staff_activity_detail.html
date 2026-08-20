@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ staff_member.full_name }} — Hoạt động team SS — MindX Career Hub{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+{% set next_url = request.path %}
+
+<a class="back-link" href="{{ url_for('staff_activity_index') }}">← Hoạt động team SS</a>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị / Hoạt động team SS</span>
+    <h1>{{ staff_member.full_name }}</h1>
+    <p class="lede">
+      {{ staff_member.email }} · {{ role_labels.get(staff_member.role, staff_member.role) }}
+    </p>
+  </div>
+</header>
+
+<div class="card student-summary-card">
+  <dl class="kv">
+    <dt>Job đã tạo</dt><dd>{{ jobs_created|length }}</dd>
+    <dt>Công ty đã tạo</dt><dd>{{ companies_created|length }}</dd>
+    <dt>Contact đã tạo</dt><dd>{{ contacts_created|length }}</dd>
+    <dt>Contact đang phụ trách</dt><dd>{{ contacts_assigned|length }}</dd>
+  </dl>
+  <dl class="kv">
+    <dt>Ngày tạo tài khoản</dt><dd>{{ staff_member.created_at|format_date }}</dd>
+  </dl>
+</div>
+
+<div class="activity-section-head">
+  <h2>💼 Job đã tạo ({{ jobs_created|length }})</h2>
+</div>
+{% if jobs_created %}
+<div class="job-grid">
+  {% for job in jobs_created %}
+  <article class="ticket">
+    <div class="ticket-stub">
+      <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
+      {% if job.industry %}<span class="ticket-industry ind-{{ loop.index0 % 3 }}">{{ job.industry }}</span>{% endif %}
+      {% if job.level %}<span class="ticket-level">{{ job.level }}</span>{% endif %}
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-top">
+        <h3><a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.position }}</a></h3>
+        <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
+      </div>
+      <p class="ticket-company">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}</p>
+      <div class="ticket-meta">
+        <span>📅 Hạn: {{ job.deadline|format_date if job.deadline else '—' }}</span>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Thành viên này chưa tự thêm job nào.</p>
+</div>
+{% endif %}
+
+<div class="activity-section-head">
+  <h2>🏢 Công ty đã tạo ({{ companies_created|length }})</h2>
+</div>
+{% if companies_created %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Công ty</th>
+        <th>Lĩnh vực</th>
+        <th>Thành phố</th>
+        <th class="col-potential">Tiềm năng</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in companies_created %}
+      <tr>
+        <td><strong><a href="{{ url_for('company_detail', company_id=c.id) }}">{{ c.company }}</a></strong></td>
+        <td class="muted">{{ c.industry or '—' }}</td>
+        <td>{{ c.city or '—' }}</td>
+        <td><span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span></td>
+        <td class="actions-cell">
+          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Thành viên này chưa tự thêm công ty nào.</p>
+</div>
+{% endif %}
+
+<div class="activity-section-head">
+  <h2>☎ Contact đã tạo ({{ contacts_created|length }})</h2>
+</div>
+{% if contacts_created %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Tên</th>
+        <th>Công ty</th>
+        <th>Email</th>
+        <th>Trạng thái</th>
+        <th>Đang phụ trách</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contacts_created %}
+      <tr>
+        <td><strong>{{ c.contact_name }}</strong></td>
+        <td>
+          {% if c.company_id %}
+          <a href="{{ url_for('company_detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          {% else %}
+          <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ c.email or '—' }}</td>
+        <td class="muted">{{ c.status }}</td>
+        <td>{% include "_contact_assign_cell.html" with context %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Thành viên này chưa tự thêm contact nào.</p>
+</div>
+{% endif %}
+
+<div class="activity-section-head">
+  <h2>🗂️ Contact đang phụ trách ({{ contacts_assigned|length }})</h2>
+  <span class="muted">Độc lập với mục "Contact đã tạo" ở trên — người phụ trách có thể khác người tạo.</span>
+</div>
+{% if contacts_assigned %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Tên</th>
+        <th>Công ty</th>
+        <th>Email</th>
+        <th>Người tạo</th>
+        <th>Trạng thái</th>
+        <th>Đổi người phụ trách</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contacts_assigned %}
+      <tr>
+        <td><strong>{{ c.contact_name }}</strong></td>
+        <td>
+          {% if c.company_id %}
+          <a href="{{ url_for('company_detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          {% else %}
+          <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ c.email or '—' }}</td>
+        <td class="muted">{{ staff_by_id.get(c.created_by).full_name if c.created_by and staff_by_id.get(c.created_by) else '—' }}</td>
+        <td class="muted">{{ c.status }}</td>
+        <td>{% include "_contact_assign_cell.html" with context %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Thành viên này chưa được giao phụ trách contact nào.</p>
+</div>
+{% endif %}
+
+{% endblock %}

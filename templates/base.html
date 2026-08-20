@@ -72,6 +72,9 @@
       <a href="{{ url_for('student_activity_index') }}" class="{{ 'active' if request.endpoint in ['student_activity_index','student_activity_detail'] else '' }}" title="Hoạt động học viên">
         <span class="nav-ic">🎯</span> <span class="nav-text">Hoạt động học viên</span>
       </a>
+      <a href="{{ url_for('staff_activity_index') }}" class="{{ 'active' if request.endpoint in ['staff_activity_index','staff_activity_detail'] else '' }}" title="Hoạt động team SS">
+        <span class="nav-ic">🗂️</span> <span class="nav-text">Hoạt động team SS</span>
+      </a>
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Hoạt động team SS — MindX Career Hub{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Hoạt động team SS</h1>
+    <p class="lede">
+      Chọn 1 thành viên để xem job/công ty/contact họ đã tự thêm tay, và contact
+      đang được giao cho họ phụ trách — dùng để nắm ai đang làm việc gì.
+    </p>
+  </div>
+</header>
+
+{% if staff_members %}
+<div class="filter-bar" id="staffFilterBar">
+  <input type="text" id="staffSearchInput" placeholder="Tìm theo họ tên, email…">
+</div>
+<p class="result-count" id="staffResultCount"></p>
+
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Họ tên</th>
+        <th>Email</th>
+        <th>Vai trò</th>
+        <th>Ngày tạo tài khoản</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="staffTableBody">
+      {% for s in staff_members %}
+      <tr data-name="{{ s.full_name|lower }}" data-email="{{ s.email|lower }}">
+        <td>
+          <strong>{{ s.full_name }}</strong>
+          {% if current_user.is_authenticated and s.ss_user_id == current_user.id %}
+            <span class="you-badge">Bạn</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ s.email }}</td>
+        <td><span class="role-chip">{{ role_labels.get(s.role, s.role) }}</span></td>
+        <td class="muted">{{ s.created_at|format_date }}</td>
+        <td>
+          <a class="btn btn-text" href="{{ url_for('staff_activity_detail', ss_user_id=s.ss_user_id) }}">
+            Xem hoạt động →
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Lọc phía client — cùng cách làm với /student-activity
+  // (student_activity.html): danh sách staff trả về toàn bộ 1 lần,
+  // không phân trang (số lượng nhân sự team SS luôn nhỏ).
+  var searchInput = document.getElementById("staffSearchInput");
+  var countEl = document.getElementById("staffResultCount");
+  var rows = Array.prototype.slice.call(document.querySelectorAll("#staffTableBody tr"));
+  if (!rows.length) return;
+
+  function applyFilter() {
+    var q = (searchInput.value || "").trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var show = !q || row.dataset.name.indexOf(q) !== -1 || row.dataset.email.indexOf(q) !== -1;
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    countEl.textContent = "Hiển thị " + visible + " / " + rows.length + " thành viên";
+  }
+
+  searchInput.addEventListener("input", applyFilter);
+  applyFilter();
+})();
+</script>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có thành viên team SS nào, hoặc không tải được danh sách (xem thông báo lỗi phía trên nếu có).</p>
+</div>
+{% endif %}
+
+{% endblock %}

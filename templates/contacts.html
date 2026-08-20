@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Danh sách contact — MindX Career Hub{% endblock %}
 {% block content %}
+{% set next_url = request.path %}
 
 <header class="page-head">
   <div>
@@ -49,6 +50,7 @@
         <th>Nguồn</th>
         <th>Liên hệ gần nhất</th>
         <th>Trạng thái</th>
+        <th>Phụ trách</th>
         <th></th>
       </tr>
     </thead>
@@ -77,6 +79,7 @@
             </select>
           </form>
         </td>
+        <td>{% include "_contact_assign_cell.html" with context %}</td>
         <td class="actions-cell">
           <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
           <form method="post" action="{{ url_for('contact_delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
