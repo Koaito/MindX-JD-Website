@@ -48,6 +48,45 @@ login_manager.login_message = "Vui lòng đăng nhập để tiếp tục."
 login_manager.login_message_category = "error"
 
 # ---------------------------------------------------------------------------
+# Cache-busting cho CSS/JS tĩnh (public/style.css, public/app.js)
+#
+# Vercel tự CDN hoá thư mục public/ (xem comment ở static_folder phía trên)
+# — request tới /style.css, /app.js KHÔNG chạy qua Flask nữa nên Flask
+# không kiểm soát được cache-control của chúng. Vì <link>/<script> trong
+# base.html trước giờ trỏ y nguyên 1 URL không đổi (/style.css, /app.js),
+# mỗi lần deploy code CSS/JS mới, CDN/trình duyệt đã cache bản cũ vẫn có
+# thể tiếp tục phục vụ y nguyên bản cũ — nhìn như "code mới không lên".
+#
+# Cách sửa: gắn thêm ?v=<mtime file mới nhất> vào URL trong base.html
+# (asset_version() bên dưới). mtime đổi mỗi khi nội dung file thật sự đổi
+# (git checkout/deploy ghi lại file -> mtime mới) -> URL đổi -> CDN/trình
+# duyệt buộc phải tải bản mới, không cần tự tay đổi version mỗi lần sửa
+# CSS/JS. style.css chỉ @import các file css/*.css (bản thân nó hiếm khi
+# đổi nội dung) nên version của "style.css" tính theo mtime MỚI NHẤT
+# trong số chính nó + toàn bộ public/css/*.css nó kéo vào.
+def _asset_version(filename):
+    base_dir = app.static_folder
+    paths = [os.path.join(base_dir, filename)]
+    if filename == "style.css":
+        css_dir = os.path.join(base_dir, "css")
+        if os.path.isdir(css_dir):
+            paths += [
+                os.path.join(css_dir, f)
+                for f in os.listdir(css_dir)
+                if f.endswith(".css")
+            ]
+    mtimes = []
+    for p in paths:
+        try:
+            mtimes.append(os.path.getmtime(p))
+        except OSError:
+            pass
+    return str(int(max(mtimes))) if mtimes else "0"
+
+
+app.jinja_env.globals["asset_version"] = _asset_version
+
+# ---------------------------------------------------------------------------
 # Hằng số dropdown (không phải model DB — chỉ là danh sách lựa chọn UI)
 #
 # ⚠️ Đổi 08/2026 (khớp đúng enum backend thật, xem lịch sử trao đổi):
