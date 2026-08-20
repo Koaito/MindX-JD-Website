@@ -9,13 +9,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
-  /* Was 820px, a second (narrower) cap stacked inside the already-capped
-     .content — on wide screens this doubled up the empty side margins
-     specifically on form pages (add job/company/contact...). Widened so
-     the form fills most of .content's width; still capped well below
-     .content's 1600px so a 2-column .form-grid row doesn't stretch each
-     input into an awkwardly long, hard-to-scan text box. */
-  max-width: 1040px;
+  /* Was 820px, then 1040px — on wide screens (.content maxes out at
+     1600px, minus its own 56px*2 padding = 1488px usable) 1040px still
+     left a ~224px empty gutter on each side, which read as wasted space
+     on form pages (add job/company/contact...). Widened again to shrink
+     that gutter to roughly 1/3 of what it was (~224px -> ~75px each
+     side at full .content width) while still leaving SOME margin so a
+     2-column .form-grid row doesn't stretch each input into an
+     awkwardly long, hard-to-scan text box. */
+  max-width: 1340px;
   /* Card has a max-width narrower than .content, so without auto
      margins it sits flush-left with a large empty gap on the right. */
   margin-left: auto;
