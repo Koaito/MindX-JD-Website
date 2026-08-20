@@ -25,11 +25,9 @@
     {# Company CHỈ chọn được lúc TẠO job — backend không cho đổi company
        của job đã tồn tại (PATCH /jobs/{id} không nhận company_id) #}
     <label class="full">Công ty *
-      <select name="company_id" id="company_id_select" required onchange="document.getElementById('new_company_fields').style.display = this.value === '__new__' ? 'grid' : 'none'; document.getElementById('company_id_select').required = this.value !== '__new__';">
-        <option value="">— chọn công ty đã có —</option>
-        {% for c in companies %}<option value="{{ c.id }}">{{ c.company }}{% if c.city %} ({{ c.city }}){% endif %}</option>{% endfor %}
-        <option value="__new__">＋ Tạo công ty mới…</option>
-      </select>
+      {% with input_id = "company_id_select", allow_new = true %}
+        {% include "_company_combobox.html" %}
+      {% endwith %}
     </label>
     <input type="hidden" name="company_mode" id="company_mode_field" value="existing">
     <div id="new_company_fields" class="form-grid full" style="display:none; grid-column: 1 / -1;">
@@ -50,10 +48,26 @@
       </label>
     </div>
     <script>
-      document.querySelector('form.form-card').addEventListener('submit', function() {
-        document.getElementById('company_mode_field').value =
-          document.getElementById('company_id_select').value === '__new__' ? 'new' : 'existing';
-      });
+      (function () {
+        // company_id_select giờ là hidden input (do combobox tạo ra, xem
+        // _company_combobox.html + app.js), không còn <select> onchange
+        // trực tiếp như trước — nghe sự kiện "change" JS tự bắn ra mỗi khi
+        // người dùng chọn 1 dòng trong combobox (kể cả dòng "Tạo công ty
+        // mới…") để show/hide đúng như hành vi cũ.
+        var valueField = document.getElementById('company_id_select_value');
+        var newFields = document.getElementById('new_company_fields');
+        function sync() {
+          var isNew = valueField.value === '__new__';
+          newFields.style.display = isNew ? 'grid' : 'none';
+        }
+        valueField.addEventListener('change', sync);
+        sync();
+
+        document.querySelector('form.form-card').addEventListener('submit', function() {
+          document.getElementById('company_mode_field').value =
+            valueField.value === '__new__' ? 'new' : 'existing';
+        });
+      })();
     </script>
     {% endif %}
 

@@ -76,3 +76,82 @@
   border-top: 1px solid var(--border);
 }
 
+/* ---- Company combobox (search + scroll) ----------------------------- */
+/* Dùng ở add_job.html / add_contact.html thay cho <select> công ty dài.
+   Xem templates/_company_combobox.html (markup) + public/app.js
+   (initCompanyCombobox, hành vi gõ-lọc/scroll/phím mũi tên). */
+
+.cbx { position: relative; }
+
+.cbx-input {
+  /* Kế thừa style input chung từ .form-card input ở trên (font, padding,
+     border, bg) — chỉ thêm cursor để gợi ý đây là ô có thể bấm mở list. */
+  cursor: text;
+}
+
+.cbx.cbx-open .cbx-input {
+  border-color: var(--accent);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cbx-panel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 24px rgba(16, 30, 26, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cbx-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.cbx-opt {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cbx-opt-sub { color: var(--muted); font-size: 13px; }
+
+.cbx-opt.cbx-active,
+.cbx-opt:hover {
+  background: var(--accent-soft);
+}
+
+.cbx-opt-new {
+  color: var(--accent);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+.cbx-opt-new.cbx-active,
+.cbx-opt-new:hover { background: var(--accent-soft); border-radius: 6px; }
+
+.cbx-empty {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cbx-error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #C0392B;
+}
+

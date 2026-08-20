@@ -17,13 +17,16 @@
 <form class="form-card" method="post">
   <div class="form-grid">
     {% if not company %}
+    {# Giữ hành vi cũ: nếu submit lỗi (vd thiếu tên) thì công ty vừa chọn
+       không bị mất khi trang render lại — <select> cũ tự làm việc này qua
+       'selected', combobox thì cần tự tìm lại tên công ty tương ứng id đã
+       gửi lên (contact ở đây chính là request.form khi có lỗi). #}
+    {% set _preselect_id = contact.get('company_id') if contact else '' %}
+    {% set _preselect_company = (companies|selectattr('id', 'equalto', _preselect_id)|first) if _preselect_id else none %}
     <label>Công ty *
-      <select name="company_id" required>
-        <option value="">— Chọn công ty —</option>
-        {% for c in companies %}
-          <option value="{{ c.id }}" {{ 'selected' if contact and contact.get('company_id') == c.id }}>{{ c.company }}</option>
-        {% endfor %}
-      </select>
+      {% with input_id = "contact_company_id", selected_id = _preselect_id, selected_label = _preselect_company.company if _preselect_company else '' %}
+        {% include "_company_combobox.html" %}
+      {% endwith %}
     </label>
     {% endif %}
     <label>Tên người liên hệ *

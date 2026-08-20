@@ -121,6 +121,184 @@
       });
   });
 
+  // ---- Company combobox (search + scroll) --------------------------------
+  //
+  // Markup: templates/_company_combobox.html (hidden input giữ giá trị thật
+  // gửi lên form, input text để gõ tìm, panel .cbx-panel cuộn được).
+  // Hành vi: chưa gõ gì -> mở ra hiện TOÀN BỘ danh sách (giống <select> cũ);
+  // gõ -> lọc theo tên công ty (không phân biệt dấu tiếng Việt); hỗ trợ
+  // ArrowUp/ArrowDown + Enter để chọn bằng bàn phím, không chỉ click chuột.
+  function stripDiacritics(str) {
+    return (str || "")
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d");
+  }
+
+  function initCompanyCombobox() {
+    var boxes = document.querySelectorAll("[data-cbx]");
+    if (!boxes.length) return;
+
+    Array.prototype.forEach.call(boxes, function (box) {
+      var input = box.querySelector("[data-cbx-input]");
+      var hidden = box.querySelector("[data-cbx-value]");
+      var panel = box.querySelector("[data-cbx-panel]");
+      var emptyMsg = box.querySelector("[data-cbx-empty]");
+      var errorMsg = box.querySelector("[data-cbx-error]");
+      if (!input || !hidden || !panel) return;
+
+      var opts = Array.prototype.slice.call(box.querySelectorAll(".cbx-opt"));
+      // hasQuery = người dùng đã thực sự gõ ký tự nào chưa. Chưa gõ (kể cả
+      // khi input đã có sẵn tên công ty do chọn từ trước / retry sau lỗi
+      // submit) thì mở ra vẫn hiện đủ danh sách, đúng yêu cầu "chưa gõ thì
+      // hiện như bình thường".
+      var hasQuery = false;
+      var activeEl = null;
+
+      function visibleOpts() {
+        return opts.filter(function (o) { return o.style.display !== "none"; });
+      }
+
+      function setActive(el) {
+        opts.forEach(function (o) { o.classList.remove("cbx-active"); });
+        activeEl = el;
+        if (el) {
+          el.classList.add("cbx-active");
+          if (el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
+        }
+      }
+
+      function applyFilter() {
+        var q = hasQuery ? stripDiacritics(input.value) : "";
+        var anyMatch = false;
+        opts.forEach(function (o) {
+          var pinned = o.dataset.pinned === "1";
+          var match = q === "" || stripDiacritics(o.dataset.label).indexOf(q) !== -1;
+          if (match && !pinned) anyMatch = true;
+          o.style.display = (pinned || match) ? "" : "none";
+        });
+        if (emptyMsg) emptyMsg.hidden = !(q !== "" && !anyMatch);
+        setActive(null);
+      }
+
+      function openPanel() {
+        panel.hidden = false;
+        box.classList.add("cbx-open");
+      }
+
+      function closePanel() {
+        panel.hidden = true;
+        box.classList.remove("cbx-open");
+        setActive(null);
+      }
+
+      function findOptByValue(val) {
+        for (var i = 0; i < opts.length; i++) {
+          if (opts[i].dataset.value === val) return opts[i];
+        }
+        return null;
+      }
+
+      function selectOpt(opt) {
+        hidden.value = opt.dataset.value;
+        input.value = opt.dataset.value === "__new__" ? "" : opt.dataset.label;
+        if (opt.dataset.value === "__new__") input.placeholder = opt.dataset.label;
+        hasQuery = false;
+        if (errorMsg) errorMsg.hidden = true;
+        closePanel();
+        // Báo cho script khác (vd add_job.html — hiện/ẩn khối "tạo công ty
+        // mới") biết giá trị vừa đổi, giống hệt onchange của <select> cũ.
+        hidden.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      opts.forEach(function (o) {
+        // mousedown thay vì click: chạy TRƯỚC sự kiện blur của input, nếu
+        // dùng click thì blur đóng panel mất trước khi click kịp bắn ra.
+        o.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          selectOpt(o);
+        });
+      });
+
+      input.addEventListener("focus", function () {
+        openPanel();
+        applyFilter();
+      });
+
+      input.addEventListener("input", function () {
+        hasQuery = true;
+        openPanel();
+        applyFilter();
+      });
+
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          openPanel();
+          var vis = visibleOpts();
+          if (!vis.length) return;
+          var idx = activeEl ? vis.indexOf(activeEl) : -1;
+          idx = e.key === "ArrowDown" ? Math.min(idx + 1, vis.length - 1) : Math.max(idx - 1, 0);
+          setActive(vis[idx]);
+        } else if (e.key === "Enter") {
+          if (!panel.hidden && activeEl) {
+            e.preventDefault();
+            selectOpt(activeEl);
+          }
+        } else if (e.key === "Escape") {
+          closePanel();
+        }
+      });
+
+      document.addEventListener("click", function (e) {
+        if (panel.hidden || box.contains(e.target)) return;
+        closePanel();
+        // Click ra ngoài mà không chọn gì: nếu chữ đang gõ dở không khớp
+        // với công ty đã chọn trước đó, trả input về đúng giá trị đã chọn
+        // (hoặc rỗng) để không lệch với hidden input thật sự gửi lên form.
+        if (hidden.value === "__new__") {
+          input.value = "";
+        } else {
+          var chosen = hidden.value ? findOptByValue(hidden.value) : null;
+          input.value = chosen ? chosen.dataset.label : "";
+        }
+        hasQuery = false;
+      });
+
+      applyFilter();
+    });
+
+    // Hidden input không tham gia validate HTML5 "required" như <select>
+    // cũ, nên tự chặn submit nếu ô công ty bắt buộc mà chưa chọn gì.
+    document.addEventListener("submit", function (evt) {
+      var form = evt.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      var requiredBoxes = form.querySelectorAll("[data-cbx][data-cbx-required]");
+      if (!requiredBoxes.length) return;
+      var blocked = false;
+      Array.prototype.forEach.call(requiredBoxes, function (box) {
+        var hidden = box.querySelector("[data-cbx-value]");
+        var input = box.querySelector("[data-cbx-input]");
+        var errorMsg = box.querySelector("[data-cbx-error]");
+        var ok = hidden && hidden.value;
+        if (errorMsg) errorMsg.hidden = !!ok;
+        if (!ok) {
+          blocked = true;
+          if (input) input.focus();
+        }
+      });
+      if (blocked) evt.preventDefault();
+    }, true);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initCompanyCombobox);
+  } else {
+    initCompanyCombobox();
+  }
+
   // NOTE: .job-grid / .job-grid-3col (/viec-lam) and .kpi-row (/dashboard)
   // used to need a JS pass here to stretch a short trailing row of cards
   // to fill empty space — CSS Grid's auto-fit/minmax() fixes the column

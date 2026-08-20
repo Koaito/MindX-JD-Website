@@ -1,0 +1,56 @@
+{# Combobox chọn công ty: gõ để lọc + danh sách cuộn được, thay cho <select>
+   thường (danh sách công ty có thể rất dài, kéo từng dòng khó tìm).
+
+   Dùng chung cho add_job.html (tạo job) và add_contact.html (tạo contact ở
+   /contacts/add, không gắn sẵn company). KHÔNG dùng cho các trường hợp
+   company đã cố định qua URL (contact_add(company_id), contact_edit) — ở
+   đó form không hiện ô chọn công ty (dùng {% if not company %} bọc ngoài
+   include này rồi), nên combobox này luôn khởi tạo rỗng, không cần preselect.
+
+   Tham số (truyền qua {% include ... with context %} + set biến trước đó,
+   hoặc {% include "_company_combobox.html" %} sau khi set các biến local):
+     - companies   : list công ty (đã có sẵn ở mọi trang gọi include này)
+     - field_name  : tên field submit lên server (mặc định "company_id")
+     - input_id    : id cho input text (để form.js cũ tìm bằng id nếu cần)
+     - allow_new   : True thì thêm dòng "＋ Tạo công ty mới…" cố định cuối
+                     danh sách, không bị lọc mất khi gõ tìm
+     - required    : True thì JS chặn submit nếu chưa chọn công ty nào
+   Field thật gửi lên server vẫn là 1 hidden input name="{{ field_name }}"
+   — HTML/route phía sau (app.py, crawler_client.py) không cần đổi gì. #}
+
+{% set field_name = field_name|default('company_id') %}
+{% set input_id = input_id|default('company_combobox_input') %}
+{% set allow_new = allow_new|default(false) %}
+{% set required = required if required is defined else true %}
+{% set selected_id = selected_id|default('') %}
+{% set selected_label = selected_label|default('') %}
+
+<div class="cbx" data-cbx{% if required %} data-cbx-required{% endif %}>
+  <input type="text"
+         class="cbx-input"
+         id="{{ input_id }}"
+         data-cbx-input
+         placeholder="— chọn công ty đã có —"
+         autocomplete="off"
+         value="{{ selected_label }}">
+  <input type="hidden" name="{{ field_name }}" id="{{ input_id }}_value" data-cbx-value value="{{ selected_id }}">
+  <div class="cbx-panel" data-cbx-panel hidden>
+    <ul class="cbx-list" data-cbx-list role="listbox">
+      {% for c in companies %}
+      <li class="cbx-opt" role="option" tabindex="-1"
+          data-value="{{ c.id }}"
+          data-label="{{ c.company }}{% if c.city %} ({{ c.city }}){% endif %}">
+        {{ c.company }}{% if c.city %}<span class="cbx-opt-sub"> ({{ c.city }})</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if allow_new %}
+    <div class="cbx-opt cbx-opt-new" role="option" tabindex="-1"
+         data-value="__new__" data-label="＋ Tạo công ty mới…" data-pinned="1">
+      ＋ Tạo công ty mới…
+    </div>
+    {% endif %}
+    <p class="cbx-empty" data-cbx-empty hidden>Không tìm thấy công ty phù hợp.</p>
+  </div>
+  <p class="cbx-error" data-cbx-error hidden>Vui lòng chọn công ty.</p>
+</div>
