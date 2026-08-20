@@ -50,12 +50,12 @@
   </div>
 </section>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script>
 (function () {
   "use strict";
   var canvas = document.getElementById("monthlyJdChart");
-  if (!canvas || typeof Chart === "undefined") return; // CDN chặn/lỗi mạng -> ẩn lặng lẽ, không làm hỏng phần còn lại của trang
+  if (!canvas || typeof Chart === "undefined") return; // an toàn: nếu vì lý do gì đó Chart.js không tải được, ẩn lặng lẽ thay vì crash cả trang
 
   var labels = {{ monthly_labels | tojson }};
   var newCounts = {{ monthly_new | tojson }};
