@@ -640,7 +640,7 @@ def logout():
 @login_required
 def job_toggle_save(job_id):
     if current_user.is_staff:
-        flash("Tài khoản team SS không dùng để lưu job.", "error")
+        flash("Tài khoản team SS/admin không dùng để lưu job.", "error")
         return redirect(request.referrer or url_for("jobs_index"))
 
     access_token, _ = _auth_tokens_from_session()

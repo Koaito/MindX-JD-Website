@@ -9,15 +9,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
-  /* Was 820px, then 1040px — on wide screens (.content maxes out at
-     1600px, minus its own 56px*2 padding = 1488px usable) 1040px still
-     left a ~224px empty gutter on each side, which read as wasted space
-     on form pages (add job/company/contact...). Widened again to shrink
-     that gutter to roughly 1/3 of what it was (~224px -> ~75px each
-     side at full .content width) while still leaving SOME margin so a
-     2-column .form-grid row doesn't stretch each input into an
-     awkwardly long, hard-to-scan text box. */
-  max-width: 1740px;
+  /* Was 820px, then 1040px, then 1340px — mỗi lần đều để lại gutter
+     trống 2 bên trên màn rộng (.content max 1600px, trừ padding
+     56px*2 = 1488px usable). Nới tiếp lên 1488px (= sát hết chiều rộng
+     usable của .content, không còn max-width riêng thu hẹp lại) để
+     form lấp gần hết khoảng trống ngang thay vì để dư viền lớn 2 bên.
+     .form-grid bên dưới đã chuyển sang auto-fit nên input không bị kéo
+     dài quá mức dù card rộng hơn — nới card không còn nghĩa là mỗi ô
+     input cũng phải dài ra tương ứng. */
+  max-width: 1488px;
   /* Card has a max-width narrower than .content, so without auto
      margins it sits flush-left with a large empty gap on the right. */
   margin-left: auto;
@@ -36,7 +36,14 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Trước: cố định 2 cột (1fr 1fr) — khi .form-card nới rộng ra, mỗi ô
+     input bị kéo dài theo, đọc khó hơn thay vì lấp khoảng trống hợp lý.
+     auto-fit + minmax tự tính số cột theo bề rộng thật của card: card
+     hẹp (mobile/tablet) -> tự co về 1 cột; card rộng (desktop lớn) ->
+     tự nở thành 3 cột thay vì kéo dài 2 cột sẵn có. 260px là bề rộng
+     tối thiểu 1 ô trước khi xuống dòng, đủ cho input/select thông
+     thường không bị bóp quá chật. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px 18px;
 }
 
