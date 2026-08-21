@@ -803,16 +803,16 @@ def jobs_index():
     page, per_page = _paginate_args(JOBS_PER_PAGE)
 
     # `status` rỗng (chưa chọn gì trong dropdown, kể cả lần đầu vào
-    # trang) TRƯỚC ĐÂY = không lọc gì -> trộn lẫn cả job OPEN/CLOSED
-    # trong danh sách mặc định, học viên phải tự chọn "Đang tuyển" mới
-    # lọc sạch được job chết. Giờ đổi mặc định: rỗng -> ngầm hiểu là
-    # OPEN (đang tuyển) — muốn xem CLOSED phải chủ động chọn dropdown,
-    # kể cả chọn hẳn "Tất cả trạng thái" (option riêng, value="ALL")
-    # nếu muốn xem trộn lẫn như hành vi cũ.
+    # trang) TRƯỚC ĐÂY = không lọc gì -> trộn lẫn cả job OPEN/EXPIRED/
+    # CLOSED trong danh sách mặc định, học viên phải tự chọn "Đang
+    # tuyển" mới lọc sạch được job chết. Giờ đổi mặc định: rỗng ->
+    # ngầm hiểu là OPEN (đang tuyển) — muốn xem EXPIRED/CLOSED phải chủ
+    # động chọn dropdown, kể cả chọn hẳn "Tất cả trạng thái" (option
+    # riêng, value="ALL") nếu muốn xem trộn lẫn như hành vi cũ.
     if status == "ALL":
-        status_filter = ""  # value đặc biệt -> KHÔNG lọc gì, xem cả 2 trạng thái
+        status_filter = ""  # value đặc biệt -> KHÔNG lọc gì, xem cả 3 trạng thái
     elif status:
-        status_filter = status  # đã chọn cụ thể (Đã đóng/Đang tuyển)
+        status_filter = status  # đã chọn cụ thể (Hết hạn/Đã đóng/Đang tuyển)
     else:
         status_filter = "Đang tuyển"  # mặc định khi chưa chọn gì
 
@@ -1266,12 +1266,35 @@ def contact_edit(company_id, contact_id):
 @app.route("/companies/<string:company_id>/contacts/<string:contact_id>/status", methods=["POST"])
 @staff_required
 def contact_update_status(company_id, contact_id):
+    """Sửa 08/2026 (fix bug mất note): route này TRƯỚC ĐÂY chỉ đọc
+    request.form.get("status") — không hề đọc note, và
+    db_data.update_contact_status() cũng không có tham số note trong
+    chữ ký hàm, nên note gõ ở form KHÔNG BAO GIỜ tới được backend →
+    backend luôn trả 422 (note bắt buộc khi contact_status thực sự đổi)
+    dù người dùng có nhập note hay không. Giờ note bắt buộc ở tầng
+    Flask (chặn sớm, giống contact_delete/contact_assign), được forward
+    xuống backend, và redirect về đúng trang xuất phát (next) thay vì
+    luôn nhảy về company_detail."""
+    note = (request.form.get("note") or "").strip()
+    next_url = request.form.get("next", "")
+
+    def _redirect_back():
+        if next_url and next_url.startswith("/"):
+            return redirect(next_url)
+        return redirect(url_for("company_detail", company_id=company_id))
+
+    if not note:
+        flash("Đổi trạng thái liên hệ bắt buộc phải nhập ghi chú lý do.", "error")
+        return _redirect_back()
     try:
-        _call_authed(db_data.update_contact_status, company_id, contact_id, request.form.get("status", ""))
+        _call_authed(
+            db_data.update_contact_status, company_id, contact_id,
+            request.form.get("status", ""), note,
+        )
         flash("Đã cập nhật trạng thái liên hệ.", "success")
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-    return redirect(url_for("company_detail", company_id=company_id))
+    return _redirect_back()
 
 
 @app.route("/companies/<string:company_id>/contacts/<string:contact_id>/delete", methods=["POST"])

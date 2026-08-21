@@ -1,0 +1,36 @@
+{# Partial "đổi trạng thái contact" dùng chung — sửa 08/2026 (fix bug
+   mất note khi đổi trạng thái, xem AUDIT.md). Trước đây có 2 cách làm
+   khác nhau ở 2 trang (select auto-submit ở contacts.html, JS modal
+   "note không bắt buộc" ở company_detail.html) và CẢ HAI đều không hề
+   gửi note lên app.py/backend → mọi request đổi trạng thái luôn bị
+   backend từ chối 422 (note bắt buộc khi contact_status thực sự đổi).
+   Giờ dùng đúng 1 partial, đúng 1 route, note bắt buộc ở cả 3 lớp:
+   HTML5 required, chặn sớm ở Flask (app.py), và chặn cứng ở backend.
+
+   Cần truyền vào (từ template gọi, qua {% include %} với context):
+     c        : 1 dict contact (từ crawler_client._normalize_contact,
+                cần có .id, .company_id, .status)
+     statuses : list các trạng thái hợp lệ, cho dropdown
+     next_url : URL quay lại sau khi submit (thường request.path của
+                trang đang đứng)
+   Route đích: contact_update_status(company_id, contact_id) trong
+   app.py — PATCH .../status phía backend.
+
+   KHÔNG auto-submit onchange — đổi trạng thái giờ BẮT BUỘC note
+   (backend chặn cứng 422 nếu đổi mà thiếu note), nên cần 1 bước xác
+   nhận có ô nhập trước khi submit, không thể tự động gửi ngay lúc đổi
+   <select>, giống hệt pattern _contact_assign_cell.html. #}
+<details style="display:inline-block;">
+  <summary class="btn btn-text" style="cursor:pointer;">{{ c.status or '— Chưa rõ —' }}</summary>
+  <form method="post" action="{{ url_for('contact_update_status', company_id=c.company_id, contact_id=c.id) }}"
+        style="margin-top:6px;display:flex;gap:6px;flex-direction:column;min-width:200px;">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <select name="status">
+      {% for s in statuses %}
+        <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <textarea name="note" required rows="2" placeholder="Lý do đổi trạng thái — bắt buộc…" style="width:100%;"></textarea>
+    <button class="btn btn-text" type="submit">Lưu</button>
+  </form>
+</details>

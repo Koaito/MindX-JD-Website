@@ -71,13 +71,7 @@
               <td class="muted">{{ c.title or '—' }}</td>
               <td class="muted">{{ c.email or '—' }}</td>
               <td class="muted">{{ c.phone or '—' }}</td>
-              <td>
-                <select class="status-select" data-contact-id="{{ c.id }}">
-                  {% for s in statuses %}
-                    <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
-                  {% endfor %}
-                </select>
-              </td>
+              <td>{% set next_url = request.path %}{% include "_contact_status_cell.html" with context %}</td>
               <td class="muted" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 {{ c.note or '—' }}
               </td>
@@ -159,25 +153,6 @@
   </div>
 </div>
 
-<!-- Modal đổi trạng thái contact -->
-<div id="contactStatusModal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <h3>Đổi trạng thái người liên hệ</h3>
-    <p id="contactStatusDesc" style="margin: 12px 0;"></p>
-    <form method="post" id="contactStatusForm">
-      <input type="hidden" name="status" id="contactStatusInput">
-      <label style="display:block; margin-bottom:12px;">
-        <strong>Ghi chú (không bắt buộc)</strong>
-        <textarea name="note" rows="3" placeholder="Ghi chú về việc thay đổi trạng thái này…" style="width:100%; margin-top:6px;"></textarea>
-      </label>
-      <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost" onclick="closeContactStatusModal()">Hủy</button>
-        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <style>
 .modal {
   position: fixed;
@@ -199,30 +174,9 @@
 .modal-content h3 {
   margin: 0 0 8px 0;
 }
-.status-select {
-  cursor: pointer;
-}
 </style>
 
 <script>
-// Xử lý dropdown trạng thái contact - mở modal để nhập note
-document.querySelectorAll('.status-select').forEach(select => {
-  select.addEventListener('change', function() {
-    const contactId = this.dataset.contactId;
-    const newStatus = this.value;
-    const oldStatus = this.dataset.oldStatus || this.value;
-    
-    // Nếu status không đổi, không làm gì
-    if (newStatus === oldStatus) return;
-    
-    // Mở modal để nhập note
-    showContactStatusModal(contactId, newStatus, oldStatus);
-  });
-  
-  // Lưu trạng thái ban đầu
-  select.dataset.oldStatus = select.value;
-});
-
 // Modal xóa contact
 function showDeleteContactModal(contactId, contactName) {
   document.getElementById('deleteContactName').textContent = `Bạn có chắc muốn xóa "${contactName}"?`;
@@ -235,45 +189,10 @@ function closeDeleteContactModal() {
   document.getElementById('deleteContactForm').reset();
 }
 
-// Modal đổi trạng thái contact
-function showContactStatusModal(contactId, newStatus, oldStatus) {
-  document.getElementById('contactStatusDesc').innerHTML = `Đổi trạng thái từ <strong>${oldStatus}</strong> sang <strong>${newStatus}</strong>`;
-  document.getElementById('contactStatusInput').value = newStatus;
-  document.getElementById('contactStatusForm').action = `/companies/{{ company.id }}/contacts/${contactId}/status`;
-  document.getElementById('contactStatusModal').style.display = 'flex';
-  
-  // Lưu lại contactId và oldStatus để có thể reset nếu user hủy
-  document.getElementById('contactStatusModal').dataset.contactId = contactId;
-  document.getElementById('contactStatusModal').dataset.oldStatus = oldStatus;
-}
-
-function closeContactStatusModal() {
-  // Reset lại dropdown về trạng thái cũ
-  const modal = document.getElementById('contactStatusModal');
-  const contactId = modal.dataset.contactId;
-  const oldStatus = modal.dataset.oldStatus;
-  
-  if (contactId && oldStatus) {
-    const select = document.querySelector(`.status-select[data-contact-id="${contactId}"]`);
-    if (select) {
-      select.value = oldStatus;
-    }
-  }
-  
-  modal.style.display = 'none';
-  document.getElementById('contactStatusForm').reset();
-}
-
 // Đóng modal khi click bên ngoài
 document.getElementById('deleteContactModal').addEventListener('click', function(e) {
   if (e.target === this) {
     closeDeleteContactModal();
-  }
-});
-
-document.getElementById('contactStatusModal').addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeContactStatusModal();
   }
 });
 </script>

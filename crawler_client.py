@@ -123,7 +123,7 @@ def _request(method, path, access_token=None, **kwargs):
 # lên backend dùng đúng enum backend yêu cầu.
 # ---------------------------------------------------------------------------
 
-JOB_STATUS_MAP = {"OPEN": "Đang tuyển", "CLOSED": "Đã đóng"}
+JOB_STATUS_MAP = {"OPEN": "Đang tuyển", "EXPIRED": "Hết hạn", "CLOSED": "Đã đóng"}
 JOB_STATUS_MAP_REV = {v: k for k, v in JOB_STATUS_MAP.items()}
 
 LEVEL_CODES = ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead", "Manager"]
@@ -718,11 +718,18 @@ def update_contact(access_token, company_id, contact_id, form, note) -> dict:
     return _normalize_contact(raw)
 
 
-def update_contact_status(access_token, company_id, contact_id, status_vn):
+def update_contact_status(access_token, company_id, contact_id, status_vn, note):
+    """note BẮT BUỘC (sửa 08/2026 — fix bug mất note khi đổi trạng thái
+    contact) NẾU status thực sự đổi giá trị — backend tự tính diff và
+    trả 422 nếu thiếu, giống pattern update_contact()/assign_contact().
+    Trước đây hàm này KHÔNG có tham số note trong chữ ký hàm nên dù UI
+    có ô nhập note thì cũng không có chỗ để truyền xuống backend, khiến
+    MỌI request đổi trạng thái contact luôn bị backend từ chối 422."""
     code = CONTACT_STATUS_MAP_REV.get(status_vn, status_vn)
     raw = _request(
         "PATCH", f"/companies/{company_id}/contacts/{contact_id}",
-        access_token=access_token, json={"contact_status": code},
+        access_token=access_token,
+        json={"contact_status": code, "note": (note or "").strip() or None},
     )
     return _normalize_contact(raw)
 

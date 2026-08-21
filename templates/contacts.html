@@ -70,15 +70,7 @@
         <td class="muted">{{ c.phone or '—' }}</td>
         <td class="muted">{{ c.source or '—' }}</td>
         <td class="muted">{{ c.last_contacted|format_date if c.last_contacted else '—' }}</td>
-        <td>
-          <form method="post" action="{{ url_for('contact_update_status', company_id=c.company_id, contact_id=c.id) }}" class="status-inline">
-            <select name="status" onchange="this.form.submit()">
-              {% for s in statuses %}
-                <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
-              {% endfor %}
-            </select>
-          </form>
-        </td>
+        <td>{% include "_contact_status_cell.html" with context %}</td>
         <td>{% include "_contact_assign_cell.html" with context %}</td>
         <td class="actions-cell">
           <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
