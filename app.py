@@ -803,16 +803,16 @@ def jobs_index():
     page, per_page = _paginate_args(JOBS_PER_PAGE)
 
     # `status` rỗng (chưa chọn gì trong dropdown, kể cả lần đầu vào
-    # trang) TRƯỚC ĐÂY = không lọc gì -> trộn lẫn cả job OPEN/EXPIRED/
-    # CLOSED trong danh sách mặc định, học viên phải tự chọn "Đang
-    # tuyển" mới lọc sạch được job chết. Giờ đổi mặc định: rỗng ->
-    # ngầm hiểu là OPEN (đang tuyển) — muốn xem EXPIRED/CLOSED phải chủ
-    # động chọn dropdown, kể cả chọn hẳn "Tất cả trạng thái" (option
-    # riêng, value="ALL") nếu muốn xem trộn lẫn như hành vi cũ.
+    # trang) TRƯỚC ĐÂY = không lọc gì -> trộn lẫn cả job OPEN/CLOSED
+    # trong danh sách mặc định, học viên phải tự chọn "Đang tuyển" mới
+    # lọc sạch được job chết. Giờ đổi mặc định: rỗng -> ngầm hiểu là
+    # OPEN (đang tuyển) — muốn xem CLOSED phải chủ động chọn dropdown,
+    # kể cả chọn hẳn "Tất cả trạng thái" (option riêng, value="ALL")
+    # nếu muốn xem trộn lẫn như hành vi cũ.
     if status == "ALL":
-        status_filter = ""  # value đặc biệt -> KHÔNG lọc gì, xem cả 3 trạng thái
+        status_filter = ""  # value đặc biệt -> KHÔNG lọc gì, xem cả 2 trạng thái
     elif status:
-        status_filter = status  # đã chọn cụ thể (Hết hạn/Đã đóng/Đang tuyển)
+        status_filter = status  # đã chọn cụ thể (Đã đóng/Đang tuyển)
     else:
         status_filter = "Đang tuyển"  # mặc định khi chưa chọn gì
 
