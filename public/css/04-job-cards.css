@@ -143,7 +143,6 @@
 }
 
 .status-Đang-tuyển { background: var(--teal-soft); color: var(--teal); }
-.status-Hết-hạn { background: #EDEFEC; color: var(--muted); }
 .status-Đã-đóng { background: #EDEFEC; color: var(--muted); }
 .status-Chưa-xác-minh { background: var(--amber-soft); color: var(--amber); }
 .status-Đã-gửi-cho-học-viên { background: var(--blue-soft); color: var(--blue); }

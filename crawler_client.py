@@ -123,7 +123,7 @@ def _request(method, path, access_token=None, **kwargs):
 # lên backend dùng đúng enum backend yêu cầu.
 # ---------------------------------------------------------------------------
 
-JOB_STATUS_MAP = {"OPEN": "Đang tuyển", "EXPIRED": "Hết hạn", "CLOSED": "Đã đóng"}
+JOB_STATUS_MAP = {"OPEN": "Đang tuyển", "CLOSED": "Đã đóng"}
 JOB_STATUS_MAP_REV = {v: k for k, v in JOB_STATUS_MAP.items()}
 
 LEVEL_CODES = ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead", "Manager"]
