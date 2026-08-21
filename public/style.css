@@ -26,3 +26,4 @@
 @import url('css/09-misc-toasts.css');           /* Empty states, flash messages, toasts */
 @import url('css/10-pagination-responsive.css'); /* Pagination + the shared @media breakpoint */
 @import url('css/11-student-activity.css');      /* /student-activity: theo dõi học viên lưu/ứng tuyển JD */
+@import url('css/12-activity-logs.css');         /* /activity-logs: lịch sử thao tác audit log */
