@@ -885,7 +885,7 @@ CONFLICT_STATUS_LABELS = {
 
 
 def export_entity(access_token, entity_type, file_format="xlsx"):
-    """POST /export/{entity_type} — trả file nhị phân (CSV hoặc XLSX).
+    """GET /export/{entity_type} — trả file nhị phân (CSV hoặc XLSX).
 
     Khác mọi hàm khác trong file này: trả về (content_bytes, filename,
     content_type) thay vì dict đã chuẩn hoá, vì đây là file tải xuống
@@ -894,7 +894,7 @@ def export_entity(access_token, entity_type, file_format="xlsx"):
     bắt và flash, KHÔNG trả file rỗng để tránh user tải nhầm file hỏng."""
     url = f"{CRAWLER_API_URL}/export/{entity_type}"
     try:
-        res = requests.post(
+        res = requests.get(
             url, headers=_headers(access_token), params={"format": file_format},
             timeout=REQUEST_TIMEOUT,
         )
