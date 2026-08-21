@@ -113,6 +113,23 @@ INDUSTRIES = [
    # job vì thiếu option -> nhìn như "job biến mất" dù job vẫn còn.
 LEVELS = db_data.LEVEL_CODES
 LOCATIONS = ["Hà Nội", "TP.HCM", "Remote", "Hybrid"]
+
+# Danh sách 63 tỉnh/thành phố Việt Nam (theo thứ tự alphabet, các thành phố lớn lên đầu)
+CITIES_VN = [
+    "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Hải Phòng",
+    "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
+    "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
+    "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông",
+    "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang",
+    "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình",
+    "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu",
+    "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
+    "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên",
+    "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
+    "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên",
+    "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang",
+    "Vĩnh Long", "Vĩnh Phúc", "Yên Bái",
+]
 JOB_STATUSES = list(db_data.JOB_STATUS_MAP.values())
 WORK_TYPES = list(db_data.WORK_TYPE_MAP.values())
 SALARY_TYPES = list(db_data.SALARY_TYPE_MAP.values())
@@ -1058,10 +1075,10 @@ def company_add():
             company = _call_authed(db_data.create_company, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_company.html", company=request.form, partnership_potentials=PARTNERSHIP_POTENTIALS)
+            return render_template("add_company.html", company=request.form, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
         flash(f"Đã thêm công ty {company['company']}.", "success")
         return redirect(url_for("company_detail", company_id=company["id"]))
-    return render_template("add_company.html", company=None, partnership_potentials=PARTNERSHIP_POTENTIALS)
+    return render_template("add_company.html", company=None, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
 
 
 @app.route("/companies/<string:company_id>/edit", methods=["GET", "POST"])
@@ -1075,10 +1092,10 @@ def company_edit(company_id):
             updated = _call_authed(db_data.update_company, company_id, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS)
+            return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
         flash(f"Đã cập nhật công ty {updated['company']}.", "success")
         return redirect(url_for("company_detail", company_id=company_id))
-    return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS)
+    return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
 
 
 @app.route("/companies/<string:company_id>/delete", methods=["POST"])

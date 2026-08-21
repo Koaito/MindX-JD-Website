@@ -61,7 +61,7 @@
         <table class="contact-table">
           <thead>
             <tr>
-              <th>Tên</th><th>Chức danh</th><th>Email</th><th>SĐT</th><th>Trạng thái</th><th></th>
+              <th>Tên</th><th>Chức danh</th><th>Email</th><th>SĐT</th><th>Trạng thái</th><th>Ghi chú</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -72,25 +72,18 @@
               <td class="muted">{{ c.email or '—' }}</td>
               <td class="muted">{{ c.phone or '—' }}</td>
               <td>
-                <form method="post" action="{{ url_for('contact_update_status', company_id=company.id, contact_id=c.id) }}" class="status-inline">
-                  <select name="status" onchange="this.form.submit()">
-                    {% for s in statuses %}
-                      <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
-                    {% endfor %}
-                  </select>
-                </form>
+                <select class="status-select" data-contact-id="{{ c.id }}">
+                  {% for s in statuses %}
+                    <option value="{{ s }}" {{ 'selected' if c.status == s }}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="muted" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ c.note or '—' }}
               </td>
               <td class="actions-cell">
                 <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
-                <details style="display:inline-block;">
-                  <summary class="btn btn-text btn-danger-text" style="cursor:pointer;display:inline;">Xóa</summary>
-                  <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}"
-                        onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở mục Đã xoá bên dưới, chưa mất hẳn dữ liệu)');"
-                        style="margin-top:6px;display:flex;gap:6px;flex-direction:column;min-width:180px;">
-                    <textarea name="note" required rows="2" placeholder="Lý do xoá — bắt buộc…" style="width:100%;"></textarea>
-                    <button class="btn btn-text btn-danger-text" type="submit">Xác nhận xoá</button>
-                  </form>
-                </details>
+                <button class="btn btn-text btn-danger-text" onclick="showDeleteContactModal('{{ c.id }}', '{{ c.contact_name }}')">Xóa</button>
               </td>
             </tr>
             {% endfor %}
@@ -147,5 +140,90 @@
     </section>
   </aside>
 </div>
+
+<!-- Modal xóa contact -->
+<div id="deleteContactModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Xóa người liên hệ</h3>
+    <p id="deleteContactName" style="margin: 12px 0;"></p>
+    <form method="post" id="deleteContactForm">
+      <label style="display:block; margin-bottom:12px;">
+        <strong>Lý do xoá (bắt buộc)</strong>
+        <textarea name="note" required rows="3" placeholder="Nhập lý do xoá người liên hệ này…" style="width:100%; margin-top:6px;"></textarea>
+      </label>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeDeleteContactModal()">Hủy</button>
+        <button type="submit" class="btn btn-danger">Xác nhận xoá</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+.modal-content h3 {
+  margin: 0 0 8px 0;
+}
+.status-select {
+  cursor: pointer;
+}
+</style>
+
+<script>
+// Xử lý dropdown trạng thái contact - không reload trang
+document.querySelectorAll('.status-select').forEach(select => {
+  select.addEventListener('change', function() {
+    const contactId = this.dataset.contactId;
+    const newStatus = this.value;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/companies/{{ company.id }}/contacts/${contactId}/status`;
+    
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = newStatus;
+    form.appendChild(statusInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+  });
+});
+
+// Modal xóa contact
+function showDeleteContactModal(contactId, contactName) {
+  document.getElementById('deleteContactName').textContent = `Bạn có chắc muốn xóa "${contactName}"?`;
+  document.getElementById('deleteContactForm').action = `/companies/{{ company.id }}/contacts/${contactId}/delete`;
+  document.getElementById('deleteContactModal').style.display = 'flex';
+}
+
+function closeDeleteContactModal() {
+  document.getElementById('deleteContactModal').style.display = 'none';
+  document.getElementById('deleteContactForm').reset();
+}
+
+// Đóng modal khi click bên ngoài
+document.getElementById('deleteContactModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeDeleteContactModal();
+  }
+});
+</script>
 
 {% endblock %}

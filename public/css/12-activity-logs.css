@@ -1,0 +1,184 @@
+/* Activity Logs Page — wider layout + custom table styling */
+
+/* Content-wide layout cho trang activity logs */
+.content-wide {
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* Tab navigation */
+.tab-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab-nav a {
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab-nav a:hover {
+  color: var(--text-primary);
+}
+
+.tab-nav a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Activity table specific styling */
+.activity-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.activity-table thead {
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.activity-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.activity-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.activity-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.activity-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.activity-table .note-text {
+  max-width: 400px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.activity-table .actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.activity-table .highlight-required {
+  background-color: rgba(255, 193, 7, 0.08);
+}
+
+.activity-table .highlight-required:hover {
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+/* Badge styling */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #2E7D32;
+}
+
+.badge-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #F57C00;
+}
+
+.badge-danger {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #C62828;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+  padding: 1.5rem;
+}
+
+.page-link {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.page-link:hover {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.page-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .activity-table {
+    font-size: 0.85rem;
+  }
+  
+  .activity-table th,
+  .activity-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .activity-table-wrap {
+    border-radius: 0;
+    margin: 0 -16px;
+  }
+  
+  .activity-table {
+    font-size: 0.8rem;
+  }
+  
+  .activity-table th,
+  .activity-table td {
+    padding: 8px 10px;
+  }
+}

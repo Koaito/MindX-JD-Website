@@ -27,10 +27,17 @@
       <input type="text" name="industry" placeholder="VD: Fintech, E-commerce…" value="{{ company.industry if company else '' }}">
     </label>
     <label>Quy mô nhân sự
-      <input type="text" name="company_size" placeholder="VD: 200-500" value="{{ company.company_size if company else '' }}">
+      <input type="text" name="company_size" placeholder="VD: 200-500" value="{{ company.company_size if company else '' }}" 
+             pattern="^[\d\s\-–—]+$" 
+             title="Chỉ nhập số và dấu gạch ngang (VD: 100-200, 500)">
     </label>
-    <label>Thành phố
-      <input type="text" name="city" placeholder="Hà Nội / TP.HCM…" value="{{ company.city if company else '' }}">
+    <label>Tỉnh/Thành
+      <select name="city">
+        <option value="">Chọn tỉnh/thành phố…</option>
+        {% for c in cities %}
+          <option value="{{ c }}" {{ 'selected' if company and company.city == c }}>{{ c }}</option>
+        {% endfor %}
+      </select>
     </label>
     <label>Địa chỉ
       <input type="text" name="address" value="{{ company.address if company else '' }}">

@@ -59,15 +59,11 @@
             <option value="{{ s }}" {{ 'selected' if job.status == s }}>{{ s }}</option>
           {% endfor %}
         </select>
-        <input type="text" name="activity_note" placeholder="Ghi chú (không bắt buộc)…" style="flex:1;min-width:120px;">
-        <button class="btn btn-ghost" type="submit">Lưu</button>
+        <button class="btn btn-ghost btn-with-note" type="button" onclick="showJobStatusModal('{{ job.id }}', this.form.querySelector('select[name=status]').value)">Lưu</button>
       </form>
       <div class="action-row">
         <a class="btn btn-ghost" href="{{ url_for('job_edit', job_id=job.id) }}">Sửa thông tin job</a>
-        <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input type="text" name="activity_note" placeholder="Lý do đóng job (không bắt buộc)…" style="flex:1;min-width:160px;">
-          <button class="btn btn-danger" type="submit">Đóng job</button>
-        </form>
+        <button class="btn btn-danger" onclick="showJobDeleteModal('{{ job.id }}', '{{ job.position }}')">Đóng job</button>
       </div>
     </section>
 
@@ -144,5 +140,99 @@
     </section>
   </aside>
 </div>
+
+<!-- Modal cập nhật trạng thái job -->
+<div id="jobStatusModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Cập nhật trạng thái job</h3>
+    <p style="margin: 12px 0;">Đổi trạng thái job <strong>"{{ job.position }}"</strong></p>
+    <form method="post" id="jobStatusForm" action="{{ url_for('job_update_status', job_id=job.id) }}">
+      <input type="hidden" name="status" id="jobStatusInput">
+      <label style="display:block; margin-bottom:12px;">
+        <strong>Ghi chú (không bắt buộc)</strong>
+        <textarea name="activity_note" rows="3" placeholder="Lý do thay đổi trạng thái…" style="width:100%; margin-top:6px;"></textarea>
+      </label>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeJobStatusModal()">Hủy</button>
+        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal đóng job -->
+<div id="jobDeleteModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Đóng job</h3>
+    <p id="jobDeleteName" style="margin: 12px 0;"></p>
+    <form method="post" id="jobDeleteForm" action="{{ url_for('job_delete', job_id=job.id) }}">
+      <label style="display:block; margin-bottom:12px;">
+        <strong>Lý do đóng job (không bắt buộc)</strong>
+        <textarea name="activity_note" rows="3" placeholder="Nhập lý do đóng job này…" style="width:100%; margin-top:6px;"></textarea>
+      </label>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeJobDeleteModal()">Hủy</button>
+        <button type="submit" class="btn btn-danger">Xác nhận đóng</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+.modal-content h3 {
+  margin: 0 0 8px 0;
+}
+</style>
+
+<script>
+// Modal cập nhật trạng thái
+function showJobStatusModal(jobId, status) {
+  document.getElementById('jobStatusInput').value = status;
+  document.getElementById('jobStatusModal').style.display = 'flex';
+}
+
+function closeJobStatusModal() {
+  document.getElementById('jobStatusModal').style.display = 'none';
+  document.getElementById('jobStatusForm').reset();
+}
+
+// Modal đóng job
+function showJobDeleteModal(jobId, jobTitle) {
+  document.getElementById('jobDeleteName').innerHTML = `Đóng job <strong>"${jobTitle}"</strong>? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)`;
+  document.getElementById('jobDeleteModal').style.display = 'flex';
+}
+
+function closeJobDeleteModal() {
+  document.getElementById('jobDeleteModal').style.display = 'none';
+  document.getElementById('jobDeleteForm').reset();
+}
+
+// Đóng modal khi click bên ngoài
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', function(e) {
+    if (e.target === this) {
+      if (this.id === 'jobStatusModal') closeJobStatusModal();
+      if (this.id === 'jobDeleteModal') closeJobDeleteModal();
+    }
+  });
+});
+</script>
 
 {% endblock %}
