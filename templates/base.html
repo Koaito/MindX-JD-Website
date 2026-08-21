@@ -75,6 +75,9 @@
       <a href="{{ url_for('staff_activity_index') }}" class="{{ 'active' if request.endpoint in ['staff_activity_index','staff_activity_detail'] else '' }}" title="Hoạt động team SS">
         <span class="nav-ic">🗂️</span> <span class="nav-text">Hoạt động team SS</span>
       </a>
+      <a href="{{ url_for('activity_logs') }}" class="{{ 'active' if request.endpoint in ['activity_logs','activity_log_update_note'] else '' }}" title="Lịch sử thao tác">
+        <span class="nav-ic">📋</span> <span class="nav-text">Lịch sử thao tác</span>
+      </a>
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}

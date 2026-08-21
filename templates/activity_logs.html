@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử thao tác — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Lịch sử thao tác</h1>
+    <p class="lede">Nhật ký chi tiết từng thao tác theo thời gian — xem ai làm gì, khi nào, với ghi chú đi kèm.</p>
+  </div>
+</header>
+
+<nav class="tab-nav">
+  <a href="{{ url_for('activity_logs', view='auto', **filters) }}" class="{{ 'active' if view == 'auto' else '' }}">
+    Tự động
+  </a>
+  <a href="{{ url_for('activity_logs', view='manual', **filters) }}" class="{{ 'active' if view == 'manual' else '' }}">
+    Thủ công
+  </a>
+</nav>
+
+<form class="filter-bar" method="get">
+  <input type="hidden" name="view" value="{{ view }}">
+
+  <select name="entity_type">
+    <option value="">Mọi đối tượng</option>
+    {% for et in entity_types %}
+      <option value="{{ et }}" {{ 'selected' if filters.entity_type == et }}>{{ et }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="company_id">
+    <option value="">Mọi công ty</option>
+    {% for c in companies %}
+      <option value="{{ c.id }}" {{ 'selected' if filters.company_id == c.id }}>{{ c.company }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="actor_id">
+    <option value="">Mọi người thực hiện</option>
+    {% for s in staff_members %}
+      <option value="{{ s.ss_user_id }}" {{ 'selected' if filters.actor_id == s.ss_user_id }}>{{ s.full_name }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.entity_type or filters.company_id or filters.actor_id %}
+    <a class="btn btn-text" href="{{ url_for('activity_logs', view=view) }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ total_logs }} log phù hợp</p>
+
+{% if logs %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Thời gian</th>
+        <th>Người thực hiện</th>
+        <th>Hành động</th>
+        <th>Đối tượng</th>
+        <th>Công ty liên quan</th>
+        {% if view == 'manual' %}
+        <th>Ghi chú</th>
+        <th></th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr {% if log.note_required and not log.note %}class="highlight-required"{% endif %}>
+        <td class="muted">{{ log.created_at|format_date('%d/%m/%Y %H:%M') if log.created_at else '—' }}</td>
+        <td>{{ log.actor_name }}</td>
+        <td>
+          <span class="badge badge-{{ 'success' if 'Thêm' in log.action_label else ('warning' if 'Sửa' in log.action_label else 'danger') }}">
+            {{ log.action_label }}
+          </span>
+        </td>
+        <td>
+          <strong>{{ log.entity_label_type }}:</strong>
+          {% if log.entity_type == 'JOB' and log.entity_id %}
+            <a href="{{ url_for('job_detail', job_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+          {% elif log.entity_type == 'COMPANY' and log.entity_id %}
+            <a href="{{ url_for('company_detail', company_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+          {% elif log.entity_type == 'CONTACT' and log.entity_id %}
+            <span>{{ log.entity_label or log.entity_id }}</span>
+          {% else %}
+            <span class="muted">{{ log.entity_label or '—' }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if log.company_id %}
+            <a href="{{ url_for('company_detail', company_id=log.company_id) }}">{{ log.company_name or '—' }}</a>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        {% if view == 'manual' %}
+        <td>
+          {% if log.note %}
+            <p class="note-text">{{ log.note }}</p>
+            {% if log.note_updated_at %}
+              <small class="muted">(Sửa lần cuối: {{ log.note_updated_at|format_date('%d/%m %H:%M') }})</small>
+            {% endif %}
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="actions-cell">
+          {% if log.actor_id == current_user.id and not log.note_required %}
+            <button 
+              class="btn btn-text" 
+              onclick="editNote('{{ log.id }}', '{{ log.note|replace('\'', '\\\'') }}', '{{ view }}')"
+            >
+              Sửa note
+            </button>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Phân trang">
+  {% if page > 1 %}
+    <a class="page-link" href="{{ url_for('activity_logs', view=view, page=page-1, **pagination_filters) }}">‹ Trang trước</a>
+  {% endif %}
+  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="page-link" href="{{ url_for('activity_logs', view=view, page=page+1, **pagination_filters) }}">Trang sau ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <p>Chưa có log nào khớp bộ lọc.</p>
+</div>
+{% endif %}
+
+<script>
+function editNote(logId, currentNote, view) {
+  const newNote = prompt('Nhập ghi chú mới:', currentNote);
+  if (newNote === null) return; // User clicked Cancel
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/activity-logs/' + logId + '/note?view=' + view;
+  
+  const noteInput = document.createElement('input');
+  noteInput.type = 'hidden';
+  noteInput.name = 'note';
+  noteInput.value = newNote;
+  
+  form.appendChild(noteInput);
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+
+<style>
+.tab-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab-nav a {
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab-nav a:hover {
+  color: var(--text-primary);
+}
+
+.tab-nav a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.note-text {
+  max-width: 300px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.highlight-required {
+  background-color: rgba(255, 193, 7, 0.1);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+
+.badge-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #FF9800;
+}
+
+.badge-danger {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #F44336;
+}
+
+.pagination {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.page-link {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.page-link:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.page-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+</style>
+
+{% endblock %}
