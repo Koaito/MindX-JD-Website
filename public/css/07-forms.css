@@ -23,18 +23,22 @@
 }
 .form-section:first-child { margin-top: 0; }
 
-/* Form grid - responsive 2-4 columns depending on width */
+/* Form grid - 4 columns với manual span control */
 .form-grid {
   display: grid;
-  /* Auto-fit với minmax(320px, 1fr):
-     - 320px: độ rộng tối thiểu thoải mái cho input/select (tăng từ 260px)
-     - Ở màn 1600px: tối đa 4-5 cột (thay vì 6 cột như trước)
-     - Ở màn 1200px: 3 cột
-     - Ở màn 900px: 2 cột
-     - Ở màn <640px (mobile): 1 cột */
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* Desktop: 4 cột bằng nhau
+     - Mỗi field có thể chiếm 1-4 cột tuỳ độ dài nội dung
+     - Dùng .span-1, .span-2, .span-3, .span-4 classes để control
+     - Responsive: 4→3→2→1 cột theo breakpoints */
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px 18px;
 }
+
+/* Span classes - control số cột mỗi field chiếm */
+.form-grid > label.span-1 { grid-column: span 1; } /* 25% - Level, Địa điểm */
+.form-grid > label.span-2 { grid-column: span 2; } /* 50% - Ngành, Công ty */
+.form-grid > label.span-3 { grid-column: span 3; } /* 75% */
+.form-grid > label.span-4 { grid-column: span 4; } /* 100% - Mô tả, Yêu cầu */
 
 /* Same overflow fix as .two-col above: a <select> with a long option
    (company name) can overflow its 1fr column and stick out past the
@@ -154,21 +158,48 @@
 }
 
 /* Responsive breakpoints */
-@media (max-width: 1024px) {
-  /* Tablet: giảm minmax xuống để form không quá rộng */
+@media (max-width: 1200px) {
+  /* Large tablet: 3 cột */
   .form-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
   }
+  
+  /* Điều chỉnh span classes cho 3 cột */
+  .form-grid > label.span-1 { grid-column: span 1; } /* 33% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 66% */
+  .form-grid > label.span-3 { grid-column: span 3; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 3; } /* 100% */
   
   .form-card {
     padding: 22px 24px;
   }
 }
 
+@media (max-width: 900px) {
+  /* Tablet: 2 cột */
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  /* Điều chỉnh span classes cho 2 cột */
+  .form-grid > label.span-1 { grid-column: span 1; } /* 50% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-3 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 2; } /* 100% */
+}
+
 @media (max-width: 768px) {
-  /* Mobile: force 1 column */
+  /* Mobile: 1 cột */
   .form-grid {
     grid-template-columns: 1fr;
+  }
+  
+  /* Tất cả fields chiếm full width */
+  .form-grid > label.span-1,
+  .form-grid > label.span-2,
+  .form-grid > label.span-3,
+  .form-grid > label.span-4 {
+    grid-column: span 1;
   }
   
   .form-card {

@@ -7,11 +7,10 @@
 /* Detail page layout - job_detail.html, company_detail.html */
 .detail-grid {
   display: grid;
-  /* Sidebar chiếm 30% max (thay vì cố định 350px)
-     - minmax(280px, 30%): sidebar tối thiểu 280px, tối đa 30% width
-     - Main content luôn chiếm ít nhất 70%
-     - Responsive tự nhiên theo chiều rộng màn hình */
-  grid-template-columns: 1fr minmax(280px, 30%);
+  /* Sidebar cố định bên phải 380px
+     - Desktop (>1200px): Main content bên trái, sidebar 380px bên phải
+     - Tablet/Mobile: Stack xuống dưới (xem @media breakpoints) */
+  grid-template-columns: 1fr 380px;
   gap: 24px;
   align-items: start;
 }
@@ -44,6 +43,13 @@
 
 .card p { margin: 0; color: var(--ink-soft); white-space: pre-line; }
 
+/* Placeholder text cho sections trống */
+.empty-placeholder {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; font-size: 13px; text-align: right; }
@@ -70,15 +76,17 @@
 .jd-bullets li:last-child { margin-bottom: 0; }
 
 /* Responsive breakpoints */
-@media (max-width: 1024px) {
-  /* Tablet: stack sidebar below main content */
+@media (max-width: 1200px) {
+  /* Tablet (768-1200px): Stack sidebar xuống dưới
+     - Main content quá hẹp nếu giữ 2 cột ở màn nhỏ hơn 1200px
+     - Sidebar mất sticky, hiện như phần content bình thường */
   .detail-grid {
     grid-template-columns: 1fr;
     gap: 20px;
   }
   
   .detail-side {
-    position: static; /* Bỏ sticky trên tablet */
+    position: static;
     max-height: none;
   }
 }

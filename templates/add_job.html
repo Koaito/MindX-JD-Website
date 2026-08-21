@@ -24,26 +24,26 @@
     {% if not edit_id %}
     {# Company CHỈ chọn được lúc TẠO job — backend không cho đổi company
        của job đã tồn tại (PATCH /jobs/{id} không nhận company_id) #}
-    <label class="full">Công ty *
+    <label class="span-4">Công ty *
       {% with input_id = "company_id_select", allow_new = true %}
         {% include "_company_combobox.html" %}
       {% endwith %}
     </label>
     <input type="hidden" name="company_mode" id="company_mode_field" value="existing">
-    <div id="new_company_fields" class="form-grid full" style="display:none; grid-column: 1 / -1;">
-      <label>Tên công ty mới *
+    <div id="new_company_fields" class="form-grid span-4" style="display:none; grid-column: 1 / -1;">
+      <label class="span-2">Tên công ty mới *
         <input type="text" name="new_company_name">
       </label>
-      <label>Mã số thuế (nếu có — tránh tạo trùng công ty đã crawl)
+      <label class="span-2">Mã số thuế (nếu có — tránh tạo trùng công ty đã crawl)
         <input type="text" name="new_company_tax_id">
       </label>
-      <label>Website
+      <label class="span-2">Website
         <input type="url" name="new_company_website" placeholder="https://">
       </label>
-      <label>Lĩnh vực
+      <label class="span-1">Lĩnh vực
         <input type="text" name="new_company_industry">
       </label>
-      <label>Thành phố
+      <label class="span-1">Thành phố
         <input type="text" name="new_company_city">
       </label>
     </div>
@@ -71,38 +71,38 @@
     </script>
     {% endif %}
 
-    <label>Vị trí tuyển dụng *
+    <label class="span-2">Vị trí tuyển dụng *
       <input type="text" name="position" required value="{{ job.position if job else '' }}">
     </label>
-    <label>Ngành *
+    <label class="span-2">Ngành *
       <select name="industry" required>
         {% for i in industries %}<option value="{{ i }}" {{ 'selected' if job and job.industry == i }}>{{ i }}</option>{% endfor %}
       </select>
     </label>
-    <label>Level
+    <label class="span-1">Level
       <select name="level">
         <option value="">— chọn —</option>
         {% for l in levels %}<option value="{{ l }}" {{ 'selected' if job and job.level == l }}>{{ l }}</option>{% endfor %}
       </select>
     </label>
-    <label>Địa điểm
+    <label class="span-1">Địa điểm
       <select name="location">
         <option value="">— chọn —</option>
         {% for loc in locations %}<option value="{{ loc }}" {{ 'selected' if job and job.location == loc }}>{{ loc }}</option>{% endfor %}
       </select>
     </label>
-    <label>Hình thức làm việc
+    <label class="span-1">Hình thức làm việc
       <select name="work_type">
         <option value="">— chọn —</option>
         {% for w in work_types %}<option value="{{ w }}" {{ 'selected' if job and job.work_type == w }}>{{ w }}</option>{% endfor %}
       </select>
     </label>
-    <label>Loại lương
+    <label class="span-1">Loại lương
       <select name="salary_type">
         {% for st in salary_types %}<option value="{{ st }}" {{ 'selected' if job and job.get('salary_type') == st }}>{{ st }}</option>{% endfor %}
       </select>
     </label>
-    <label>Chu kỳ trả lương
+    <label class="span-1">Chu kỳ trả lương
       {# Mới thêm 08/2026 — trước đây KHÔNG có ô này, mọi job nhập tay
          lương NĂM qua form bị backend mặc định hiểu nhầm là lương/tháng
          (sai lệch 12 lần), y hệt bug từng gặp ở job crawl "/năm". Mặc
@@ -112,40 +112,40 @@
         {% for sp in salary_periods %}<option value="{{ sp }}" {{ 'selected' if (job and job.get('salary_period') == sp) or (not job and sp == 'Tháng') }}>{{ sp }}</option>{% endfor %}
       </select>
     </label>
-    <label>Lương tối thiểu
+    <label class="span-1">Lương tối thiểu
       <input type="number" name="salary_min" min="0" value="{{ job.salary_min if job else '' }}">
     </label>
-    <label>Lương tối đa
+    <label class="span-1">Lương tối đa
       <input type="number" name="salary_max" min="0" value="{{ job.salary_max if job else '' }}">
     </label>
-    <label>Đơn vị tiền tệ
+    <label class="span-1">Đơn vị tiền tệ
       <select name="currency">
         <option value="VNĐ" {{ 'selected' if not job or job.get('currency','VNĐ') == 'VNĐ' }}>VNĐ</option>
         <option value="USD" {{ 'selected' if job and job.get('currency') == 'USD' }}>USD</option>
       </select>
     </label>
-    <label>Deadline
+    <label class="span-1">Deadline
       <input type="date" name="deadline" value="{{ job.deadline if job else '' }}">
     </label>
   </div>
 
-  <label class="full">Kỹ năng / công nghệ yêu cầu (cách nhau bởi dấu phẩy)
+  <label class="span-4">Kỹ năng / công nghệ yêu cầu (cách nhau bởi dấu phẩy)
     <input type="text" name="skills" placeholder="SQL, Python, Excel" value="{{ job.skills if job else '' }}">
   </label>
-  <label class="full">Mô tả công việc
+  <label class="span-4">Mô tả công việc
     <textarea name="description" rows="3">{{ job.description if job else '' }}</textarea>
   </label>
-  <label class="full">Yêu cầu ứng viên
+  <label class="span-4">Yêu cầu ứng viên
     <textarea name="requirements" rows="3">{{ job.requirements if job else '' }}</textarea>
   </label>
-  <label class="full">Quyền lợi
+  <label class="span-4">Quyền lợi
     <textarea name="benefits" rows="2">{{ job.benefits if job else '' }}</textarea>
   </label>
   {% if edit_id %}
-  <label class="full">Ghi chú của team SS
+  <label class="span-4">Ghi chú của team SS
     <textarea name="note" rows="2">{{ job.note if job else '' }}</textarea>
   </label>
-  <label class="full">Ghi chú lịch sử thao tác (không bắt buộc)
+  <label class="span-4">Ghi chú lịch sử thao tác (không bắt buộc)
     <textarea name="activity_note" rows="2" placeholder="Lý do sửa job này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
   </label>
   {% endif %}

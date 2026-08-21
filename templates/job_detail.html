@@ -15,18 +15,24 @@
 
 <div class="detail-grid">
   <div class="detail-main">
-    {% if job.description %}
     <section class="card">
       <h4>Mô tả công việc</h4>
-      {{ job.description|to_bullets }}
+      {% if job.description %}
+        {{ job.description|to_bullets }}
+      {% else %}
+        <p class="empty-placeholder">Chưa có thông tin.</p>
+      {% endif %}
     </section>
-    {% endif %}
-    {% if job.requirements %}
+
     <section class="card">
       <h4>Yêu cầu ứng viên</h4>
-      {{ job.requirements|to_bullets }}
+      {% if job.requirements %}
+        {{ job.requirements|to_bullets }}
+      {% else %}
+        <p class="empty-placeholder">Chưa có thông tin.</p>
+      {% endif %}
     </section>
-    {% endif %}
+
     {% if job.skills %}
     <section class="card">
       <h4>Kỹ năng / công nghệ</h4>
@@ -35,12 +41,16 @@
       </div>
     </section>
     {% endif %}
-    {% if job.benefits %}
+
     <section class="card">
       <h4>Quyền lợi</h4>
-      {{ job.benefits|to_bullets }}
+      {% if job.benefits %}
+        {{ job.benefits|to_bullets }}
+      {% else %}
+        <p class="empty-placeholder">Chưa có thông tin.</p>
+      {% endif %}
     </section>
-    {% endif %}
+
     {% if job.note %}
     <section class="card">
       <h4>Ghi chú của team SS</h4>

@@ -14,24 +14,24 @@
 
 <form class="form-card" method="post">
   <div class="form-grid">
-    <label>Tên công ty *
+    <label class="span-2">Tên công ty *
       <input type="text" name="company" required value="{{ company.company if company else '' }}">
     </label>
-    <label>Mã số thuế
+    <label class="span-2">Mã số thuế
       <input type="text" name="tax_id" placeholder="Nếu điền đúng, tự khớp công ty đã crawl trước đó" value="{{ company.tax_id if company else '' }}">
     </label>
-    <label>Website
+    <label class="span-2">Website
       <input type="url" name="website" placeholder="https://" value="{{ company.website if company else '' }}">
     </label>
-    <label>Lĩnh vực hoạt động
+    <label class="span-2">Lĩnh vực hoạt động
       <input type="text" name="industry" placeholder="VD: Fintech, E-commerce…" value="{{ company.industry if company else '' }}">
     </label>
-    <label>Quy mô nhân sự
+    <label class="span-1">Quy mô nhân sự
       <input type="text" name="company_size" placeholder="VD: 200-500" value="{{ company.company_size if company else '' }}" 
              pattern="^[\d\s\-–—]+$" 
              title="Chỉ nhập số và dấu gạch ngang (VD: 100-200, 500)">
     </label>
-    <label>Tỉnh/Thành
+    <label class="span-1">Tỉnh/Thành
       <select name="city">
         <option value="">Chọn tỉnh/thành phố…</option>
         {% for c in cities %}
@@ -39,22 +39,22 @@
         {% endfor %}
       </select>
     </label>
-    <label>Địa chỉ
+    <label class="span-2">Địa chỉ
       <input type="text" name="address" value="{{ company.address if company else '' }}">
     </label>
-    <label>Link fanpage
+    <label class="span-2">Link fanpage
       <input type="url" name="fanpage" placeholder="https://facebook.com/..." value="{{ company.fanpage if company else '' }}">
     </label>
-    <label>Link LinkedIn công ty
+    <label class="span-2">Link LinkedIn công ty
       <input type="url" name="linkedin_company" placeholder="https://linkedin.com/company/..." value="{{ company.linkedin_company if company else '' }}">
     </label>
-    <label>Tiềm năng hợp tác
+    <label class="span-2">Tiềm năng hợp tác
       <select name="partnership_potential">
         {% for p in partnership_potentials %}<option value="{{ p }}" {{ 'selected' if company and company.partnership_potential == p }}>{{ p }}</option>{% endfor %}
       </select>
     </label>
     {% if edit_id %}
-    <label class="full">Ghi chú lịch sử thao tác (không bắt buộc)
+    <label class="span-4">Ghi chú lịch sử thao tác (không bắt buộc)
       <textarea name="activity_note" rows="2" placeholder="Lý do sửa hồ sơ công ty này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
     </label>
     {% endif %}

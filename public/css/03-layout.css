@@ -7,10 +7,11 @@
 
 .content {
   /* Giảm horizontal padding từ 56px → 40px mỗi bên
-     - Tăng usable width: 1672px - 80px = 1592px (thay vì 1560px)
-     - Vẫn đủ breathing room, không sát mép */
+     - Tăng usable width: 1800px - 80px = 1720px (tăng từ 1520px)
+     - Vẫn đủ breathing room, không sát mép
+     - Tối ưu cho form 4 cột và job detail sidebar rộng hơn */
   padding: 40px 40px 64px;
-  max-width: 1600px;
+  max-width: 1800px;
   margin: 0 auto;
 }
 
