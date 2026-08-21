@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Xuất / Nhập dữ liệu — MindX Career Hub{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Xuất / Nhập dữ liệu</h1>
+    <p class="lede">Xuất JD/Công ty/Người liên hệ ra file, hoặc nhập hàng loạt từ file CSV/XLSX — có kiểm tra trùng lặp trước khi ghi vào hệ thống.</p>
+  </div>
+</header>
+
+<div class="dm-entity-switch">
+  {% for et in entity_types %}
+    <a href="{{ url_for('data_management', entity=et, tab=tab) }}"
+       class="dm-entity-tab {{ 'active' if entity_type == et else '' }}">
+      {{ entity_labels[et] }}
+    </a>
+  {% endfor %}
+</div>
+
+<nav class="tab-nav">
+  <a href="{{ url_for('data_management', entity=entity_type, tab='export') }}" class="{{ 'active' if tab == 'export' else '' }}">
+    Xuất dữ liệu (Export)
+  </a>
+  <a href="{{ url_for('data_management', entity=entity_type, tab='import') }}" class="{{ 'active' if tab == 'import' else '' }}">
+    Nhập dữ liệu (Import)
+  </a>
+</nav>
+
+{% if tab == 'export' %}
+  {% include "_dm_export.html" %}
+{% else %}
+  {% include "_dm_import.html" %}
+{% endif %}
+
+{% endblock %}

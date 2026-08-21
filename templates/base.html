@@ -78,6 +78,9 @@
       <a href="{{ url_for('activity_logs') }}" class="{{ 'active' if request.endpoint in ['activity_logs','activity_log_update_note'] else '' }}" title="Lịch sử thao tác">
         <span class="nav-ic">📋</span> <span class="nav-text">Lịch sử thao tác</span>
       </a>
+      <a href="{{ url_for('data_management') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('data_management') else '' }}" title="Xuất / Nhập dữ liệu">
+        <span class="nav-ic">⇄</span> <span class="nav-text">Xuất / Nhập dữ liệu</span>
+      </a>
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}

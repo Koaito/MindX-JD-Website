@@ -845,3 +845,209 @@ def update_audit_log_note(access_token, log_id, note) -> dict:
     gọi thẳng URL."""
     raw = _request("PATCH", f"/audit-logs/{log_id}/note", access_token=access_token, json={"note": note})
     return _normalize_audit_log(raw)
+
+
+# ---------------------------------------------------------------------------
+# Import / Export (trang /data-management)
+#
+# ⚠️ Router backend api/routers/import_export.py CHƯA được code ở phía
+# backend tại thời điểm viết module này (chỉ mới chốt DESIGN qua trao
+# đổi, xem lịch sử — 6 endpoint dưới đây là CONTRACT đã thống nhất,
+# không phải code đã verify chạy thật). Khi backend triển khai xong,
+# nếu path/field lệch so với dưới đây thì sửa LẠI CHÍNH module này,
+# không cần đụng app.py/template (mọi chỗ khác chỉ gọi qua các hàm này).
+#
+# ENTITY_TYPE dùng trong path: "job" | "company" | "contact" (chữ
+# thường, số ít — khác ENTITY_TYPE_MAP ở trên vốn dùng cho audit log,
+# key "JOB"/"COMPANY"/"CONTACT" chữ hoa; 2 map KHÔNG dùng lẫn nhau).
+# ---------------------------------------------------------------------------
+
+IMPORT_EXPORT_ENTITY_TYPES = ["job", "company", "contact"]
+IMPORT_EXPORT_ENTITY_LABELS = {"job": "JD", "company": "Công ty", "contact": "Người liên hệ HR"}
+
+# Nhãn hiển thị cho conflict_status trả về từ conflict_detector backend
+# (xem preview row "conflict_status" bên dưới) — 3 trạng thái đã chốt:
+# không trùng (tạo mới bình thường), trùng với bản ghi ĐANG active (cho
+# chọn Skip/Update/Create), trùng với bản ghi INACTIVE/CLOSED/EXPIRED
+# (cảnh báo riêng, hỏi có ghi đè + kích hoạt lại không — xem [giả định B]).
+CONFLICT_STATUS_LABELS = {
+    "new": "Dòng mới",
+    "conflict": "Trùng dữ liệu",
+    "conflict_inactive": "Trùng — bản ghi đã ngừng hoạt động",
+}
+
+
+def export_entity(access_token, entity_type, file_format="xlsx"):
+    """POST /export/{entity_type} — trả file nhị phân (CSV hoặc XLSX).
+
+    Khác mọi hàm khác trong file này: trả về (content_bytes, filename,
+    content_type) thay vì dict đã chuẩn hoá, vì đây là file tải xuống
+    thẳng cho user (app.py dùng send_file/Response), không phải data
+    hiển thị trên UI. Raise CrawlerAPIError nếu backend lỗi — app.py tự
+    bắt và flash, KHÔNG trả file rỗng để tránh user tải nhầm file hỏng."""
+    url = f"{CRAWLER_API_URL}/export/{entity_type}"
+    try:
+        res = requests.post(
+            url, headers=_headers(access_token), params={"format": file_format},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise CrawlerAPIError(f"Không kết nối được tới backend ({url}): {exc}") from exc
+
+    if not res.ok:
+        try:
+            detail = res.json().get("detail", "") or ""
+        except Exception:
+            detail = res.text[:300]
+        raise CrawlerAPIError(f"Xuất file thất bại ({res.status_code}): {detail}", status_code=res.status_code)
+
+    content_type = res.headers.get("Content-Type", "application/octet-stream")
+    # Backend nên trả Content-Disposition kèm filename gợi ý; nếu thiếu,
+    # tự đặt tên theo đúng convention Requirement 1.9 (đã chốt) làm dự
+    # phòng — KHÔNG để app.py phải tự đoán tên file.
+    disposition = res.headers.get("Content-Disposition", "")
+    filename = None
+    if "filename=" in disposition:
+        filename = disposition.split("filename=")[-1].strip('"; ')
+    if not filename:
+        ts = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        ext = "xlsx" if file_format == "xlsx" else "csv"
+        filename = f"{entity_type}_export_{ts}.{ext}"
+    return res.content, filename, content_type
+
+
+def _normalize_preview_row(raw: dict) -> dict:
+    return {
+        "row_index": raw.get("row_index"),
+        "data": raw.get("data") or {},
+        "conflict_status": raw.get("conflict_status") or "new",
+        "conflict_status_label": CONFLICT_STATUS_LABELS.get(
+            raw.get("conflict_status") or "new", raw.get("conflict_status") or ""
+        ),
+        "existing_data": raw.get("existing_data"),
+        "existing_id": raw.get("existing_id"),
+        # needs_company_resolve: True khi dòng Job/Contact có tên công
+        # ty chưa map được thẳng ra company_id (xem [giả định A]) — FE
+        # phải hiện dropdown gợi ý (get_company_suggestions bên dưới)
+        # trước khi cho phép confirm dòng này.
+        "needs_company_resolve": raw.get("needs_company_resolve", False),
+        "resolved_company_id": raw.get("resolved_company_id"),
+        "resolved_company_name": raw.get("resolved_company_name"),
+        "errors": raw.get("errors") or [],
+    }
+
+
+def _normalize_preview_summary(raw: dict) -> dict:
+    return {
+        "preview_id": raw.get("preview_id"),
+        "entity_type": raw.get("entity_type"),
+        "total_rows": raw.get("total_rows", 0),
+        "new_count": raw.get("new_count", 0),
+        "conflict_count": raw.get("conflict_count", 0),
+        "conflict_inactive_count": raw.get("conflict_inactive_count", 0),
+        "error_count": raw.get("error_count", 0),
+        "needs_company_resolve_count": raw.get("needs_company_resolve_count", 0),
+        "expires_at": raw.get("expires_at"),
+        "rows": [_normalize_preview_row(r) for r in raw.get("rows", [])],
+    }
+
+
+def import_preview(access_token, entity_type, file_storage):
+    """POST /import/{entity_type}/preview — upload file (multipart), trả
+    preview_id + summary (đếm dòng mới/conflict/lỗi) + toàn bộ rows để
+    FE render bảng (bảng có thể tới 5000 dòng theo giới hạn file_parser
+    backend — phân trang do JS phía template tự làm, KHÔNG phân trang
+    ở tầng gọi API này).
+
+    file_storage: werkzeug.datastructures.FileStorage (từ
+    request.files["file"] trong route Flask) — đọc thẳng .stream/.filename,
+    KHÔNG cần lưu ra đĩa trước."""
+    url = f"{CRAWLER_API_URL}/import/{entity_type}/preview"
+    files = {"file": (file_storage.filename, file_storage.stream, file_storage.mimetype)}
+    try:
+        res = requests.post(url, headers=_headers(access_token), files=files, timeout=REQUEST_TIMEOUT)
+    except requests.exceptions.RequestException as exc:
+        raise CrawlerAPIError(f"Không kết nối được tới backend ({url}): {exc}") from exc
+
+    if res.ok:
+        return _normalize_preview_summary(res.json())
+
+    try:
+        detail = res.json().get("detail", "") or ""
+    except Exception:
+        detail = res.text[:300]
+    if res.status_code == 401:
+        raise CrawlerAPIError(detail or "Chưa đăng nhập hoặc phiên đã hết hạn.", status_code=401)
+    if res.status_code == 403:
+        raise CrawlerAPIError(detail or "Tài khoản không có quyền thực hiện thao tác này.", status_code=403)
+    if res.status_code == 422:
+        raise CrawlerAPIError(f"File không hợp lệ: {detail}", status_code=422)
+    raise CrawlerAPIError(f"Backend lỗi {res.status_code} khi đọc preview: {detail}", status_code=res.status_code)
+
+
+def get_import_preview(access_token, entity_type, preview_id):
+    """GET /import/{entity_type}/preview/{preview_id} — lấy lại preview đã
+    tạo (vd sau khi reload trang, hoặc load lại để render bảng phân
+    trang phía JS mà không cần re-upload file). Trả None nếu preview đã
+    hết hạn (TTL 1h) hoặc không thuộc user hiện tại — backend trả 404
+    cho cả 2 case này để không lộ preview_id của người khác tồn tại hay
+    không (_request() có sẵn coi 404 = None)."""
+    raw = _request("GET", f"/import/{entity_type}/preview/{preview_id}", access_token=access_token)
+    return _normalize_preview_summary(raw) if raw is not None else None
+
+
+def get_company_suggestions(access_token, entity_type, preview_id, row_index):
+    """GET /import/{entity_type}/preview/{preview_id}/company-suggestions?row_index=
+    — danh sách công ty gợi ý (fuzzy match) cho 1 dòng cụ thể cần resolve
+    company (xem [giả định A]/[giả định B], company_resolver.py backend).
+    Trả list [{"company_id", "company_name", "tax_id", "score"}, ...],
+    KHÔNG tự chọn hộ — staff bấm chọn tay trên UI."""
+    raw = _request(
+        "GET", f"/import/{entity_type}/preview/{preview_id}/company-suggestions",
+        access_token=access_token, params={"row_index": row_index},
+    ) or []
+    return [
+        {
+            "company_id": s.get("company_id"),
+            "company_name": s.get("company_name") or "",
+            "tax_id": s.get("tax_id") or "",
+            "score": s.get("score"),
+        }
+        for s in raw
+    ]
+
+
+def import_confirm(access_token, entity_type, preview_id, resolutions, import_note):
+    """POST /import/{entity_type}/confirm — chạy import thật trong 1
+    transaction, ghi đúng 1 dòng audit_logs tổng hợp kèm import_note.
+
+    resolutions: list các dict, MỖI DÒNG preview cần resolve gửi lên 1
+    phần tử:
+        {
+          "row_index": int,
+          "action": "create" | "update" | "skip" | "reactivate",
+          "selected_company_id": str | None,  # chỉ khi needs_company_resolve
+        }
+    Dòng "new" (không conflict, không cần resolve company) KHÔNG bắt
+    buộc phải có trong resolutions — backend mặc định action="create"
+    cho dòng nào không được liệt kê tường minh (giữ payload gọn, khớp
+    tinh thần "chỉ gửi lên phần user thực sự chọn").
+
+    import_note: BẮT BUỘC, khác rỗng (câu 6 đã chốt) — app.py phải chặn
+    submit nếu rỗng TRƯỚC khi gọi hàm này, nhưng vẫn để backend là nguồn
+    xác thực cuối (422 nếu thiếu) phòng gọi thẳng.
+
+    Trả {"created": int, "updated": int, "skipped": int, "reactivated": int,
+    "errors": [...]}; preview bị XOÁ ở backend sau khi confirm thành công
+    (không gọi lại được preview_id này nữa)."""
+    payload = {"resolutions": resolutions, "import_note": import_note}
+    raw = _request(
+        "POST", f"/import/{entity_type}/confirm", access_token=access_token, json=payload,
+    ) or {}
+    return {
+        "created": raw.get("created", 0),
+        "updated": raw.get("updated", 0),
+        "skipped": raw.get("skipped", 0),
+        "reactivated": raw.get("reactivated", 0),
+        "errors": raw.get("errors") or [],
+    }

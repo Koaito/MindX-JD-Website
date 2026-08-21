@@ -1,0 +1,15 @@
+<div class="dm-panel">
+  <div class="dm-export-card">
+    <h2>Xuất {{ entity_labels[entity_type] }} ra file</h2>
+    <p class="dm-hint">Tải toàn bộ dữ liệu {{ entity_labels[entity_type]|lower }} hiện có trong hệ thống ra file — dùng để đối chiếu, chỉnh sửa hàng loạt bên ngoài rồi nhập lại qua tab Import.</p>
+
+    <div class="dm-export-actions">
+      <a class="btn btn-primary" href="{{ url_for('data_management_export', entity_type=entity_type, format='xlsx') }}">
+        Tải file Excel (.xlsx)
+      </a>
+      <a class="btn btn-ghost" href="{{ url_for('data_management_export', entity_type=entity_type, format='csv') }}">
+        Tải file CSV (.csv)
+      </a>
+    </div>
+  </div>
+</div>

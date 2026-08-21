@@ -1,0 +1,275 @@
+/* Data Management page (/data-management) — Export/Import Job/Company/Contact.
+   Reuses .tab-nav (12-activity-logs.css), .btn/.filter-bar/.page-head
+   (03-layout.css), .form-card-ish inputs (07-forms.css tokens), .pagination
+   (10-pagination-responsive.css). Only page-specific pieces live here. */
+
+/* ---- Entity switch (Job / Company / Contact) ---- */
+.dm-entity-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.dm-entity-tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dm-entity-tab:hover { border-color: var(--ink); color: var(--ink); }
+
+.dm-entity-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #16130E;
+}
+
+.dm-panel { margin-top: 6px; }
+
+/* ---- Export tab ---- */
+.dm-export-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  max-width: 640px;
+}
+
+.dm-export-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
+
+.dm-hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; margin: 0 0 18px; }
+.dm-hint-muted { margin-top: 14px; margin-bottom: 0; font-size: 12.5px; }
+
+.dm-export-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- Import tab: upload step ---- */
+.dm-import-upload-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  max-width: 640px;
+}
+
+.dm-import-upload-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
+
+.dm-file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.dm-file-label input[type="file"] {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+}
+
+/* ---- Import tab: preview step ---- */
+.dm-preview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dm-stat {
+  flex: 1 1 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.dm-stat strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.dm-stat span { font-size: 12px; color: var(--ink-soft); }
+
+.dm-stat-new strong { color: #2E8B57; }
+.dm-stat-conflict strong { color: #B58000; }
+.dm-stat-inactive strong,
+.dm-stat-error strong { color: #B23A22; }
+.dm-stat-resolve strong { color: #3A6FB0; }
+
+.dm-tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dm-tag-new { background: #E4F3E9; color: #2E8B57; }
+.dm-tag-conflict { background: #FCF1D8; color: #B58000; }
+.dm-tag-inactive { background: #FBE7E4; color: #B23A22; }
+
+.dm-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  margin-bottom: 8px;
+}
+
+.dm-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dm-preview-table thead {
+  background: var(--bg-secondary, #F4F6F4);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.dm-preview-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.dm-preview-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  max-width: 260px;
+  overflow-wrap: break-word;
+}
+
+.dm-preview-table tbody tr:last-child td { border-bottom: none; }
+.dm-preview-table tbody tr.dm-row-flag { background: #FFFCF6; }
+
+.dm-row-errors {
+  color: #B23A22;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.dm-action-fixed { color: var(--ink-soft); font-size: 12.5px; }
+
+.dm-action-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dm-radio-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.dm-inactive-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dm-inactive-warn {
+  font-size: 12px;
+  color: #B23A22;
+  font-weight: 500;
+}
+
+.dm-inactive-btns { display: flex; gap: 6px; }
+
+.dm-inactive-btns .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.dm-inactive-btns .btn.active {
+  background: var(--accent);
+  color: #16130E;
+  border-color: var(--accent);
+}
+
+.dm-resolve-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.dm-resolve-current {
+  font-size: 12.5px;
+  padding: 3px 0;
+}
+
+.dm-resolve-pending { color: #B23A22; font-weight: 500; }
+.dm-resolve-ok { color: #2E8B57; font-weight: 500; }
+
+.dm-btn-choose-company { padding: 4px 0; font-size: 12.5px; align-self: flex-start; }
+
+.dm-pagination { margin-top: 8px; margin-bottom: 20px; }
+
+/* ---- Confirm form (note + submit) ---- */
+#dm-confirm-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  max-width: 720px;
+}
+
+.dm-note-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.dm-note-label textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.dm-required { color: #B23A22; }
+
+#dm-confirm-blocked-hint {
+  color: #B23A22;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .dm-preview-summary { gap: 8px; }
+  .dm-stat { flex: 1 1 100px; padding: 10px 12px; }
+  .dm-preview-table td, .dm-preview-table th { padding: 8px 10px; }
+}
