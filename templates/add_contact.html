@@ -47,6 +47,12 @@
     <label>Nguồn tìm thấy
       <input type="text" name="source" placeholder="LinkedIn, JD tuyển dụng, fanpage…" value="{{ contact.source if contact else '' }}">
     </label>
+    <label class="full">
+      {% if edit_id %}Ghi chú lịch sử thao tác — <strong>bắt buộc</strong>{% else %}Ghi chú lịch sử thao tác (không bắt buộc){% endif %}
+      <textarea name="activity_note" rows="2" {{ 'required' if edit_id }}
+        placeholder="{{ 'Lý do sửa thông tin người liên hệ này (bắt buộc — các ss_team khác sẽ xem được ở mục Lịch sử thao tác)…' if edit_id else 'Ghi chú thêm nếu cần (không bắt buộc)…' }}"
+      ></textarea>
+    </label>
   </div>
 
   <div class="form-actions">

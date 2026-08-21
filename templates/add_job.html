@@ -145,6 +145,9 @@
   <label class="full">Ghi chú của team SS
     <textarea name="note" rows="2">{{ job.note if job else '' }}</textarea>
   </label>
+  <label class="full">Ghi chú lịch sử thao tác (không bắt buộc)
+    <textarea name="activity_note" rows="2" placeholder="Lý do sửa job này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
+  </label>
   {% endif %}
 
   <div class="form-actions">

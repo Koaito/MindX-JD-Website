@@ -13,8 +13,9 @@ Client gọi API backend "Scrap JD" (repo Koaito/scrap-jd, deploy trên Render)
     định refresh rồi gọi lại.
   - job/company/contact CHỈ có PATCH (sửa từng phần) — KHÔNG có PUT.
   - job KHÔNG có DELETE thật — "xóa" = PATCH job_status=CLOSED.
-  - company KHÔNG có DELETE — chỉ tạo (POST, idempotent theo tax_id) và
-    sửa (PATCH, thêm 08/2026).
+  - company có DELETE (thêm 08/2026) — nhưng là XOÁ MỀM (is_active=false,
+    xem delete_company() bên dưới), KHÔNG xoá thật, và BẮT BUỘC kèm note
+    giải thích lý do (audit log, xem khối comment "AUDIT LOG NOTE" bên dưới).
   - "Contact" (người liên hệ HR) là bảng CON của company, route riêng
     /companies/{company_id}/contacts — KHÔNG còn gộp chung với company
     như bản cũ (bản cũ coi "contact" = "company", sai hoàn toàn).
@@ -30,6 +31,21 @@ Mọi field trả về từ backend được CHUẨN HÓA (map) sang tên field 
 template đang dùng (job.company, job.position...), giữ nguyên tinh thần
 bản cũ để đỡ phải sửa lại toàn bộ giao diện hiển thị (chỉ sửa phần
 form nhập liệu — nơi field/enum thực sự đổi).
+
+AUDIT LOG NOTE (thêm 08/2026, xem sql/migration_add_audit_logs.sql +
+db.ACTION_LOG_RULES ở backend): các hàm sửa/xoá JD, company, HR contact
+bên dưới nhận thêm 1 tham số `note` — nội dung ghi vào audit_logs.note,
+KHÔNG PHẢI ss_team_notes (note nội bộ hiển thị ngay trên JD, đã có sẵn
+từ trước, field backend riêng `ss_team_notes`). Vì 2 khái niệm dễ nhầm
+tên, form HTML dùng tên input RIÊNG `activity_note` cho note audit log
+(khác `note` cũ vẫn giữ nguyên cho ss_team_notes) — xem app.py đọc
+`request.form.get("activity_note")` khi gọi các hàm dưới đây.
+
+note BẮT BUỘC (backend trả 422 nếu thiếu, xem CompanyDeleteRequest/
+ContactDeleteRequest/CompanyContactUpdate/ContactAssignUpdate ở
+api/schemas.py backend) cho: xoá company, sửa contact, xoá contact,
+gán contact. TUỲ CHỌN (None hợp lệ) cho: sửa/xoá JD, sửa company, tạo
+contact.
 """
 
 import os
@@ -235,6 +251,11 @@ def _normalize_company(raw: dict) -> dict | None:
         ),
         "date_collected": raw.get("created_at"),
         "jobs": jobs,
+        # is_active (thêm 08/2026) — false = công ty đã bị xoá mềm qua
+        # DELETE /companies/{id} (xem delete_company() bên dưới). GET
+        # /companies mặc định KHÔNG trả company này (backend tự lọc,
+        # xem list_companies() phía dưới không truyền include_inactive).
+        "is_active": raw.get("is_active", True),
         # created_by/updated_by — cùng ý nghĩa với _normalize_job(), xem
         # comment ở đó. NULL với company crawl tự động.
         "created_by": raw.get("created_by"),
@@ -377,6 +398,18 @@ def get_stats() -> dict:
     return _request("GET", "/stats") or {}
 
 
+def get_engagement_stats() -> dict:
+    """GET /stats/engagement (thêm 08/2026, cùng lúc dashboard 4 tab) —
+    trả {"jobs": [...], "monthly": {...}}:
+    - jobs: MỌI job đang OPEN kèm application_count/saved_count gộp sẵn
+      (dùng lọc "JD sắp hết hạn chưa ai quan tâm" / "JD ế" phía
+      dashboard() mà không phải gọi N+1 request cho từng job).
+    - monthly: tổng ứng tuyển/lưu job THÁNG NÀY vs THÁNG TRƯỚC, dùng
+      tính % chênh lệch cho tab "Báo cáo tháng".
+    Chỉ cần API key, không cần access_token — giống get_stats()."""
+    return _request("GET", "/stats/engagement") or {}
+
+
 def is_duplicate_candidate(job: dict) -> bool:
     matches = list_jobs(q=job["company"], limit=50)
     return any(
@@ -426,6 +459,9 @@ def update_job(access_token, job_id, form) -> dict:
         "salary_period": SALARY_PERIOD_MAP_REV.get(form.get("salary_period", ""), form.get("salary_period") or "MONTH"),
         "deadline": form.get("deadline") or None,
         "ss_team_notes": (form.get("note") or "").strip() or None,
+        # note audit log — TUỲ CHỌN, KHÁC ss_team_notes ở trên (xem
+        # docstring đầu file, mục "AUDIT LOG NOTE").
+        "note": (form.get("activity_note") or "").strip() or None,
     }
     parsed = _build_parsed_content(form)
     if parsed:
@@ -434,11 +470,17 @@ def update_job(access_token, job_id, form) -> dict:
     return _normalize_job(raw)
 
 
-def update_job_status(access_token, job_id, status_vn):
+def update_job_status(access_token, job_id, status_vn, note=None):
     """status_vn: nhãn tiếng Việt (vd 'Đã đóng') hoặc mã backend thẳng
-    (vd 'CLOSED') — tự nhận diện qua JOB_STATUS_MAP_REV."""
+    (vd 'CLOSED') — tự nhận diện qua JOB_STATUS_MAP_REV.
+
+    note (thêm 08/2026): TUỲ CHỌN — nếu status đổi thành CLOSED, backend
+    tự ghi log này thành DELETE_JOB thay vì UPDATE_JOB (xem
+    api/routers/jobs.py::patch_job ở backend), note ở đây là lý do đóng/
+    đổi trạng thái job, không liên quan ss_team_notes."""
     code = JOB_STATUS_MAP_REV.get(status_vn, status_vn)
-    raw = _request("PATCH", f"/jobs/{job_id}", access_token=access_token, json={"job_status": code})
+    payload = {"job_status": code, "note": (note or "").strip() or None}
+    raw = _request("PATCH", f"/jobs/{job_id}", access_token=access_token, json=payload)
     return _normalize_job(raw)
 
 
@@ -555,8 +597,23 @@ def create_company(access_token, form) -> dict:
 
 
 def update_company(access_token, company_id, form) -> dict:
-    raw = _request("PATCH", f"/companies/{company_id}", access_token=access_token, json=_company_payload(form))
+    # note audit log — TUỲ CHỌN (xem docstring đầu file, mục "AUDIT LOG
+    # NOTE") — CHỈ thêm ở update, KHÔNG thêm ở create_company() phía
+    # trên (CREATE_COMPANY không nhận note, tạo company không phải hành
+    # vi cần giải thích lý do).
+    payload = {**_company_payload(form), "note": (form.get("activity_note") or "").strip() or None}
+    raw = _request("PATCH", f"/companies/{company_id}", access_token=access_token, json=payload)
     return _normalize_company(raw)
+
+
+def delete_company(access_token, company_id, note):
+    """DELETE /companies/{company_id} (thêm 08/2026) — xoá MỀM
+    (is_active=false), KHÔNG xoá thật (JD/HR contact cũ vẫn giữ nguyên,
+    chỉ ẩn company khỏi GET /companies mặc định).
+
+    note BẮT BUỘC — backend trả 422 ngay nếu thiếu/rỗng (xem
+    CompanyDeleteRequest ở api/schemas.py backend), KHÔNG xoá gì cả."""
+    _request("DELETE", f"/companies/{company_id}", access_token=access_token, json={"note": note})
 
 
 # ---------------------------------------------------------------------------
@@ -635,18 +692,27 @@ def create_contact(access_token, company_id, form) -> dict:
         # tạo, optional (form không có ô này thì bỏ trống -> NULL, gán
         # sau qua assign_contact()/route /assign như thường lệ).
         "assigned_ss_user": (form.get("assigned_ss_user") or "").strip() or None,
+        # note audit log — TUỲ CHỌN (xem docstring đầu file, mục "AUDIT
+        # LOG NOTE") — tạo contact không bắt buộc giải thích lý do.
+        "note": (form.get("activity_note") or "").strip() or None,
     }
     raw = _request("POST", f"/companies/{company_id}/contacts", access_token=access_token, json=payload)
     return _normalize_contact(raw)
 
 
-def update_contact(access_token, company_id, contact_id, form) -> dict:
+def update_contact(access_token, company_id, contact_id, form, note) -> dict:
+    """note BẮT BUỘC (thêm 08/2026) NẾU thực sự có field nào đổi giá
+    trị — backend tự tính diff và trả 422 nếu thiếu, xem docstring
+    CompanyContactUpdate.note ở api/schemas.py backend. Truyền None/""
+    vẫn hợp lệ cho lượt gọi KHÔNG đổi field nào (backend bỏ qua yêu cầu
+    note khi không có thay đổi thật)."""
     payload = {
         "contact_name": (form.get("contact_name") or "").strip() or None,
         "job_title": (form.get("title") or "").strip() or None,
         "work_email": (form.get("email") or "").strip() or None,
         "social_link": (form.get("contact_link") or "").strip() or None,
         "phone_number": (form.get("phone") or "").strip() or None,
+        "note": (note or "").strip() or None,
     }
     raw = _request("PATCH", f"/companies/{company_id}/contacts/{contact_id}", access_token=access_token, json=payload)
     return _normalize_contact(raw)
@@ -661,7 +727,7 @@ def update_contact_status(access_token, company_id, contact_id, status_vn):
     return _normalize_contact(raw)
 
 
-def assign_contact(access_token, company_id, contact_id, assigned_ss_user):
+def assign_contact(access_token, company_id, contact_id, assigned_ss_user, note=None):
     """PATCH /companies/{company_id}/contacts/{contact_id}/assign (thêm
     08/2026) — gán (hoặc BỎ gán khi assigned_ss_user rỗng/None) người
     phụ trách 1 contact. Route RIÊNG khỏi update_contact_status() ở trên
@@ -670,17 +736,26 @@ def assign_contact(access_token, company_id, contact_id, assigned_ss_user):
     api/schemas.py và docstring assign_contact() ở db.py backend.
 
     assigned_ss_user: ss_user_id (UUID) của thành viên ss_team/admin, hoặc
-    "" / None để bỏ gán — cả 2 đều gửi JSON null lên backend."""
+    "" / None để bỏ gán — cả 2 đều gửi JSON null lên backend.
+
+    note (thêm 08/2026): BẮT BUỘC NẾU lượt gán này thực sự ĐỔI người
+    phụ trách so với hiện tại (gán mới/đổi người/bỏ gán) — backend tự
+    so sánh, trả 422 nếu thiếu. Nếu chọn lại đúng người đang phụ trách
+    (không đổi gì) thì note không bắt buộc."""
     raw = _request(
         "PATCH", f"/companies/{company_id}/contacts/{contact_id}/assign",
-        access_token=access_token, json={"assigned_ss_user": assigned_ss_user or None},
+        access_token=access_token,
+        json={"assigned_ss_user": assigned_ss_user or None, "note": (note or "").strip() or None},
     )
     return _normalize_contact(raw)
 
 
-def delete_contact(access_token, company_id, contact_id):
-    """Xoá MỀM phía backend (is_active=false) — không phải xoá thật."""
-    _request("DELETE", f"/companies/{company_id}/contacts/{contact_id}", access_token=access_token)
+def delete_contact(access_token, company_id, contact_id, note):
+    """Xoá MỀM phía backend (is_active=false) — không phải xoá thật.
+
+    note BẮT BUỘC (thêm 08/2026) — backend trả 422 ngay nếu thiếu/rỗng
+    (xem ContactDeleteRequest ở api/schemas.py backend), KHÔNG xoá gì."""
+    _request("DELETE", f"/companies/{company_id}/contacts/{contact_id}", access_token=access_token, json={"note": note})
 
 
 def hard_delete_contact(access_token, company_id, contact_id):
@@ -691,3 +766,82 @@ def hard_delete_contact(access_token, company_id, contact_id):
     CrawlerAPIError từ 2 case 409 này có message đủ rõ để flash thẳng
     cho staff, không cần app.py tự diễn giải thêm."""
     _request("DELETE", f"/companies/{company_id}/contacts/{contact_id}/hard", access_token=access_token)
+
+
+# ---------------------------------------------------------------------------
+# Audit logs — "Lịch sử thao tác" (thêm 08/2026, xem
+# sql/migration_add_audit_logs.sql phía backend). 2 view auto/manual
+# trên CÙNG 1 endpoint GET /audit-logs, khác nhau ở query param `view`
+# — KHÔNG phải 2 route riêng, mirror đúng thiết kế backend.
+# ---------------------------------------------------------------------------
+
+ACTION_TYPE_MAP = {
+    "CREATE_JOB": "Thêm JD", "UPDATE_JOB": "Sửa JD", "DELETE_JOB": "Xoá JD",
+    "CREATE_COMPANY": "Thêm công ty", "UPDATE_COMPANY": "Sửa công ty", "DELETE_COMPANY": "Xoá công ty",
+    "CREATE_CONTACT": "Thêm người liên hệ", "UPDATE_CONTACT": "Sửa người liên hệ",
+    "DELETE_CONTACT": "Xoá người liên hệ", "ASSIGN_CONTACT": "Gán người phụ trách",
+}
+ENTITY_TYPE_MAP = {"JOB": "JD", "COMPANY": "Công ty", "CONTACT": "Người liên hệ"}
+
+
+def _normalize_audit_log(raw: dict) -> dict:
+    return {
+        "id": raw.get("log_id"),
+        "actor_id": raw.get("actor_id"),
+        # actor_name None -> "Hệ thống (tự động)" thay vì để trống —
+        # actor_id NULL nghĩa là thao tác tự động, KHÔNG phải lỗi thiếu
+        # dữ liệu (xem docstring db.log_action() phía backend).
+        "actor_name": raw.get("actor_name") or "Hệ thống (tự động)",
+        "action_type": raw.get("action_type") or "",
+        "action_label": ACTION_TYPE_MAP.get(raw.get("action_type"), raw.get("action_type") or ""),
+        "entity_type": raw.get("entity_type") or "",
+        "entity_label_type": ENTITY_TYPE_MAP.get(raw.get("entity_type"), raw.get("entity_type") or ""),
+        "entity_id": raw.get("entity_id"),
+        "entity_label": raw.get("entity_label") or "",
+        "company_id": raw.get("company_id"),
+        "company_name": raw.get("company_name") or "",
+        "changes": raw.get("changes") or {},
+        "is_manual_log": raw.get("is_manual_log", False),
+        "note_required": raw.get("note_required", False),
+        "note": raw.get("note") or "",
+        "note_updated_by": raw.get("note_updated_by"),
+        "note_updated_at": raw.get("note_updated_at"),
+        "created_at": raw.get("created_at"),
+    }
+
+
+def list_audit_logs(access_token, *, view="auto", entity_type="", company_id="", actor_id="",
+                     action_type="", pending_note=None, limit=50, offset=0) -> dict:
+    """GET /audit-logs — trả {"items": [...], "total": int}.
+
+    BẮT BUỘC truyền access_token thật — route backend yêu cầu
+    require_role("ss_team") qua chính JWT trong Authorization header
+    (KHÔNG chỉ check API key như GET /jobs, /companies công khai), xem
+    api/deps.py::require_role backend. Gọi qua _call_authed() ở app.py
+    để tự refresh nếu access_token hết hạn giữa chừng, giống mọi hàm
+    cần access_token khác trong file này."""
+    params = {"view": view, "limit": limit, "offset": offset}
+    if entity_type:
+        params["entity_type"] = entity_type
+    if company_id:
+        params["company_id"] = company_id
+    if actor_id:
+        params["actor_id"] = actor_id
+    if action_type:
+        params["action_type"] = action_type
+    if pending_note is not None:
+        params["pending_note"] = "true" if pending_note else "false"
+    data = _request("GET", "/audit-logs", access_token=access_token, params=params) or {}
+    items = [_normalize_audit_log(r) for r in data.get("items", [])]
+    return {"items": items, "total": data.get("total", 0)}
+
+
+def update_audit_log_note(access_token, log_id, note) -> dict:
+    """PATCH /audit-logs/{log_id}/note — CHỈ actor GỐC của log (người
+    thực hiện thao tác đó) mới gọi được, backend trả 403 nếu người
+    khác gọi (xem api/routers/audit_logs.py::update_note backend) —
+    app.py nên ẨN nút sửa note nếu current_user khác actor_id, nhưng
+    vẫn phải bắt CrawlerAPIError(403) ở đây phòng người dùng cố tình
+    gọi thẳng URL."""
+    raw = _request("PATCH", f"/audit-logs/{log_id}/note", access_token=access_token, json={"note": note})
+    return _normalize_audit_log(raw)

@@ -1,6 +1,6 @@
 import math
 import os
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 
 from env_loader import load_env_file
@@ -640,7 +640,7 @@ def logout():
 @login_required
 def job_toggle_save(job_id):
     if current_user.is_staff:
-        flash("Tài khoản team SS/admin không dùng để lưu job.", "error")
+        flash("Tài khoản team SS không dùng để lưu job.", "error")
         return redirect(request.referrer or url_for("jobs_index"))
 
     access_token, _ = _auth_tokens_from_session()
@@ -986,7 +986,10 @@ def job_update_status(job_id):
     if not job:
         abort(404)
     try:
-        _call_authed(db_data.update_job_status, job_id, request.form.get("status", job["status"]))
+        _call_authed(
+            db_data.update_job_status, job_id, request.form.get("status", job["status"]),
+            request.form.get("activity_note", ""),
+        )
         flash("Đã cập nhật trạng thái job.", "success")
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
@@ -1004,7 +1007,7 @@ def job_delete(job_id):
     if not job:
         abort(404)
     try:
-        _call_authed(db_data.update_job_status, job_id, "CLOSED")
+        _call_authed(db_data.update_job_status, job_id, "CLOSED", request.form.get("activity_note", ""))
         flash("Đã đóng job (không xoá dữ liệu — job đóng vẫn xem được, chỉ ẩn khỏi tìm kiếm mặc định).", "success")
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
@@ -1076,6 +1079,25 @@ def company_edit(company_id):
         flash(f"Đã cập nhật công ty {updated['company']}.", "success")
         return redirect(url_for("company_detail", company_id=company_id))
     return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS)
+
+
+@app.route("/companies/<string:company_id>/delete", methods=["POST"])
+@staff_required
+def company_delete(company_id):
+    """Xoá MỀM (thêm 08/2026) — trước đây company KHÔNG có cách xoá nào
+    ở cả UI lẫn backend. note BẮT BUỘC (backend chặn cứng 422 nếu
+    thiếu), kiểm tra sớm ở đây trước để tránh round-trip mạng vô ích."""
+    note = (request.form.get("note") or "").strip()
+    if not note:
+        flash("Xoá công ty bắt buộc phải nhập ghi chú lý do.", "error")
+        return redirect(url_for("company_detail", company_id=company_id))
+    try:
+        _call_authed(db_data.delete_company, company_id, note)
+        flash("Đã xoá công ty (xoá mềm — vẫn xem lại được qua Lịch sử thao tác, JD/contact liên quan không bị mất).", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("company_detail", company_id=company_id))
+    return redirect(url_for("companies_index"))
 
 
 @app.route("/companies/<string:company_id>")
@@ -1212,7 +1234,10 @@ def contact_edit(company_id, contact_id):
         abort(404)
     if request.method == "POST":
         try:
-            _call_authed(db_data.update_contact, company_id, contact_id, request.form)
+            _call_authed(
+                db_data.update_contact, company_id, contact_id, request.form,
+                request.form.get("activity_note", ""),
+            )
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
             return render_template("add_contact.html", company=company, contact=contact, edit_id=contact_id)
@@ -1235,8 +1260,15 @@ def contact_update_status(company_id, contact_id):
 @app.route("/companies/<string:company_id>/contacts/<string:contact_id>/delete", methods=["POST"])
 @staff_required
 def contact_delete(company_id, contact_id):
+    note = (request.form.get("note") or "").strip()
+    if not note:
+        # Chặn ở tầng Flask TRƯỚC KHI gọi backend — cùng validate với
+        # backend (422 nếu thiếu note) nhưng bắt sớm hơn để tránh 1
+        # round-trip mạng không cần thiết cho lỗi chắc chắn xảy ra.
+        flash("Xoá người liên hệ bắt buộc phải nhập ghi chú lý do.", "error")
+        return redirect(url_for("company_detail", company_id=company_id))
     try:
-        _call_authed(db_data.delete_contact, company_id, contact_id)
+        _call_authed(db_data.delete_contact, company_id, contact_id, note)
         flash("Đã xoá người liên hệ.", "success")
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
@@ -1275,6 +1307,7 @@ def contact_assign(company_id, contact_id):
         _call_authed(
             db_data.assign_contact, company_id, contact_id,
             request.form.get("assigned_ss_user", ""),
+            request.form.get("note", ""),
         )
         flash("Đã cập nhật người phụ trách.", "success")
     except CrawlerAPIError as exc:
@@ -1304,6 +1337,286 @@ def _list_all_companies():
             break
         offset += 200
     return companies
+
+
+# ---------------------------------------------------------------------------
+# Dashboard — helpers cho tab "Gợi ý học viên" (nhóm A)
+# ---------------------------------------------------------------------------
+
+def _merge_engagement_into_jobs(jobs, engagement_jobs):
+    """Gộp application_count/saved_count (từ GET /stats/engagement) vào
+    từng job trong `jobs` (list đã có từ list_all_jobs()) theo job_id —
+    sửa TRỰC TIẾP trên list jobs hiện có thay vì tạo list riêng, để mọi
+    chỗ dùng `jobs` sau đó (kể cả các bar-chart theo ngành/level cũ) đều
+    thấy field mới nếu cần, không phải truyền thêm biến song song.
+
+    engagement_jobs chỉ có job đang OPEN (xem db.get_job_engagement_counts
+    ở backend) — job KHÔNG có trong engagement_jobs (đã đóng/hết hạn)
+    được gán application_count=None/saved_count=None, KHÔNG phải 0, để
+    phân biệt "chắc chắn 0 lượt quan tâm" với "không có dữ liệu" (job
+    đã đóng thì không còn ý nghĩa để tính vào 'JD ế'/'JD sắp hết hạn')."""
+    by_id = {e.get("job_id"): e for e in engagement_jobs or []}
+    for job in jobs:
+        eng = by_id.get(job.get("id"))
+        job["application_count"] = eng.get("application_count") if eng else None
+        job["saved_count"] = eng.get("saved_count") if eng else None
+
+
+def _jd_needing_push(jobs, days_min=7, days_max=14):
+    """'JD sắp hết hạn cần đẩy gấp' — job OPEN, deadline rơi trong
+    days_min..days_max ngày tới, và CHƯA có ai lưu/ứng tuyển. Sort theo
+    deadline gần nhất trước (job sắp hết hạn nhất ưu tiên gọi/đẩy trước)."""
+    today = datetime.now().date()
+    result = []
+    for job in jobs:
+        if job.get("status_raw") != "OPEN":
+            continue
+        if job.get("application_count") is None:  # không có dữ liệu engagement -> bỏ qua, tránh báo nhầm
+            continue
+        if job["application_count"] or job["saved_count"]:
+            continue
+        d = _parse_any_date(job.get("deadline"))
+        if d is None:
+            continue
+        days_left = (d - today).days
+        if days_min <= days_left <= days_max:
+            result.append({**job, "days_left": days_left})
+    result.sort(key=lambda j: j["days_left"])
+    return result
+
+
+def _jd_stale(jobs, min_age_days=30):
+    """'JD ế' — job OPEN đã đăng >= min_age_days ngày mà vẫn 0 lượt
+    lưu/ứng tuyển. Sort theo ngày đăng cũ nhất trước (nằm im lâu nhất,
+    cần xem lại/gỡ trước)."""
+    today = datetime.now().date()
+    result = []
+    for job in jobs:
+        if job.get("status_raw") != "OPEN":
+            continue
+        if job.get("application_count") is None:
+            continue
+        if job["application_count"] or job["saved_count"]:
+            continue
+        d = _parse_any_date(job.get("date_collected"))
+        if d is None:
+            continue
+        age_days = (today - d).days
+        if age_days >= min_age_days:
+            result.append({**job, "age_days": age_days})
+    result.sort(key=lambda j: -j["age_days"])
+    return result
+
+
+def _top_skills(jobs, days_recent=30, top_n=10):
+    """Top skill hot — đếm tần suất skill (field 'skills', chuỗi phân
+    cách dấu phẩy) trong JD mới thêm trong days_recent ngày gần đây.
+    Chỉ tính JD mới để phản ánh đúng nhu cầu HIỆN TẠI của doanh
+    nghiệp, không lẫn skill từ JD cũ đăng nhiều tháng trước."""
+    today = datetime.now().date()
+    counts: dict = {}
+    for job in jobs:
+        d = _parse_any_date(job.get("date_collected"))
+        if d is None or (today - d).days > days_recent:
+            continue
+        for raw_skill in (job.get("skills") or "").split(","):
+            skill = raw_skill.strip()
+            if skill:
+                counts[skill] = counts.get(skill, 0) + 1
+    return sorted(counts.items(), key=lambda kv: -kv[1])[:top_n]
+
+
+def _salary_ranges_by_industry_level(jobs):
+    """Khoảng lương trung bình theo (ngành, level) — chỉ gộp job có
+    currency=VNĐ và trả theo tháng (salary_period_raw mặc định MONTH,
+    hoặc rỗng) để không lẫn đơn vị/kỳ hạn khác nhau vào cùng 1 con số
+    trung bình (job trả USD hoặc theo NĂM bị bỏ qua khỏi bảng này, vẫn
+    xem chi tiết được ở trang /jobs như bình thường)."""
+    groups: dict = {}
+    for job in jobs:
+        if (job.get("currency") or "VNĐ") != "VNĐ":
+            continue
+        if (job.get("salary_period_raw") or "MONTH") != "MONTH":
+            continue
+        lo, hi = job.get("salary_min"), job.get("salary_max")
+        if not lo and not hi:
+            continue
+        key = (job.get("industry") or "Khác", job.get("level") or "Khác")
+        g = groups.setdefault(key, {"mins": [], "maxs": []})
+        if lo:
+            g["mins"].append(lo)
+        if hi:
+            g["maxs"].append(hi)
+    rows = []
+    for (industry, level), vals in groups.items():
+        avg_min = sum(vals["mins"]) / len(vals["mins"]) if vals["mins"] else None
+        avg_max = sum(vals["maxs"]) / len(vals["maxs"]) if vals["maxs"] else None
+        rows.append({
+            "industry": industry, "level": level,
+            "avg_min": avg_min, "avg_max": avg_max,
+            "sample_size": len(vals["mins"]) or len(vals["maxs"]),
+        })
+    rows.sort(key=lambda r: -(r["avg_max"] or r["avg_min"] or 0))
+    # Format thành chuỗi hiển thị sẵn ở đây (không phải trong template)
+    # — cùng cách "{:,.0f}" như _fmt_salary() bên crawler_client.py, để
+    # 2 nơi hiện số lương ra UI dùng chung 1 kiểu định dạng.
+    for r in rows:
+        r["avg_min_fmt"] = f"{r['avg_min']:,.0f}" if r["avg_min"] else None
+        r["avg_max_fmt"] = f"{r['avg_max']:,.0f}" if r["avg_max"] else None
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Dashboard — helpers cho tab "Doanh nghiệp" (nhóm B)
+# ---------------------------------------------------------------------------
+
+def _companies_high_potential_no_contact(companies, contacts, quiet_days=60):
+    """'Công ty tiềm năng nhưng thiếu contact' — công ty Tiềm năng hợp
+    tác = Cao mà (a) chưa có contact nào, hoặc (b) MỌI contact đều đã
+    liên hệ lần cuối >= quiet_days ngày trước (hoặc chưa từng liên hệ
+    lần nào). Chỉ cần 1 contact còn "nóng" là công ty coi như đang được
+    theo dõi, không tính vào đây. Sort: chưa có contact/chưa từng liên
+    hệ lên đầu, rồi tới nguội lâu nhất."""
+    today = datetime.now().date()
+    contacts_by_company: dict = {}
+    for ct in contacts:
+        contacts_by_company.setdefault(ct.get("company_id"), []).append(ct)
+
+    result = []
+    for c in companies:
+        if c.get("partnership_potential") != "Cao":
+            continue
+        company_contacts = contacts_by_company.get(c.get("id"), [])
+        if not company_contacts:
+            result.append({**c, "reason": "Chưa có contact nào", "last_contacted": None})
+            continue
+        last_dates = [_parse_any_date(ct.get("last_contacted")) for ct in company_contacts]
+        if any(d is not None and (today - d).days < quiet_days for d in last_dates):
+            continue  # có ít nhất 1 contact còn "nóng" -> bỏ qua công ty này
+        most_recent = max((d for d in last_dates if d), default=None)
+        result.append({
+            **c,
+            "reason": "Contact đã nguội" if most_recent else "Có contact nhưng chưa từng liên hệ",
+            "last_contacted": most_recent,
+        })
+    result.sort(key=lambda c: c["last_contacted"] or date.min)
+    return result
+
+
+def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jobs=2, quiet_days=75):
+    """Trả 2 nhóm cùng lúc (dùng chung 1 lượt group job theo company_id):
+    - expanding: công ty có >= expanding_min_jobs job mới trong
+      expanding_days ngày gần đây -> dấu hiệu mở rộng tuyển dụng mạnh,
+      cơ hội đề xuất hợp tác dài hạn.
+    - quiet: công ty ĐÃ TỪNG có job nhưng job MỚI NHẤT cũng đã >=
+      quiet_days ngày trước -> cần chủ động liên hệ lại xem còn nhu cầu
+      tuyển không."""
+    today = datetime.now().date()
+    jobs_by_company: dict = {}
+    for j in jobs:
+        d = _parse_any_date(j.get("date_collected"))
+        if d is None or not j.get("company_id"):
+            continue
+        jobs_by_company.setdefault(j["company_id"], []).append(d)
+
+    companies_idx = {c["id"]: c for c in companies}
+    expanding, quiet = [], []
+    for company_id, dates in jobs_by_company.items():
+        company = companies_idx.get(company_id)
+        if not company:
+            continue
+        recent_count = sum(1 for d in dates if (today - d).days <= expanding_days)
+        if recent_count >= expanding_min_jobs:
+            expanding.append({**company, "recent_job_count": recent_count})
+        latest = max(dates)
+        quiet_for = (today - latest).days
+        if quiet_for >= quiet_days:
+            quiet.append({**company, "quiet_days": quiet_for, "last_job_date": latest})
+
+    expanding.sort(key=lambda c: -c["recent_job_count"])
+    quiet.sort(key=lambda c: -c["quiet_days"])
+    return expanding, quiet
+
+
+# ---------------------------------------------------------------------------
+# Dashboard — helpers cho tab "Báo cáo tháng" (nhóm C)
+# ---------------------------------------------------------------------------
+
+def _pct_change(current, previous):
+    """% thay đổi so tháng trước — trả None nếu tháng trước = 0 (chia
+    cho 0 vô nghĩa); template tự hiện '—' hoặc 'Mới' thay vì 'inf%'."""
+    if not previous:
+        return None
+    return round((current - previous) / previous * 100)
+
+
+def _monthly_recap(jobs, companies, engagement_monthly):
+    """Khối 'recap' tự động cho tab Báo cáo tháng — số job/công ty mới
+    tháng này (kèm % so tháng trước), top 3 ngành, top 5 công ty đăng
+    nhiều job nhất tháng, và số ứng tuyển/lưu job tháng này vs tháng
+    trước (lấy từ GET /stats/engagement, xem crawler_client.
+    get_engagement_stats())."""
+    today = datetime.now().date()
+    this_y, this_m = today.year, today.month
+    last_y, last_m = (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
+
+    def _in_month(raw_date, y, m):
+        d = _parse_any_date(raw_date)
+        return d is not None and d.year == y and d.month == m
+
+    jobs_this_month = [j for j in jobs if _in_month(j.get("date_collected"), this_y, this_m)]
+    jobs_last_month = [j for j in jobs if _in_month(j.get("date_collected"), last_y, last_m)]
+    # Job hết hạn tháng này = deadline rơi vào tháng này VÀ đã thực sự
+    # qua hạn tính đến hôm nay (nhất quán với _jobs_by_month(only_past=True)
+    # dùng cho biểu đồ ở tab Tổng quan).
+    jobs_expired_this_month = [
+        j for j in jobs
+        if _in_month(j.get("deadline"), this_y, this_m) and _parse_any_date(j.get("deadline")) < today
+    ]
+    companies_this_month = [c for c in companies if _in_month(c.get("date_collected"), this_y, this_m)]
+    companies_last_month = [c for c in companies if _in_month(c.get("date_collected"), last_y, last_m)]
+
+    industry_this: dict = {}
+    for j in jobs_this_month:
+        ind = j.get("industry") or "Khác"
+        industry_this[ind] = industry_this.get(ind, 0) + 1
+    industry_last: dict = {}
+    for j in jobs_last_month:
+        ind = j.get("industry") or "Khác"
+        industry_last[ind] = industry_last.get(ind, 0) + 1
+    top_industries = [
+        {"industry": ind, "count": cnt, "pct_change": _pct_change(cnt, industry_last.get(ind, 0))}
+        for ind, cnt in sorted(industry_this.items(), key=lambda kv: -kv[1])[:3]
+    ]
+
+    company_job_count: dict = {}
+    for j in jobs_this_month:
+        cid = j.get("company_id")
+        if cid:
+            company_job_count[cid] = company_job_count.get(cid, 0) + 1
+    companies_idx = {c["id"]: c for c in companies}
+    top_companies = [
+        {"company": companies_idx.get(cid, {}).get("company", "—"), "company_id": cid, "count": cnt}
+        for cid, cnt in sorted(company_job_count.items(), key=lambda kv: -kv[1])[:5]
+    ]
+
+    monthly = engagement_monthly or {}
+    applications = monthly.get("applications") or {}
+    saved_jobs = monthly.get("saved_jobs") or {}
+
+    return {
+        "jobs_new": len(jobs_this_month),
+        "jobs_new_pct": _pct_change(len(jobs_this_month), len(jobs_last_month)),
+        "jobs_expired": len(jobs_expired_this_month),
+        "companies_new": len(companies_this_month),
+        "companies_new_pct": _pct_change(len(companies_this_month), len(companies_last_month)),
+        "top_industries": top_industries,
+        "top_companies": top_companies,
+        "applications_this_month": applications.get("this_month", 0),
+        "applications_pct": _pct_change(applications.get("this_month", 0), applications.get("last_month", 0)),
+        "saved_jobs_this_month": saved_jobs.get("this_month", 0),
+        "saved_jobs_pct": _pct_change(saved_jobs.get("this_month", 0), saved_jobs.get("last_month", 0)),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1372,6 +1685,36 @@ def dashboard():
     except CrawlerAPIError:
         pass
 
+    # ---- Dữ liệu riêng cho 3 tab mới (Gợi ý học viên / Doanh nghiệp /
+    # Báo cáo tháng) — xem trao đổi thiết kế "dashboard 4 tab". Gọi
+    # GET /stats/engagement (thêm 08/2026) 1 lần, gộp counts vào `jobs`
+    # đã có sẵn; lỗi backend tạm thời thì các tab này hiện rỗng thay vì
+    # làm sập cả trang (giống pattern total_applications ở trên).
+    try:
+        engagement = db_data.get_engagement_stats()
+    except CrawlerAPIError:
+        engagement = {}
+    _merge_engagement_into_jobs(jobs, engagement.get("jobs", []))
+
+    # Contact cần cho tab Doanh nghiệp (công ty tiềm năng thiếu contact)
+    # — dashboard trước đây không gọi /contacts, giờ cần để join với
+    # companies theo company_id. Cùng access_token đã lấy ở trên cho
+    # total_students.
+    try:
+        all_contacts = db_data.list_all_contacts(access_token) if access_token else []
+    except CrawlerAPIError:
+        all_contacts = []
+
+    jd_needing_push = _jd_needing_push(jobs)
+    jd_stale = _jd_stale(jobs)
+    top_skills = _top_skills(jobs)
+    salary_ranges = _salary_ranges_by_industry_level(jobs)
+
+    companies_no_contact = _companies_high_potential_no_contact(companies, all_contacts)
+    companies_expanding, companies_quiet = _companies_job_activity(jobs, companies)
+
+    monthly_recap = _monthly_recap(jobs, companies, engagement.get("monthly"))
+
     return render_template(
         "dashboard.html",
         total_jobs=len(jobs), total_contacts=len(companies),
@@ -1388,6 +1731,17 @@ def dashboard():
         monthly_labels=monthly_labels,
         monthly_new=monthly_new,
         monthly_expired=monthly_expired,
+        # Tab "Gợi ý học viên"
+        jd_needing_push=jd_needing_push,
+        jd_stale=jd_stale,
+        top_skills=top_skills,
+        salary_ranges=salary_ranges,
+        # Tab "Doanh nghiệp"
+        companies_no_contact=companies_no_contact,
+        companies_expanding=companies_expanding,
+        companies_quiet=companies_quiet,
+        # Tab "Báo cáo tháng"
+        recap=monthly_recap,
     )
 
 

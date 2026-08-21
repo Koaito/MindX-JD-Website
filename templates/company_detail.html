@@ -16,6 +16,20 @@
   <a class="btn btn-ghost" href="{{ url_for('company_edit', company_id=company.id) }}">Sửa hồ sơ công ty</a>
 </header>
 
+{# Xoá công ty (thêm 08/2026) — trước đây company KHÔNG có cách xoá. Xoá
+   MỀM, note BẮT BUỘC. Dùng <details> thay vì modal JS để giữ style
+   plain-HTML nhất quán với khối "Đã xoá" của contact bên dưới — bấm mở
+   ra mới thấy ô note, tránh xoá nhầm chỉ vì 1 cú click. #}
+<details class="card" style="margin-bottom: 20px;">
+  <summary class="btn-danger-text" style="cursor:pointer;">Xoá công ty này</summary>
+  <form method="post" action="{{ url_for('company_delete', company_id=company.id) }}"
+        onsubmit="return confirm('Xoá công ty này? (Xoá mềm — JD và người liên hệ liên quan vẫn giữ nguyên, có thể xem lại ở Lịch sử thao tác)');"
+        style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+    <textarea name="note" required rows="2" placeholder="Lý do xoá công ty này — bắt buộc…" style="flex:1;min-width:220px;"></textarea>
+    <button class="btn btn-danger" type="submit">Xác nhận xoá</button>
+  </form>
+</details>
+
 <div class="detail-grid">
   <div class="detail-main">
     <section class="card">
@@ -68,9 +82,15 @@
               </td>
               <td class="actions-cell">
                 <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
-                <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở mục Đã xoá bên dưới, chưa mất hẳn dữ liệu)');" style="display:inline;">
-                  <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
-                </form>
+                <details style="display:inline-block;">
+                  <summary class="btn btn-text btn-danger-text" style="cursor:pointer;display:inline;">Xóa</summary>
+                  <form method="post" action="{{ url_for('contact_delete', company_id=company.id, contact_id=c.id) }}"
+                        onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở mục Đã xoá bên dưới, chưa mất hẳn dữ liệu)');"
+                        style="margin-top:6px;display:flex;gap:6px;flex-direction:column;min-width:180px;">
+                    <textarea name="note" required rows="2" placeholder="Lý do xoá — bắt buộc…" style="width:100%;"></textarea>
+                    <button class="btn btn-text btn-danger-text" type="submit">Xác nhận xoá</button>
+                  </form>
+                </details>
               </td>
             </tr>
             {% endfor %}

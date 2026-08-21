@@ -46,6 +46,11 @@
         {% for p in partnership_potentials %}<option value="{{ p }}" {{ 'selected' if company and company.partnership_potential == p }}>{{ p }}</option>{% endfor %}
       </select>
     </label>
+    {% if edit_id %}
+    <label class="full">Ghi chú lịch sử thao tác (không bắt buộc)
+      <textarea name="activity_note" rows="2" placeholder="Lý do sửa hồ sơ công ty này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
+    </label>
+    {% endif %}
   </div>
 
   <div class="form-actions">

@@ -59,11 +59,13 @@
             <option value="{{ s }}" {{ 'selected' if job.status == s }}>{{ s }}</option>
           {% endfor %}
         </select>
+        <input type="text" name="activity_note" placeholder="Ghi chú (không bắt buộc)…" style="flex:1;min-width:120px;">
         <button class="btn btn-ghost" type="submit">Lưu</button>
       </form>
       <div class="action-row">
         <a class="btn btn-ghost" href="{{ url_for('job_edit', job_id=job.id) }}">Sửa thông tin job</a>
-        <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');">
+        <form method="post" action="{{ url_for('job_delete', job_id=job.id) }}" onsubmit="return confirm('Đóng job này? (Không xoá dữ liệu, chỉ ẩn khỏi tìm kiếm mặc định)');" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" name="activity_note" placeholder="Lý do đóng job (không bắt buộc)…" style="flex:1;min-width:160px;">
           <button class="btn btn-danger" type="submit">Đóng job</button>
         </form>
       </div>

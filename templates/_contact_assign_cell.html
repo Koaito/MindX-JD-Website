@@ -8,13 +8,26 @@
    Route đích: contact_assign(company_id, contact_id) trong app.py —
    PATCH .../assign phía backend, cho phép bỏ gán về NULL tường minh
    khi chọn "— Chưa gán —" (value rỗng), khác PATCH thường (update_contact)
-   vốn không ghi đè field không gửi lên. #}
-<form method="post" action="{{ url_for('contact_assign', company_id=c.company_id, contact_id=c.id) }}" class="status-inline">
-  <input type="hidden" name="next" value="{{ next_url }}">
-  <select name="assigned_ss_user" onchange="this.form.submit()">
-    <option value="">— Chưa gán —</option>
-    {% for u in staff_members %}
-      <option value="{{ u.ss_user_id }}" {{ 'selected' if c.assigned_ss_user == u.ss_user_id }}>{{ u.full_name }}</option>
-    {% endfor %}
-  </select>
-</form>
+   vốn không ghi đè field không gửi lên.
+
+   KHÔNG còn auto-submit onchange (thêm 08/2026) — gán/đổi người phụ
+   trách giờ BẮT BUỘC note (backend chặn cứng 422 nếu đổi mà thiếu note,
+   xem db.ACTION_LOG_RULES phía backend), nên cần 1 bước xác nhận có ô
+   nhập trước khi submit, không thể tự động gửi ngay lúc đổi <select>. #}
+<details style="display:inline-block;">
+  <summary class="btn btn-text" style="cursor:pointer;">
+    {{ (staff_members|selectattr('ss_user_id', 'equalto', c.assigned_ss_user)|map(attribute='full_name')|first) or '— Chưa gán —' }}
+  </summary>
+  <form method="post" action="{{ url_for('contact_assign', company_id=c.company_id, contact_id=c.id) }}"
+        style="margin-top:6px;display:flex;gap:6px;flex-direction:column;min-width:200px;">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <select name="assigned_ss_user">
+      <option value="">— Chưa gán —</option>
+      {% for u in staff_members %}
+        <option value="{{ u.ss_user_id }}" {{ 'selected' if c.assigned_ss_user == u.ss_user_id }}>{{ u.full_name }}</option>
+      {% endfor %}
+    </select>
+    <textarea name="note" required rows="2" placeholder="Lý do gán/đổi/bỏ gán — bắt buộc…" style="width:100%;"></textarea>
+    <button class="btn btn-text" type="submit">Lưu</button>
+  </form>
+</details>
