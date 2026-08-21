@@ -11,47 +11,393 @@
   </div>
 </header>
 
-<div class="kpi-row">
-  <div class="kpi-card">
-    <span class="kpi-num">{{ total_jobs }}</span>
-    <span class="kpi-label">Job trong database</span>
-  </div>
-  <div class="kpi-card">
-    <span class="kpi-num">{{ total_contacts }}</span>
-    <span class="kpi-label">Công ty trong database</span>
-  </div>
-  <div class="kpi-card">
-    <span class="kpi-num">{{ jobs_by_status.get('Đang tuyển', 0) }}</span>
-    <span class="kpi-label">Job đang còn tuyển</span>
-  </div>
-  <div class="kpi-card">
-    <span class="kpi-num">{{ total_students if total_students is not none else '—' }}</span>
-    <span class="kpi-label">Học viên đã đăng ký</span>
-  </div>
-  <div class="kpi-card">
-    <span class="kpi-num">{{ total_applications if total_applications is not none else '—' }}</span>
-    <span class="kpi-label">Lượt ứng tuyển</span>
-  </div>
-  <div class="kpi-card">
-    <span class="kpi-num">{{ total_saved_jobs if total_saved_jobs is not none else '—' }}</span>
-    <span class="kpi-label">Lượt lưu job</span>
-  </div>
+<!-- Thanh tab nội bộ trang (thêm 08/2026) — sidebar chỉ có 1 mục
+     "Dashboard" duy nhất nên không tách route riêng, chỉ ẩn/hiện
+     .dashboard-tab bằng JS thuần. ?tab= lưu lựa chọn vào URL để chia
+     sẻ link trực tiếp tới đúng tab cho đồng nghiệp (xem script cuối
+     trang). -->
+<div class="tab-bar" id="dashboardTabBar" role="tablist">
+  <button type="button" data-tab="tong-quan" role="tab">Tổng quan</button>
+  <button type="button" data-tab="hoc-vien" role="tab">Gợi ý học viên</button>
+  <button type="button" data-tab="doanh-nghiep" role="tab">Doanh nghiệp</button>
+  <button type="button" data-tab="bao-cao" role="tab">Báo cáo tháng</button>
 </div>
 
-<p class="muted" style="margin: -10px 0 22px; font-size: 12.5px;">
-  Xem chi tiết ứng tuyển/lưu job theo từng học viên tại
-  <a href="{{ url_for('student_activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
-</p>
+<!-- ================= TAB: Tổng quan (mặc định, y hệt trước đây) ================= -->
+<div class="dashboard-tab" id="tab-tong-quan" data-tab="tong-quan">
 
-<section class="card" style="margin-bottom: 22px;">
-  <h4>JD theo tháng — mới thêm vs đã hết hạn (6 tháng gần nhất)</h4>
-  <p class="muted" style="font-size: 12px; margin: 4px 0 14px;">
-    "Đã hết hạn" chỉ tính job có hạn nộp đã qua tính đến hôm nay — job còn hạn (kể cả hạn rơi vào các tháng sắp tới) không được tính vào đây.
-  </p>
-  <div style="position: relative; height: 320px;">
-    <canvas id="monthlyJdChart"></canvas>
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <span class="kpi-num">{{ total_jobs }}</span>
+      <span class="kpi-label">Job trong database</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ total_contacts }}</span>
+      <span class="kpi-label">Công ty trong database</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ jobs_by_status.get('Đang tuyển', 0) }}</span>
+      <span class="kpi-label">Job đang còn tuyển</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ total_students if total_students is not none else '—' }}</span>
+      <span class="kpi-label">Học viên đã đăng ký</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ total_applications if total_applications is not none else '—' }}</span>
+      <span class="kpi-label">Lượt ứng tuyển</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ total_saved_jobs if total_saved_jobs is not none else '—' }}</span>
+      <span class="kpi-label">Lượt lưu job</span>
+    </div>
   </div>
-</section>
+
+  <p class="muted" style="margin: -10px 0 22px; font-size: 12.5px; color: var(--muted);">
+    Xem chi tiết ứng tuyển/lưu job theo từng học viên tại
+    <a href="{{ url_for('student_activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
+  </p>
+
+  <section class="card" style="margin-bottom: 22px;">
+    <h4>JD theo tháng — mới thêm vs đã hết hạn (6 tháng gần nhất)</h4>
+    <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+      "Đã hết hạn" chỉ tính job có hạn nộp đã qua tính đến hôm nay — job còn hạn (kể cả hạn rơi vào các tháng sắp tới) không được tính vào đây.
+    </p>
+    <div style="position: relative; height: 320px;">
+      <canvas id="monthlyJdChart"></canvas>
+    </div>
+  </section>
+
+  <div class="chart-grid">
+    <section class="card">
+      <h4>Job theo ngành</h4>
+      {% for k, v in jobs_by_industry.items() %}
+      <div class="bar-row">
+        <span class="bar-label">{{ k }}</span>
+        <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+        <span class="bar-value">{{ v }}</span>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h4>Job theo level</h4>
+      {% for k, v in jobs_by_level.items() %}
+      <div class="bar-row">
+        <span class="bar-label">{{ k }}</span>
+        <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+        <span class="bar-value">{{ v }}</span>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h4>Job theo địa điểm</h4>
+      {% for k, v in jobs_by_location.items() %}
+      <div class="bar-row">
+        <span class="bar-label">{{ k }}</span>
+        <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+        <span class="bar-value">{{ v }}</span>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h4>Job theo trạng thái</h4>
+      {% for k, v in jobs_by_status.items() %}
+      <div class="bar-row">
+        <span class="bar-label">{{ k }}</span>
+        <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+        <span class="bar-value">{{ v }}</span>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h4>Công ty theo thành phố</h4>
+      {% for k, v in contacts_by_city.items() %}
+      <div class="bar-row">
+        <span class="bar-label">{{ k }}</span>
+        <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_contacts * 100) if total_contacts else 0 }}%"></div></div>
+        <span class="bar-value">{{ v }}</span>
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+
+</div>
+
+<!-- ================= TAB: Gợi ý học viên (nhóm A) ================= -->
+<div class="dashboard-tab" id="tab-hoc-vien" data-tab="hoc-vien">
+
+  <section class="card" style="margin-bottom: 22px;">
+    <h4>JD sắp hết hạn cần đẩy gấp <span class="muted" style="font-weight: 400; color: var(--muted);">({{ jd_needing_push|length }})</span></h4>
+    <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+      Job còn 7–14 ngày là hết hạn, nhưng CHƯA có học viên nào lưu hoặc ứng tuyển — gợi ý cho học viên phù hợp trước khi hết cơ hội.
+    </p>
+    {% if jd_needing_push %}
+    <div class="contact-table-wrap">
+      <table class="contact-table">
+        <thead><tr><th>Vị trí</th><th>Công ty</th><th>Deadline</th><th>Còn lại</th></tr></thead>
+        <tbody>
+          {% for j in jd_needing_push %}
+          <tr>
+            <td><a href="{{ url_for('job_detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+            <td>{{ j.company }}</td>
+            <td>{{ j.deadline | format_date }}</td>
+            <td><span class="reason-tag">{{ j.days_left }} ngày</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-note">Không có JD nào sắp hết hạn mà chưa có ai quan tâm — ổn.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" style="margin-bottom: 22px;">
+    <h4>JD "ế" — đăng lâu, chưa ai lưu/ứng tuyển <span class="muted" style="font-weight: 400; color: var(--muted);">({{ jd_stale|length }})</span></h4>
+    <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+      Job đang tuyển đã đăng &gt; 30 ngày nhưng vẫn 0 lượt lưu/ứng tuyển — có thể JD có vấn đề (lương, mô tả, sai ngành) hoặc chưa quảng bá tới đúng học viên.
+    </p>
+    {% if jd_stale %}
+    <div class="contact-table-wrap">
+      <table class="contact-table">
+        <thead><tr><th>Vị trí</th><th>Công ty</th><th>Ngày đăng</th><th>Đã đăng</th></tr></thead>
+        <tbody>
+          {% for j in jd_stale %}
+          <tr>
+            <td><a href="{{ url_for('job_detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+            <td>{{ j.company }}</td>
+            <td>{{ j.date_collected | format_date }}</td>
+            <td><span class="reason-tag">{{ j.age_days }} ngày</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-note">Không có JD nào bị "ế" — mọi job đang tuyển đều đã có người quan tâm.</p>
+    {% endif %}
+  </section>
+
+  <div class="chart-grid">
+    <section class="card">
+      <h4>Top skill hot <span class="muted" style="font-weight: 400; color: var(--muted);">(JD mới thêm 30 ngày qua)</span></h4>
+      {% if top_skills %}
+        {% set max_count = top_skills[0][1] %}
+        {% for skill, count in top_skills %}
+        <div class="bar-row">
+          <span class="bar-label">{{ skill }}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ (count / max_count * 100) if max_count else 0 }}%"></div></div>
+          <span class="bar-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+      <p class="empty-note">Chưa có đủ dữ liệu skill từ JD mới thêm gần đây.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h4>Khoảng lương theo ngành / level <span class="muted" style="font-weight: 400; color: var(--muted);">(VNĐ/tháng)</span></h4>
+      {% if salary_ranges %}
+      <div class="contact-table-wrap" style="border: none;">
+        <table class="contact-table">
+          <thead><tr><th>Ngành</th><th>Level</th><th>Lương TB</th><th>Số mẫu</th></tr></thead>
+          <tbody>
+            {% for r in salary_ranges %}
+            <tr>
+              <td>{{ r.industry }}</td>
+              <td>{{ r.level }}</td>
+              <td>
+                {% if r.avg_min_fmt and r.avg_max_fmt %}{{ r.avg_min_fmt }} – {{ r.avg_max_fmt }}
+                {% elif r.avg_min_fmt %}từ {{ r.avg_min_fmt }}
+                {% elif r.avg_max_fmt %}đến {{ r.avg_max_fmt }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="muted">{{ r.sample_size }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-note">Chưa có đủ job có lương cụ thể (VNĐ/tháng) để tính trung bình.</p>
+      {% endif %}
+    </section>
+  </div>
+
+</div>
+
+<!-- ================= TAB: Doanh nghiệp (nhóm B) ================= -->
+<div class="dashboard-tab" id="tab-doanh-nghiep" data-tab="doanh-nghiep">
+
+  <section class="card" style="margin-bottom: 22px;">
+    <h4>Công ty tiềm năng cao nhưng thiếu contact <span class="muted" style="font-weight: 400; color: var(--muted);">({{ companies_no_contact|length }})</span></h4>
+    <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+      Công ty có "Tiềm năng hợp tác" = Cao nhưng chưa có contact nào, hoặc mọi contact đã "nguội" (chưa liên hệ lại ≥ 60 ngày) — ưu tiên gọi/email trong tháng.
+    </p>
+    {% if companies_no_contact %}
+    <div class="contact-table-wrap">
+      <table class="contact-table">
+        <thead><tr><th>Công ty</th><th>Thành phố</th><th>Lý do</th><th>Liên hệ cuối</th></tr></thead>
+        <tbody>
+          {% for c in companies_no_contact %}
+          <tr>
+            <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+            <td>{{ c.city or '—' }}</td>
+            <td><span class="reason-tag">{{ c.reason }}</span></td>
+            <td class="muted">{{ c.last_contacted | format_date if c.last_contacted else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-note">Mọi công ty tiềm năng Cao đều đang có contact được theo dõi gần đây.</p>
+    {% endif %}
+  </section>
+
+  <div class="chart-grid">
+    <section class="card">
+      <h4>Đang mở rộng tuyển dụng <span class="muted" style="font-weight: 400; color: var(--muted);">(≥2 job mới / 30 ngày)</span></h4>
+      <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+        Dấu hiệu công ty đang tuyển mạnh — cơ hội đề xuất hợp tác dài hạn thay vì từng job lẻ.
+      </p>
+      {% if companies_expanding %}
+      <div class="contact-table-wrap" style="border: none;">
+        <table class="contact-table">
+          <thead><tr><th>Công ty</th><th>Job mới (30 ngày)</th></tr></thead>
+          <tbody>
+            {% for c in companies_expanding %}
+            <tr>
+              <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+              <td><span class="reason-tag" style="background: var(--teal-soft); color: var(--teal);">{{ c.recent_job_count }} job</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-note">Chưa có công ty nào đăng ≥2 job mới trong 30 ngày qua.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h4>Im lặng lâu <span class="muted" style="font-weight: 400; color: var(--muted);">(&gt;75 ngày không có job mới)</span></h4>
+      <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+        Công ty từng có job nhưng lâu rồi không đăng thêm — cần chủ động liên hệ lại xem còn nhu cầu tuyển không.
+      </p>
+      {% if companies_quiet %}
+      <div class="contact-table-wrap" style="border: none;">
+        <table class="contact-table">
+          <thead><tr><th>Công ty</th><th>Job gần nhất</th><th>Đã im lặng</th></tr></thead>
+          <tbody>
+            {% for c in companies_quiet %}
+            <tr>
+              <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+              <td class="muted">{{ c.last_job_date | format_date }}</td>
+              <td><span class="reason-tag">{{ c.quiet_days }} ngày</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-note">Không có công ty nào im lặng quá lâu.</p>
+      {% endif %}
+    </section>
+  </div>
+
+</div>
+
+<!-- ================= TAB: Báo cáo tháng (nhóm C) ================= -->
+<div class="dashboard-tab" id="tab-bao-cao" data-tab="bao-cao">
+
+  <div class="recap-grid">
+    <div class="kpi-card">
+      <span class="kpi-num">{{ recap.jobs_new }}</span>
+      <span class="kpi-label">
+        Job mới tháng này
+        {% if recap.jobs_new_pct is not none %}
+        <span class="pct-badge {{ 'pct-up' if recap.jobs_new_pct > 0 else ('pct-down' if recap.jobs_new_pct < 0 else 'pct-flat') }}">{{ '+' if recap.jobs_new_pct > 0 }}{{ recap.jobs_new_pct }}%</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ recap.jobs_expired }}</span>
+      <span class="kpi-label">Job hết hạn tháng này</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ recap.companies_new }}</span>
+      <span class="kpi-label">
+        Công ty mới tháng này
+        {% if recap.companies_new_pct is not none %}
+        <span class="pct-badge {{ 'pct-up' if recap.companies_new_pct > 0 else ('pct-down' if recap.companies_new_pct < 0 else 'pct-flat') }}">{{ '+' if recap.companies_new_pct > 0 }}{{ recap.companies_new_pct }}%</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ recap.applications_this_month }}</span>
+      <span class="kpi-label">
+        Lượt ứng tuyển tháng này
+        {% if recap.applications_pct is not none %}
+        <span class="pct-badge {{ 'pct-up' if recap.applications_pct > 0 else ('pct-down' if recap.applications_pct < 0 else 'pct-flat') }}">{{ '+' if recap.applications_pct > 0 }}{{ recap.applications_pct }}%</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-num">{{ recap.saved_jobs_this_month }}</span>
+      <span class="kpi-label">
+        Lượt lưu job tháng này
+        {% if recap.saved_jobs_pct is not none %}
+        <span class="pct-badge {{ 'pct-up' if recap.saved_jobs_pct > 0 else ('pct-down' if recap.saved_jobs_pct < 0 else 'pct-flat') }}">{{ '+' if recap.saved_jobs_pct > 0 }}{{ recap.saved_jobs_pct }}%</span>
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <section class="card">
+      <h4>Top 3 ngành nhiều job nhất tháng này</h4>
+      {% if recap.top_industries %}
+        {% set max_ind_count = recap.top_industries[0].count %}
+        {% for row in recap.top_industries %}
+        <div class="bar-row">
+          <span class="bar-label">{{ row.industry }}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ (row.count / max_ind_count * 100) if max_ind_count else 0 }}%"></div></div>
+          <span class="bar-value">
+            {{ row.count }}
+            {% if row.pct_change is not none %}
+            <span class="pct-badge {{ 'pct-up' if row.pct_change > 0 else ('pct-down' if row.pct_change < 0 else 'pct-flat') }}" style="margin-left: 4px;">{{ '+' if row.pct_change > 0 }}{{ row.pct_change }}%</span>
+            {% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      {% else %}
+      <p class="empty-note">Chưa có job nào đăng trong tháng này.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h4>Top 5 công ty đăng nhiều job nhất tháng này</h4>
+      {% if recap.top_companies %}
+        {% set max_co_count = recap.top_companies[0].count %}
+        {% for row in recap.top_companies %}
+        <div class="bar-row">
+          <span class="bar-label"><a href="{{ url_for('company_detail', company_id=row.company_id) }}" style="color: var(--ink-soft);">{{ row.company }}</a></span>
+          <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (row.count / max_co_count * 100) if max_co_count else 0 }}%"></div></div>
+          <span class="bar-value">{{ row.count }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+      <p class="empty-note">Chưa có job nào đăng trong tháng này.</p>
+      {% endif %}
+    </section>
+  </div>
+
+</div>
 
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script>
@@ -95,61 +441,41 @@
 })();
 </script>
 
-<div class="chart-grid">
-  <section class="card">
-    <h4>Job theo ngành</h4>
-    {% for k, v in jobs_by_industry.items() %}
-    <div class="bar-row">
-      <span class="bar-label">{{ k }}</span>
-      <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
-      <span class="bar-value">{{ v }}</span>
-    </div>
-    {% endfor %}
-  </section>
+<script>
+(function () {
+  "use strict";
+  // Tab nội bộ trang dashboard (thêm 08/2026) — ẩn/hiện .dashboard-tab
+  // bằng class "active", lưu lựa chọn vào ?tab= (history.replaceState,
+  // không reload trang) để chia sẻ link trực tiếp tới đúng tab được.
+  var VALID_TABS = ["tong-quan", "hoc-vien", "doanh-nghiep", "bao-cao"];
+  var tabBar = document.getElementById("dashboardTabBar");
+  if (!tabBar) return;
 
-  <section class="card">
-    <h4>Job theo level</h4>
-    {% for k, v in jobs_by_level.items() %}
-    <div class="bar-row">
-      <span class="bar-label">{{ k }}</span>
-      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
-      <span class="bar-value">{{ v }}</span>
-    </div>
-    {% endfor %}
-  </section>
+  function activate(tab) {
+    if (VALID_TABS.indexOf(tab) === -1) tab = "tong-quan";
+    var buttons = tabBar.querySelectorAll("button[data-tab]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].getAttribute("data-tab") === tab);
+    }
+    var panels = document.querySelectorAll(".dashboard-tab[data-tab]");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].classList.toggle("active", panels[j].getAttribute("data-tab") === tab);
+    }
+  }
 
-  <section class="card">
-    <h4>Job theo địa điểm</h4>
-    {% for k, v in jobs_by_location.items() %}
-    <div class="bar-row">
-      <span class="bar-label">{{ k }}</span>
-      <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
-      <span class="bar-value">{{ v }}</span>
-    </div>
-    {% endfor %}
-  </section>
+  tabBar.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-tab]");
+    if (!btn) return;
+    var tab = btn.getAttribute("data-tab");
+    activate(tab);
+    var url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    history.replaceState(null, "", url);
+  });
 
-  <section class="card">
-    <h4>Job theo trạng thái</h4>
-    {% for k, v in jobs_by_status.items() %}
-    <div class="bar-row">
-      <span class="bar-label">{{ k }}</span>
-      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
-      <span class="bar-value">{{ v }}</span>
-    </div>
-    {% endfor %}
-  </section>
-
-  <section class="card">
-    <h4>Công ty theo thành phố</h4>
-    {% for k, v in contacts_by_city.items() %}
-    <div class="bar-row">
-      <span class="bar-label">{{ k }}</span>
-      <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_contacts * 100) if total_contacts else 0 }}%"></div></div>
-      <span class="bar-value">{{ v }}</span>
-    </div>
-    {% endfor %}
-  </section>
-</div>
+  var params = new URLSearchParams(window.location.search);
+  activate(params.get("tab") || "tong-quan");
+})();
+</script>
 
 {% endblock %}

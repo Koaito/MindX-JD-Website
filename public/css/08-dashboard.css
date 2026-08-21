@@ -76,3 +76,89 @@
 
 .bar-value { font-family: var(--font-mono); text-align: right; color: var(--muted); }
 
+/* ---------------- Tab bar ---------------- */
+/* Thêm 08/2026 cùng lúc với việc chia dashboard thành 4 tab nội bộ
+   (Tổng quan/Gợi ý học viên/Doanh nghiệp/Báo cáo tháng) — không thêm
+   mục sidebar mới (sidebar chỉ có 1 mục "Dashboard"), chỉ 1 thanh tab
+   ngay dưới tiêu đề trang. Cố ý viết riêng .tab-bar thay vì tái dùng
+   .filter-bar — .filter-bar là 1 hàng input/select có viền + nền
+   trắng (control), còn tab-bar là điều hướng (nav) nên cần trạng thái
+   active rõ ràng hơn 1 input thường có. */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px;
+  margin-bottom: 22px;
+}
+
+.tab-bar button {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.tab-bar button:hover { color: var(--ink); }
+
+.tab-bar button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tab-bar .tab-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-left: 6px;
+  opacity: 0.75;
+}
+
+.dashboard-tab { display: none; }
+.dashboard-tab.active { display: block; }
+
+/* ---------------- Recap / insight cards (3 tab mới) ---------------- */
+
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.pct-badge {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+
+.pct-up { background: var(--teal-soft); color: var(--teal); }
+.pct-down { background: #F1EDF0; color: #8A6E80; }
+.pct-flat { background: #EDEFEC; color: var(--muted); }
+
+.empty-note {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 14px 2px;
+}
+
+.reason-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  white-space: nowrap;
+}
+
