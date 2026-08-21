@@ -6,9 +6,20 @@
 
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 20px;
+  grid-template-columns: 1fr 350px;
+  gap: 24px;
   align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.detail-main {
+  min-width: 0; /* Prevent grid blowout */
+}
+
+.detail-side {
+  position: sticky;
+  top: 20px;
 }
 
 .card {

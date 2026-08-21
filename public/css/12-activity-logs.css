@@ -67,6 +67,12 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.activity-table td a {
+  word-break: break-word;
 }
 
 .activity-table tbody tr:last-child td {
