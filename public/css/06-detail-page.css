@@ -4,22 +4,27 @@
    inside 08-dashboard.css for chart panels — check both before renaming
    .card), and the JD bullet list. */
 
+/* Detail page layout - job_detail.html, company_detail.html */
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  /* Sidebar chiếm 30% max (thay vì cố định 350px)
+     - minmax(280px, 30%): sidebar tối thiểu 280px, tối đa 30% width
+     - Main content luôn chiếm ít nhất 70%
+     - Responsive tự nhiên theo chiều rộng màn hình */
+  grid-template-columns: 1fr minmax(280px, 30%);
   gap: 24px;
   align-items: start;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .detail-main {
-  min-width: 0; /* Prevent grid blowout */
+  min-width: 0; /* Prevent grid blowout with long text */
 }
 
 .detail-side {
   position: sticky;
   top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 .card {
@@ -64,3 +69,33 @@
 .jd-bullets li { margin-bottom: 6px; line-height: 1.5; }
 .jd-bullets li:last-child { margin-bottom: 0; }
 
+/* Responsive breakpoints */
+@media (max-width: 1024px) {
+  /* Tablet: stack sidebar below main content */
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .detail-side {
+    position: static; /* Bỏ sticky trên tablet */
+    max-height: none;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Mobile: smaller card padding */
+  .card {
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  
+  .inline-form {
+    flex-direction: column;
+  }
+  
+  .action-row .btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}

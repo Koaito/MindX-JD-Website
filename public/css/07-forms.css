@@ -4,14 +4,13 @@
    of 02-auth.css even though both style <input>/<select> — auth pages
    use .auth-card, these use .form-card, so the two never collide. */
 
+/* Form card wrapper - add_job.html, add_company.html, add_contact.html */
 .form-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
-  max-width: 1100px;
-  margin-left: auto;
-  margin-right: auto;
+  /* BỎ max-width - để form fill hết chiều rộng .content (đã có max 1600px) */
 }
 
 .form-section {
@@ -24,16 +23,16 @@
 }
 .form-section:first-child { margin-top: 0; }
 
+/* Form grid - responsive 2-4 columns depending on width */
 .form-grid {
   display: grid;
-  /* Trước: cố định 2 cột (1fr 1fr) — khi .form-card nới rộng ra, mỗi ô
-     input bị kéo dài theo, đọc khó hơn thay vì lấp khoảng trống hợp lý.
-     auto-fit + minmax tự tính số cột theo bề rộng thật của card: card
-     hẹp (mobile/tablet) -> tự co về 1 cột; card rộng (desktop lớn) ->
-     tự nở thành 3 cột thay vì kéo dài 2 cột sẵn có. 260px là bề rộng
-     tối thiểu 1 ô trước khi xuống dòng, đủ cho input/select thông
-     thường không bị bóp quá chật. */
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  /* Auto-fit với minmax(320px, 1fr):
+     - 320px: độ rộng tối thiểu thoải mái cho input/select (tăng từ 260px)
+     - Ở màn 1600px: tối đa 4-5 cột (thay vì 6 cột như trước)
+     - Ở màn 1200px: 3 cột
+     - Ở màn 900px: 2 cột
+     - Ở màn <640px (mobile): 1 cột */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 14px 18px;
 }
 
@@ -152,5 +151,37 @@
   margin: 4px 0 0;
   font-size: 12px;
   color: #C0392B;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1024px) {
+  /* Tablet: giảm minmax xuống để form không quá rộng */
+  .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .form-card {
+    padding: 22px 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Mobile: force 1 column */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-card {
+    padding: 18px 20px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .form-card input,
+  .form-card select,
+  .form-card textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
 }
 

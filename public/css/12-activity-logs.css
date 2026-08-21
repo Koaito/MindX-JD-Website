@@ -1,10 +1,4 @@
-/* Activity Logs Page — wider layout + custom table styling */
-
-/* Content-wide layout cho trang activity logs */
-.content-wide {
-  max-width: 1400px;
-  width: 100%;
-}
+/* Activity Logs Page — full-width layout + custom table styling */
 
 /* Tab navigation */
 .tab-nav {
@@ -186,5 +180,11 @@
   .activity-table th,
   .activity-table td {
     padding: 8px 10px;
+  }
+  
+  /* Stack table cho mobile - ẩn bớt cột */
+  .activity-table th:nth-child(5),
+  .activity-table td:nth-child(5) {
+    display: none; /* Ẩn cột "Công ty" trên mobile */
   }
 }

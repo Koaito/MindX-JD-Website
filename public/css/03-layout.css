@@ -6,16 +6,11 @@
    the base .btn/.filter-bar rules. */
 
 .content {
-  padding: 40px 56px 64px;
-  /* Was 1180px — on wide/ultrawide screens that left huge empty gutters
-     on both sides of the content column (reported: "2 bên trống quá
-     nhiều"). Raised so content fills far more of the available width;
-     still capped (rather than 100%) so grids/cards don't stretch to an
-     unreadable/absurd width on very large monitors. */
+  /* Giảm horizontal padding từ 56px → 40px mỗi bên
+     - Tăng usable width: 1672px - 80px = 1592px (thay vì 1560px)
+     - Vẫn đủ breathing room, không sát mép */
+  padding: 40px 40px 64px;
   max-width: 1600px;
-  /* Centers the content column within the available space — as the
-     sidebar collapses/expands and that space changes, content re-centers
-     automatically instead of staying pinned to the left edge. */
   margin: 0 auto;
 }
 
