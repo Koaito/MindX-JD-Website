@@ -289,6 +289,18 @@
   z-index: 100;
 }
 
+/* BUG FIX (08/2026): [hidden] (UA stylesheet, display:none) và
+   .dm-modal-overlay (display:flex, rule ở trên) có cùng specificity
+   (0,0,1,0) — rule custom nạp SAU UA stylesheet nên luôn thắng, khiến
+   modal HIỆN NGAY LÚC VỪA RENDER PREVIEW (JS chỉ set hidden=true lúc
+   khởi tạo, nhưng display:flex đè lên, modal vẫn che kín màn hình dù
+   chưa ai bấm "Chọn công ty…"). Rule dưới đây có specificity cao hơn
+   (0,0,2,0 nhờ kết hợp .dm-modal-overlay[hidden]) để đảm bảo ẩn đúng
+   khi có thuộc tính hidden, bất kể thứ tự cascade phía trên đổi sao. */
+.dm-modal-overlay[hidden] {
+  display: none;
+}
+
 .dm-modal {
   background: var(--surface);
   border-radius: var(--radius);
