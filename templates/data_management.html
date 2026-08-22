@@ -13,7 +13,7 @@
 
 <div class="dm-entity-switch">
   {% for et in entity_types %}
-    <a href="{{ url_for('data_management', entity=et, tab=tab) }}"
+    <a href="{{ url_for('data_mgmt.index', entity=et, tab=tab) }}"
        class="dm-entity-tab {{ 'active' if entity_type == et else '' }}">
       {{ entity_labels[et] }}
     </a>
@@ -21,10 +21,10 @@
 </div>
 
 <nav class="tab-nav">
-  <a href="{{ url_for('data_management', entity=entity_type, tab='export') }}" class="{{ 'active' if tab == 'export' else '' }}">
+  <a href="{{ url_for('data_mgmt.index', entity=entity_type, tab='export') }}" class="{{ 'active' if tab == 'export' else '' }}">
     Xuất dữ liệu (Export)
   </a>
-  <a href="{{ url_for('data_management', entity=entity_type, tab='import') }}" class="{{ 'active' if tab == 'import' else '' }}">
+  <a href="{{ url_for('data_mgmt.index', entity=entity_type, tab='import') }}" class="{{ 'active' if tab == 'import' else '' }}">
     Nhập dữ liệu (Import)
   </a>
 </nav>

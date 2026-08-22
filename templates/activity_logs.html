@@ -12,10 +12,10 @@
 </header>
 
 <nav class="tab-nav">
-  <a href="{{ url_for('activity_logs', view='auto', **filters) }}" class="{{ 'active' if view == 'auto' else '' }}">
+  <a href="{{ url_for('activity_logs.logs', view='auto', **filters) }}" class="{{ 'active' if view == 'auto' else '' }}">
     Tự động
   </a>
-  <a href="{{ url_for('activity_logs', view='manual', **filters) }}" class="{{ 'active' if view == 'manual' else '' }}">
+  <a href="{{ url_for('activity_logs.logs', view='manual', **filters) }}" class="{{ 'active' if view == 'manual' else '' }}">
     Thủ công
   </a>
 </nav>
@@ -46,7 +46,7 @@
 
   <button type="submit" class="btn btn-ghost">Lọc</button>
   {% if filters.entity_type or filters.company_id or filters.actor_id %}
-    <a class="btn btn-text" href="{{ url_for('activity_logs', view=view) }}">Xóa lọc</a>
+    <a class="btn btn-text" href="{{ url_for('activity_logs.logs', view=view) }}">Xóa lọc</a>
   {% endif %}
 </form>
 
@@ -81,9 +81,9 @@
         <td>
           <strong>{{ log.entity_label_type }}:</strong>
           {% if log.entity_type == 'JOB' and log.entity_id %}
-            <a href="{{ url_for('job_detail', job_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+            <a href="{{ url_for('jobs.detail', job_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
           {% elif log.entity_type == 'COMPANY' and log.entity_id %}
-            <a href="{{ url_for('company_detail', company_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+            <a href="{{ url_for('companies.detail', company_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
           {% elif log.entity_type == 'CONTACT' and log.entity_id %}
             <span>{{ log.entity_label or log.entity_id }}</span>
           {% else %}
@@ -92,7 +92,7 @@
         </td>
         <td>
           {% if log.company_id %}
-            <a href="{{ url_for('company_detail', company_id=log.company_id) }}">{{ log.company_name or '—' }}</a>
+            <a href="{{ url_for('companies.detail', company_id=log.company_id) }}">{{ log.company_name or '—' }}</a>
           {% else %}
             <span class="muted">—</span>
           {% endif %}
@@ -128,11 +128,11 @@
 {% if total_pages > 1 %}
 <nav class="pagination" aria-label="Phân trang">
   {% if page > 1 %}
-    <a class="page-link" href="{{ url_for('activity_logs', view=view, page=page-1, **pagination_filters) }}">‹ Trang trước</a>
+    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page-1, **pagination_filters) }}">‹ Trang trước</a>
   {% endif %}
   <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-    <a class="page-link" href="{{ url_for('activity_logs', view=view, page=page+1, **pagination_filters) }}">Trang sau ›</a>
+    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page+1, **pagination_filters) }}">Trang sau ›</a>
   {% endif %}
 </nav>
 {% endif %}

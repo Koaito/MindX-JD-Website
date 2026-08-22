@@ -10,13 +10,13 @@
       <div class="verify-icon verify-icon-success">✓</div>
       <h1>Xác thực thành công</h1>
       <p class="lede">Tài khoản của bạn đã được kích hoạt — bây giờ có thể đăng nhập để lưu job yêu thích và ứng tuyển.</p>
-      <a class="btn btn-primary btn-block" href="{{ url_for('login') }}">Đăng nhập ngay</a>
+      <a class="btn btn-primary btn-block" href="{{ url_for('auth.login') }}">Đăng nhập ngay</a>
 
     {% elif status == 'expired' %}
       <div class="verify-icon verify-icon-warn">!</div>
       <h1>Liên kết đã hết hạn</h1>
       <p class="lede">Link xác thực chỉ có hiệu lực trong 24 giờ. Nhập email đã đăng ký để nhận link mới.</p>
-      <form method="post" action="{{ url_for('resend_verification') }}">
+      <form method="post" action="{{ url_for('auth.resend_verification') }}">
         <label>Email
           <input type="email" name="email" required autofocus>
         </label>
@@ -27,10 +27,10 @@
       <div class="verify-icon verify-icon-error">✕</div>
       <h1>Liên kết không hợp lệ</h1>
       <p class="lede">Liên kết đã được dùng trước đó hoặc không đúng. Thử đăng ký lại hoặc xin gửi lại email xác thực từ trang đăng nhập.</p>
-      <a class="btn btn-ghost btn-block" href="{{ url_for('register') }}">Đăng ký lại</a>
+      <a class="btn btn-ghost btn-block" href="{{ url_for('auth.register') }}">Đăng ký lại</a>
     {% endif %}
 
-    <p class="auth-foot">Đã xác thực rồi? <a href="{{ url_for('login') }}">Quay lại đăng nhập</a></p>
+    <p class="auth-foot">Đã xác thực rồi? <a href="{{ url_for('auth.login') }}">Quay lại đăng nhập</a></p>
   </div>
 </div>
 

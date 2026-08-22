@@ -9,7 +9,7 @@
     <h1>Danh sách contact</h1>
     <p class="lede">Toàn bộ người liên hệ HR đã thu thập được, gộp từ mọi công ty — lọc theo trạng thái, công ty hoặc tìm theo tên để theo dõi tiến độ liên hệ.</p>
   </div>
-  <a class="btn btn-primary" href="{{ url_for('contact_add_any') }}">＋ Thêm người liên hệ</a>
+  <a class="btn btn-primary" href="{{ url_for('contacts.add_any') }}">＋ Thêm người liên hệ</a>
 </header>
 
 <form class="filter-bar" method="get">
@@ -31,7 +31,7 @@
 
   <button type="submit" class="btn btn-ghost">Lọc</button>
   {% if filters.q or filters.company_id or filters.status %}
-    <a class="btn btn-text" href="{{ url_for('contacts_index') }}">Xóa lọc</a>
+    <a class="btn btn-text" href="{{ url_for('contacts.index') }}">Xóa lọc</a>
   {% endif %}
 </form>
 
@@ -60,7 +60,7 @@
         <td><strong>{{ c.contact_name }}</strong></td>
         <td>
           {% if c.company_id %}
-          <a href="{{ url_for('company_detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          <a href="{{ url_for('companies.detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
           {% else %}
           <span class="muted">—</span>
           {% endif %}
@@ -73,8 +73,8 @@
         <td>{% include "_contact_status_cell.html" with context %}</td>
         <td>{% include "_contact_assign_cell.html" with context %}</td>
         <td class="actions-cell">
-          <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
-          <form method="post" action="{{ url_for('contact_delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
+          <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
+          <form method="post" action="{{ url_for('contacts.delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
             <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
           </form>
         </td>

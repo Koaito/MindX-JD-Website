@@ -3,7 +3,7 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
-<a class="back-link" href="{{ url_for('student_activity_index') }}">← Hoạt động học viên</a>
+<a class="back-link" href="{{ url_for('students.activity_index') }}">← Hoạt động học viên</a>
 
 <header class="page-head">
   <div>
@@ -36,7 +36,7 @@
     </div>
     <div class="ticket-body">
       <div class="ticket-top">
-        <h3><a href="{{ url_for('job_detail', job_id=a.job_id) }}">{{ a.job_title }}</a></h3>
+        <h3><a href="{{ url_for('jobs.detail', job_id=a.job_id) }}">{{ a.job_title }}</a></h3>
       </div>
       <p class="ticket-company">{{ a.company_name }}</p>
       {% if a.note %}<p class="ticket-note">Ghi chú của học viên: {{ a.note }}</p>{% endif %}
@@ -44,7 +44,7 @@
         <span>📨 Đã ứng tuyển: {{ a.applied_at|format_date }}</span>
       </div>
       {% if a.cv_url %}
-        <a class="btn btn-ghost btn-block" href="{{ url_for('student_cv_download', application_id=a.application_id) }}" target="_blank" rel="noopener" style="margin-top:8px;">
+        <a class="btn btn-ghost btn-block" href="{{ url_for('students.cv_download', application_id=a.application_id) }}" target="_blank" rel="noopener" style="margin-top:8px;">
           📄 Tải CV ứng tuyển
         </a>
       {% else %}
@@ -73,7 +73,7 @@
     </div>
     <div class="ticket-body">
       <div class="ticket-top">
-        <h3><a href="{{ url_for('job_detail', job_id=s.job_id) }}">{{ s.job_title }}</a></h3>
+        <h3><a href="{{ url_for('jobs.detail', job_id=s.job_id) }}">{{ s.job_title }}</a></h3>
       </div>
       <p class="ticket-company">{{ s.company_name }}</p>
       <div class="ticket-meta">

@@ -12,7 +12,7 @@
     </p>
   </div>
   {% if current_user.role == "admin" %}
-  <a class="btn btn-primary" href="{{ url_for('staff_account_add') }}">＋ Thêm tài khoản</a>
+  <a class="btn btn-primary" href="{{ url_for('staff.add') }}">＋ Thêm tài khoản</a>
   {% endif %}
 </header>
 
@@ -91,14 +91,14 @@
             <span class="muted">Tài khoản của bạn</span>
           {% else %}
             <div class="role-actions">
-              <form method="post" action="{{ url_for('staff_account_update_role', ss_user_id=u.ss_user_id) }}" class="status-inline">
+              <form method="post" action="{{ url_for('staff.update_role', ss_user_id=u.ss_user_id) }}" class="status-inline">
                 <select name="role" onchange="this.form.submit()">
                   {% for r in roles %}
                     <option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ role_labels.get(r, r) }}</option>
                   {% endfor %}
                 </select>
               </form>
-              <form method="post" action="{{ url_for('staff_account_update_active_status', ss_user_id=u.ss_user_id) }}" class="status-inline">
+              <form method="post" action="{{ url_for('staff.update_active_status', ss_user_id=u.ss_user_id) }}" class="status-inline">
                 {% if u.is_active %}
                   <input type="hidden" name="is_active" value="false">
                   <button type="submit" class="btn btn-text btn-danger-text"

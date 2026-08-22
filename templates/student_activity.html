@@ -39,7 +39,7 @@
         <td class="muted">{{ s.phone or "—" }}</td>
         <td class="muted">{{ s.created_at|format_date }}</td>
         <td>
-          <a class="btn btn-text" href="{{ url_for('student_activity_detail', ss_user_id=s.ss_user_id) }}">
+          <a class="btn btn-text" href="{{ url_for('students.activity_detail', ss_user_id=s.ss_user_id) }}">
             Xem hoạt động →
           </a>
         </td>

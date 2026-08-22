@@ -38,57 +38,57 @@
 
     <nav class="nav">
       <span class="nav-label">Việc làm</span>
-      <a href="{{ url_for('jobs_index') }}" class="{{ 'active' if request.endpoint in ['jobs_index','job_detail'] else '' }}" title="Danh sách job">
+      <a href="{{ url_for('jobs.index') }}" class="{{ 'active' if request.endpoint in ['jobs.index','jobs.detail'] else '' }}" title="Danh sách job">
         <span class="nav-ic">▤</span> <span class="nav-text">Danh sách job</span>
       </a>
       {% if current_user.is_authenticated and current_user.is_staff %}
-      <a href="{{ url_for('job_add') }}" class="{{ 'active' if request.endpoint == 'job_add' else '' }}" title="Thêm job">
+      <a href="{{ url_for('jobs.add') }}" class="{{ 'active' if request.endpoint == 'jobs.add' else '' }}" title="Thêm job">
         <span class="nav-ic">＋</span> <span class="nav-text">Thêm job</span>
       </a>
 
       <span class="nav-label">Doanh nghiệp</span>
-      <a href="{{ url_for('companies_index') }}" class="{{ 'active' if request.endpoint in ['companies_index','company_detail'] else '' }}" title="Danh sách công ty">
+      <a href="{{ url_for('companies.index') }}" class="{{ 'active' if request.endpoint in ['companies.index','companies.detail'] else '' }}" title="Danh sách công ty">
         <span class="nav-ic">☰</span> <span class="nav-text">Danh sách công ty</span>
       </a>
-      <a href="{{ url_for('company_add') }}" class="{{ 'active' if request.endpoint == 'company_add' else '' }}" title="Thêm công ty">
+      <a href="{{ url_for('companies.add') }}" class="{{ 'active' if request.endpoint == 'companies.add' else '' }}" title="Thêm công ty">
         <span class="nav-ic">＋</span> <span class="nav-text">Thêm công ty</span>
       </a>
-      <a href="{{ url_for('contacts_index') }}" class="{{ 'active' if request.endpoint == 'contacts_index' else '' }}" title="Danh sách contact">
+      <a href="{{ url_for('contacts.index') }}" class="{{ 'active' if request.endpoint == 'contacts.index' else '' }}" title="Danh sách contact">
         <span class="nav-ic">☎</span> <span class="nav-text">Danh sách contact</span>
       </a>
-      <a href="{{ url_for('contact_add_any') }}" class="{{ 'active' if request.endpoint == 'contact_add_any' else '' }}" title="Thêm contact">
+      <a href="{{ url_for('contacts.add_any') }}" class="{{ 'active' if request.endpoint == 'contacts.add_any' else '' }}" title="Thêm contact">
         <span class="nav-ic">＋</span> <span class="nav-text">Thêm contact</span>
       </a>
 
       <span class="nav-label">Báo cáo</span>
-      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" title="Dashboard">
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.endpoint == 'dashboard.index' else '' }}" title="Dashboard">
         <span class="nav-ic">◨</span> <span class="nav-text">Dashboard</span>
       </a>
 
       <span class="nav-label">Quản trị</span>
-      <a href="{{ url_for('staff_accounts') }}" class="{{ 'active' if request.endpoint in ['staff_accounts','staff_account_add'] else '' }}" title="Tài khoản team SS">
+      <a href="{{ url_for('staff.accounts') }}" class="{{ 'active' if request.endpoint in ['staff.accounts','staff.add'] else '' }}" title="Tài khoản team SS">
         <span class="nav-ic">♟</span> <span class="nav-text">Tài khoản team SS</span>
       </a>
-      <a href="{{ url_for('student_activity_index') }}" class="{{ 'active' if request.endpoint in ['student_activity_index','student_activity_detail'] else '' }}" title="Hoạt động học viên">
+      <a href="{{ url_for('students.activity_index') }}" class="{{ 'active' if request.endpoint in ['students.activity_index','students.activity_detail'] else '' }}" title="Hoạt động học viên">
         <span class="nav-ic">◎</span> <span class="nav-text">Hoạt động học viên</span>
       </a>
-      <a href="{{ url_for('staff_activity_index') }}" class="{{ 'active' if request.endpoint in ['staff_activity_index','staff_activity_detail'] else '' }}" title="Hoạt động team SS">
+      <a href="{{ url_for('staff_activity.index') }}" class="{{ 'active' if request.endpoint in ['staff_activity.index','staff_activity.detail'] else '' }}" title="Hoạt động team SS">
         <span class="nav-ic">▤</span> <span class="nav-text">Hoạt động team SS</span>
       </a>
-      <a href="{{ url_for('activity_logs') }}" class="{{ 'active' if request.endpoint in ['activity_logs','activity_log_update_note'] else '' }}" title="Lịch sử thao tác">
+      <a href="{{ url_for('activity_logs.logs') }}" class="{{ 'active' if request.endpoint in ['activity_logs.logs','activity_logs.update_note'] else '' }}" title="Lịch sử thao tác">
         <span class="nav-ic">☷</span> <span class="nav-text">Lịch sử thao tác</span>
       </a>
-      <a href="{{ url_for('data_management') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('data_management') else '' }}" title="Xuất / Nhập dữ liệu">
+      <a href="{{ url_for('data_mgmt.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('data_mgmt.index') else '' }}" title="Xuất / Nhập dữ liệu">
         <span class="nav-ic">⇄</span> <span class="nav-text">Xuất / Nhập dữ liệu</span>
       </a>
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}
       <span class="nav-label">Học viên</span>
-      <a href="{{ url_for('saved_jobs') }}" class="{{ 'active' if request.endpoint == 'saved_jobs' else '' }}" title="Job đã lưu">
+      <a href="{{ url_for('my_stuff.saved_jobs') }}" class="{{ 'active' if request.endpoint == 'my_stuff.saved_jobs' else '' }}" title="Job đã lưu">
         <span class="nav-ic">🔖</span> <span class="nav-text">Job đã lưu</span>
       </a>
-      <a href="{{ url_for('my_applications') }}" class="{{ 'active' if request.endpoint == 'my_applications' else '' }}" title="Đã ứng tuyển">
+      <a href="{{ url_for('my_stuff.my_applications') }}" class="{{ 'active' if request.endpoint == 'my_stuff.my_applications' else '' }}" title="Đã ứng tuyển">
         <span class="nav-ic">📨</span> <span class="nav-text">Đã ứng tuyển</span>
       </a>
       {% endif %}
@@ -103,14 +103,14 @@
             <span>{{ role_labels.get(current_user.role, current_user.email) if current_user.is_staff else current_user.email }}</span>
           </div>
         </div>
-        <a class="btn btn-ghost btn-block" href="{{ url_for('change_password') }}" title="Đổi mật khẩu"><span class="btn-text-label">Đổi mật khẩu</span></a>
-        <a class="btn btn-ghost btn-block" href="{{ url_for('logout') }}" title="Đăng xuất"><span class="btn-text-label">Đăng xuất</span></a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('auth.change_password') }}" title="Đổi mật khẩu"><span class="btn-text-label">Đổi mật khẩu</span></a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('auth.logout') }}" title="Đăng xuất"><span class="btn-text-label">Đăng xuất</span></a>
       {% else %}
         <div class="auth-box auth-box-guest">
           <p>Học viên MindX? Đăng nhập để lưu job và ứng tuyển.</p>
         </div>
-        <a class="btn btn-primary btn-block" href="{{ url_for('login') }}" title="Đăng nhập"><span class="btn-text-label">Đăng nhập</span></a>
-        <a class="btn btn-ghost btn-block" href="{{ url_for('register') }}" title="Đăng ký"><span class="btn-text-label">Đăng ký</span></a>
+        <a class="btn btn-primary btn-block" href="{{ url_for('auth.login') }}" title="Đăng nhập"><span class="btn-text-label">Đăng nhập</span></a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('auth.register') }}" title="Đăng ký"><span class="btn-text-label">Đăng ký</span></a>
       {% endif %}
     </div>
   </aside>

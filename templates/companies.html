@@ -9,7 +9,7 @@
     <h1>Database công ty đối tác</h1>
     <p class="lede">Hồ sơ công ty đã tiếp cận/crawl được — vào từng công ty để xem job đã đăng và quản lý người liên hệ HR.</p>
   </div>
-  <a class="btn btn-primary" href="{{ url_for('company_add') }}">＋ Thêm công ty</a>
+  <a class="btn btn-primary" href="{{ url_for('companies.add') }}">＋ Thêm công ty</a>
 </header>
 
 <form class="filter-bar" method="get">
@@ -24,7 +24,7 @@
 
   <button type="submit" class="btn btn-ghost">Lọc</button>
   {% if filters.q or filters.city %}
-    <a class="btn btn-text" href="{{ url_for('companies_index') }}">Xóa lọc</a>
+    <a class="btn btn-text" href="{{ url_for('companies.index') }}">Xóa lọc</a>
   {% endif %}
 </form>
 
@@ -54,7 +54,7 @@
       {% for c in companies %}
       <tr>
         <td>
-          <strong><a href="{{ url_for('company_detail', company_id=c.id) }}">{{ c.company }}</a></strong>
+          <strong><a href="{{ url_for('companies.detail', company_id=c.id) }}">{{ c.company }}</a></strong>
         </td>
         <td class="muted">{{ c.industry or '—' }}</td>
         <td>{{ c.city or '—' }}</td>
@@ -68,8 +68,8 @@
           {% endif %}
         </td>
         <td class="actions-cell">
-          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem</a>
-          <a class="btn btn-text" href="{{ url_for('company_edit', company_id=c.id) }}">Sửa</a>
+          <a class="btn btn-text" href="{{ url_for('companies.detail', company_id=c.id) }}">Xem</a>
+          <a class="btn btn-text" href="{{ url_for('companies.edit', company_id=c.id) }}">Sửa</a>
         </td>
       </tr>
       {% endfor %}
@@ -80,7 +80,7 @@
 {% else %}
 <div class="empty-state">
   <p>Chưa có công ty nào khớp bộ lọc.</p>
-  <a class="btn btn-primary" href="{{ url_for('company_add') }}">Thêm công ty đầu tiên</a>
+  <a class="btn btn-primary" href="{{ url_for('companies.add') }}">Thêm công ty đầu tiên</a>
 </div>
 {% endif %}
 

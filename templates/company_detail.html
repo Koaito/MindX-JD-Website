@@ -2,7 +2,7 @@
 {% block title %}{{ company.company }} — MindX Career Hub{% endblock %}
 {% block content %}
 
-<a class="back-link" href="{{ url_for('companies_index') }}">← Danh sách công ty</a>
+<a class="back-link" href="{{ url_for('companies.index') }}">← Danh sách công ty</a>
 
 <header class="page-head">
   <div>
@@ -13,7 +13,7 @@
       {% if company.company_size %} · {{ company.company_size }} nhân sự{% endif %}
     </p>
   </div>
-  <a class="btn btn-ghost" href="{{ url_for('company_edit', company_id=company.id) }}">Sửa hồ sơ công ty</a>
+  <a class="btn btn-ghost" href="{{ url_for('companies.edit', company_id=company.id) }}">Sửa hồ sơ công ty</a>
 </header>
 
 {# Xoá công ty (thêm 08/2026) — trước đây company KHÔNG có cách xoá. Xoá
@@ -22,7 +22,7 @@
    ra mới thấy ô note, tránh xoá nhầm chỉ vì 1 cú click. #}
 <details class="card" style="margin-bottom: 20px;">
   <summary class="btn-danger-text" style="cursor:pointer;">Xoá công ty này</summary>
-  <form method="post" action="{{ url_for('company_delete', company_id=company.id) }}"
+  <form method="post" action="{{ url_for('companies.delete', company_id=company.id) }}"
         onsubmit="return confirm('Xoá công ty này? (Xoá mềm — JD và người liên hệ liên quan vẫn giữ nguyên, có thể xem lại ở Lịch sử thao tác)');"
         style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
     <textarea name="note" required rows="2" placeholder="Lý do xoá công ty này — bắt buộc…" style="flex:1;min-width:220px;"></textarea>
@@ -38,7 +38,7 @@
       <ul class="applicant-list">
         {% for j in company.jobs %}
         <li>
-          <a href="{{ url_for('job_detail', job_id=j.id) }}"><strong>{{ j.position }}</strong></a>
+          <a href="{{ url_for('jobs.detail', job_id=j.id) }}"><strong>{{ j.position }}</strong></a>
           <span class="muted">{{ j.level }} · {{ j.location }} · {{ j.status }}</span>
         </li>
         {% endfor %}
@@ -46,13 +46,13 @@
       {% else %}
       <p>Chưa có job nào của công ty này.</p>
       {% endif %}
-      <a class="btn btn-ghost" href="{{ url_for('job_add') }}" style="margin-top: 8px;">＋ Thêm job cho công ty này</a>
+      <a class="btn btn-ghost" href="{{ url_for('jobs.add') }}" style="margin-top: 8px;">＋ Thêm job cho công ty này</a>
     </section>
 
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h4 style="margin: 0;">Người liên hệ HR ({{ contacts|selectattr('is_active')|list|length }})</h4>
-        <a class="btn btn-primary" href="{{ url_for('contact_add', company_id=company.id) }}">＋ Thêm người liên hệ</a>
+        <a class="btn btn-primary" href="{{ url_for('contacts.add', company_id=company.id) }}">＋ Thêm người liên hệ</a>
       </div>
       {% set active_contacts = contacts|selectattr('is_active')|list %}
       {% set inactive_contacts = contacts|rejectattr('is_active')|list %}
@@ -76,7 +76,7 @@
                 {{ c.note or '—' }}
               </td>
               <td class="actions-cell">
-                <a class="btn btn-text" href="{{ url_for('contact_edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
+                <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
                 <button class="btn btn-text btn-danger-text" onclick="showDeleteContactModal('{{ c.id }}', '{{ c.contact_name }}')">Xóa</button>
               </td>
             </tr>
@@ -106,7 +106,7 @@
                 <td class="muted">{{ c.email or '—' }}</td>
                 <td class="muted">{{ c.phone or '—' }}</td>
                 <td>
-                  <form method="post" action="{{ url_for('contact_hard_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá HẲN người liên hệ này? Không thể khôi phục lại được.');" style="display:inline;">
+                  <form method="post" action="{{ url_for('contacts.hard_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá HẲN người liên hệ này? Không thể khôi phục lại được.');" style="display:inline;">
                     <button class="btn btn-text btn-danger-text" type="submit">Xoá hẳn</button>
                   </form>
                 </td>

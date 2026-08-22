@@ -10,7 +10,7 @@
     <p class="lede">Tổng hợp job Code, Data Analysis, Business Analysis từ TopCV, LinkedIn, ITviec, VietnamWorks, website công ty và các nguồn công khai khác.</p>
   </div>
   {% if current_user.is_authenticated and current_user.is_staff %}
-  <a class="btn btn-primary" href="{{ url_for('job_add') }}">＋ Thêm job mới</a>
+  <a class="btn btn-primary" href="{{ url_for('jobs.add') }}">＋ Thêm job mới</a>
   {% endif %}
 </header>
 
@@ -48,7 +48,7 @@
 
   <button type="submit" class="btn btn-ghost">Lọc</button>
   {% if filters.q or filters.industry or filters.level or filters.location or filters.status %}
-    <a class="btn btn-text" href="{{ url_for('jobs_index') }}">Xóa lọc</a>
+    <a class="btn btn-text" href="{{ url_for('jobs.index') }}">Xóa lọc</a>
   {% endif %}
 </form>
 
@@ -71,7 +71,7 @@
     </div>
     <div class="ticket-body">
       <div class="ticket-top">
-        <h3><a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.position }}</a></h3>
+        <h3><a href="{{ url_for('jobs.detail', job_id=job.id) }}">{{ job.position }}</a></h3>
         <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
       </div>
       <p class="ticket-company">{{ job.company }} · {{ job.location }}</p>
@@ -92,15 +92,15 @@
         <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
         {% endif %}
         {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}"
-              class="save-job-form" data-json-action="{{ url_for('job_toggle_save_json', job_id=job.id) }}"
+        <form method="post" action="{{ url_for('my_stuff.job_toggle_save', job_id=job.id) }}"
+              class="save-job-form" data-json-action="{{ url_for('my_stuff.job_toggle_save_json', job_id=job.id) }}"
               data-saved-label="🔖 Đã lưu" data-unsaved-label="🔖 Lưu job">
           <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
             {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
           </button>
         </form>
         {% else %}
-        <a class="save-btn" href="{{ url_for('login') }}">🔖 Đăng nhập để lưu</a>
+        <a class="save-btn" href="{{ url_for('auth.login') }}">🔖 Đăng nhập để lưu</a>
         {% endif %}
       </div>
     </div>
@@ -111,7 +111,7 @@
 {% else %}
 <div class="empty-state">
   <p>Chưa có job nào khớp bộ lọc.</p>
-  <a class="btn btn-primary" href="{{ url_for('job_add') }}">Thêm job đầu tiên</a>
+  <a class="btn btn-primary" href="{{ url_for('jobs.add') }}">Thêm job đầu tiên</a>
 </div>
 {% endif %}
 

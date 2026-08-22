@@ -2,7 +2,7 @@
 {% block title %}{{ 'Sửa job' if edit_id else 'Thêm job' }} — MindX Career Hub{% endblock %}
 {% block content %}
 
-<a class="back-link" href="{{ url_for('jobs_index') }}">← Danh sách job</a>
+<a class="back-link" href="{{ url_for('jobs.index') }}">← Danh sách job</a>
 
 <header class="page-head">
   <div>
@@ -152,7 +152,7 @@
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu job' }}</button>
-    <a class="btn btn-text" href="{{ url_for('job_detail', job_id=edit_id) if edit_id else url_for('jobs_index') }}">Hủy</a>
+    <a class="btn btn-text" href="{{ url_for('jobs.detail', job_id=edit_id) if edit_id else url_for('jobs.index') }}">Hủy</a>
   </div>
 </form>
 

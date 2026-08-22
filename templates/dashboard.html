@@ -55,7 +55,7 @@
 
   <p class="muted" style="margin: -10px 0 22px; font-size: 12.5px; color: var(--muted);">
     Xem chi tiết ứng tuyển/lưu job theo từng học viên tại
-    <a href="{{ url_for('student_activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
+    <a href="{{ url_for('students.activity_index') }}" style="color: var(--accent);">Hoạt động học viên →</a>
   </p>
 
   <section class="card" style="margin-bottom: 22px;">
@@ -142,7 +142,7 @@
         <tbody>
           {% for j in jd_needing_push %}
           <tr>
-            <td><a href="{{ url_for('job_detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+            <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
             <td>{{ j.company }}</td>
             <td>{{ j.deadline | format_date }}</td>
             <td><span class="reason-tag">{{ j.days_left }} ngày</span></td>
@@ -168,7 +168,7 @@
         <tbody>
           {% for j in jd_stale %}
           <tr>
-            <td><a href="{{ url_for('job_detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+            <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
             <td>{{ j.company }}</td>
             <td>{{ j.date_collected | format_date }}</td>
             <td><span class="reason-tag">{{ j.age_days }} ngày</span></td>
@@ -245,7 +245,7 @@
         <tbody>
           {% for c in companies_no_contact %}
           <tr>
-            <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+            <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
             <td>{{ c.city or '—' }}</td>
             <td><span class="reason-tag">{{ c.reason }}</span></td>
             <td class="muted">{{ c.last_contacted | format_date if c.last_contacted else '—' }}</td>
@@ -272,7 +272,7 @@
           <tbody>
             {% for c in companies_expanding %}
             <tr>
-              <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+              <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
               <td><span class="reason-tag" style="background: var(--teal-soft); color: var(--teal);">{{ c.recent_job_count }} job</span></td>
             </tr>
             {% endfor %}
@@ -296,7 +296,7 @@
           <tbody>
             {% for c in companies_quiet %}
             <tr>
-              <td><a href="{{ url_for('company_detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
+              <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
               <td class="muted">{{ c.last_job_date | format_date }}</td>
               <td><span class="reason-tag">{{ c.quiet_days }} ngày</span></td>
             </tr>
@@ -386,7 +386,7 @@
         {% set max_co_count = recap.top_companies[0].count %}
         {% for row in recap.top_companies %}
         <div class="bar-row">
-          <span class="bar-label"><a href="{{ url_for('company_detail', company_id=row.company_id) }}" style="color: var(--ink-soft);">{{ row.company }}</a></span>
+          <span class="bar-label"><a href="{{ url_for('companies.detail', company_id=row.company_id) }}" style="color: var(--ink-soft);">{{ row.company }}</a></span>
           <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (row.count / max_co_count * 100) if max_co_count else 0 }}%"></div></div>
           <span class="bar-value">{{ row.count }}</span>
         </div>

@@ -4,7 +4,7 @@
 {% block content %}
 {% set next_url = request.path %}
 
-<a class="back-link" href="{{ url_for('staff_activity_index') }}">← Hoạt động team SS</a>
+<a class="back-link" href="{{ url_for('staff_activity.index') }}">← Hoạt động team SS</a>
 
 <header class="page-head">
   <div>
@@ -42,7 +42,7 @@
     </div>
     <div class="ticket-body">
       <div class="ticket-top">
-        <h3><a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.position }}</a></h3>
+        <h3><a href="{{ url_for('jobs.detail', job_id=job.id) }}">{{ job.position }}</a></h3>
         <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
       </div>
       <p class="ticket-company">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}</p>
@@ -77,12 +77,12 @@
     <tbody>
       {% for c in companies_created %}
       <tr>
-        <td><strong><a href="{{ url_for('company_detail', company_id=c.id) }}">{{ c.company }}</a></strong></td>
+        <td><strong><a href="{{ url_for('companies.detail', company_id=c.id) }}">{{ c.company }}</a></strong></td>
         <td class="muted">{{ c.industry or '—' }}</td>
         <td>{{ c.city or '—' }}</td>
         <td><span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span></td>
         <td class="actions-cell">
-          <a class="btn btn-text" href="{{ url_for('company_detail', company_id=c.id) }}">Xem →</a>
+          <a class="btn btn-text" href="{{ url_for('companies.detail', company_id=c.id) }}">Xem →</a>
         </td>
       </tr>
       {% endfor %}
@@ -116,7 +116,7 @@
         <td><strong>{{ c.contact_name }}</strong></td>
         <td>
           {% if c.company_id %}
-          <a href="{{ url_for('company_detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          <a href="{{ url_for('companies.detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
           {% else %}
           <span class="muted">—</span>
           {% endif %}
@@ -157,7 +157,7 @@
         <td><strong>{{ c.contact_name }}</strong></td>
         <td>
           {% if c.company_id %}
-          <a href="{{ url_for('company_detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          <a href="{{ url_for('companies.detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
           {% else %}
           <span class="muted">—</span>
           {% endif %}

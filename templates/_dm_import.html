@@ -8,7 +8,7 @@
     </p>
 
     <form method="post" enctype="multipart/form-data"
-          action="{{ url_for('data_management_import_preview', entity_type=entity_type) }}">
+          action="{{ url_for('data_mgmt.import_preview', entity_type=entity_type) }}">
       <label class="dm-file-label">
         <span>Chọn file (.csv, .xlsx)</span>
         <input type="file" name="file" accept=".csv,.xlsx" required>
@@ -29,8 +29,8 @@
 <div class="dm-panel" id="dm-preview-root"
      data-entity-type="{{ entity_type }}"
      data-preview-id="{{ preview.preview_id }}"
-     data-confirm-url="{{ url_for('data_management_import_confirm', entity_type=entity_type) }}"
-     data-suggestions-url="{{ url_for('data_management_company_suggestions', entity_type=entity_type) }}">
+     data-confirm-url="{{ url_for('data_mgmt.import_confirm', entity_type=entity_type) }}"
+     data-suggestions-url="{{ url_for('data_mgmt.company_suggestions', entity_type=entity_type) }}">
 
   <div class="dm-preview-summary">
     <div class="dm-stat"><strong>{{ preview.total_rows }}</strong><span>Tổng số dòng</span></div>
@@ -64,7 +64,7 @@
   <nav class="pagination dm-pagination" id="dm-pagination" aria-label="Phân trang bản xem trước"></nav>
 
   <form method="post" id="dm-confirm-form"
-        action="{{ url_for('data_management_import_confirm', entity_type=entity_type) }}">
+        action="{{ url_for('data_mgmt.import_confirm', entity_type=entity_type) }}">
     <input type="hidden" name="preview_id" value="{{ preview.preview_id }}">
     <input type="hidden" name="resolutions" id="dm-resolutions-input" value="[]">
 
@@ -76,7 +76,7 @@
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary" id="dm-confirm-btn" disabled>Xác nhận nhập dữ liệu</button>
-      <a class="btn btn-ghost" href="{{ url_for('data_management', entity=entity_type, tab='import') }}">Huỷ, tải file khác</a>
+      <a class="btn btn-ghost" href="{{ url_for('data_mgmt.index', entity=entity_type, tab='import') }}">Huỷ, tải file khác</a>
     </div>
     <p class="dm-hint dm-hint-muted" id="dm-confirm-blocked-hint">
       Còn dòng chưa xử lý (chưa chọn công ty, hoặc chưa xác nhận trùng bản ghi ngừng hoạt động) — vui lòng xử lý hết trước khi xác nhận.

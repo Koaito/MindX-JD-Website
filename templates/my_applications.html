@@ -20,14 +20,14 @@
     </div>
     <div class="ticket-body">
       <div class="ticket-top">
-        <h3><a href="{{ url_for('job_detail', job_id=a.job_id) }}">{{ a.job_title }}</a></h3>
+        <h3><a href="{{ url_for('jobs.detail', job_id=a.job_id) }}">{{ a.job_title }}</a></h3>
       </div>
       <p class="ticket-company">{{ a.company_name }}</p>
       {% if a.note %}<p class="ticket-note">Ghi chú của bạn: {{ a.note }}</p>{% endif %}
       <div class="ticket-meta">
         <span>📨 Đã ứng tuyển: {{ a.applied_at|format_date }}</span>
       </div>
-      <form method="post" action="{{ url_for('job_withdraw', job_id=a.job_id) }}"
+      <form method="post" action="{{ url_for('my_stuff.job_withdraw', job_id=a.job_id) }}"
             onsubmit="return confirm('Huỷ ứng tuyển job này?');">
         <button class="btn btn-ghost btn-block" type="submit">Huỷ ứng tuyển</button>
       </form>
@@ -38,7 +38,7 @@
 {% else %}
 <div class="empty-state">
   <p>Bạn chưa ứng tuyển job nào.</p>
-  <a class="btn btn-primary" href="{{ url_for('jobs_index') }}">Khám phá job ngay</a>
+  <a class="btn btn-primary" href="{{ url_for('jobs.index') }}">Khám phá job ngay</a>
 </div>
 {% endif %}
 
