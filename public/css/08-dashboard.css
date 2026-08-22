@@ -177,3 +177,17 @@
   justify-content: center;
 }
 
+/* ---------------- Bảng phân trang client-side: khoá layout cột ---------------- */
+/* .contact-table mặc định KHÔNG set table-layout (xem 05-contact-table.css) nên
+   trình duyệt tự auto-size cột dựa trên các <tr> đang HIỂN THỊ — dòng bị ẩn bởi
+   phân trang client-side (display:none, xem app.js initClientListPagination)
+   không tính vào phép đo đó, nên mỗi lần đổi trang là 1 tập dòng khác -> cột
+   auto-size lại -> bảng bị "nhảy" kích thước.
+   .dash-table-fixed (gắn kèm .contact-table, chỉ dùng ở dashboard.html) khoá layout
+   bằng table-layout: fixed + <colgroup> % cố định khai báo riêng theo từng bảng
+   trong template (số cột/ý nghĩa mỗi bảng khác nhau nên không dùng 1 bộ % chung).
+   Scope theo class thay vì sửa thẳng .contact-table để KHÔNG ảnh hưởng contacts.html
+   và company_detail.html — hai trang đó dùng chung .contact-table nhưng phân trang
+   phía server (không có tình trạng ẩn/hiện dòng qua display) nên không cần fix này. */
+.dash-table-fixed { table-layout: fixed; }
+.dash-table-fixed td, .dash-table-fixed th { overflow-wrap: break-word; }

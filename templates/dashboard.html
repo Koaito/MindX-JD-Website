@@ -93,7 +93,7 @@
 
     <section class="card">
       <h4>Job theo địa điểm</h4>
-      <div id="pg-jobs-by-location" data-paginate-size="25">
+      <div id="pg-jobs-by-location" data-paginate-size="20">
         {% for k, v in jobs_by_location.items() %}
         <div class="bar-row">
           <span class="bar-label">{{ k }}</span>
@@ -118,7 +118,7 @@
 
     <section class="card">
       <h4>Công ty theo thành phố</h4>
-      <div id="pg-contacts-by-city" data-paginate-size="25">
+      <div id="pg-contacts-by-city" data-paginate-size="20">
         {% for k, v in contacts_by_city.items() %}
         <div class="bar-row">
           <span class="bar-label">{{ k }}</span>
@@ -143,7 +143,8 @@
     </p>
     {% if jd_needing_push %}
     <div class="contact-table-wrap">
-      <table class="contact-table">
+      <table class="contact-table dash-table-fixed">
+        <colgroup><col style="width: 34%;"><col style="width: 30%;"><col style="width: 18%;"><col style="width: 18%;"></colgroup>
         <thead><tr><th>Vị trí</th><th>Công ty</th><th>Deadline</th><th>Còn lại</th></tr></thead>
         <tbody id="pg-jd-needing-push" data-paginate-size="20">
           {% for j in jd_needing_push %}
@@ -170,7 +171,8 @@
     </p>
     {% if jd_stale %}
     <div class="contact-table-wrap">
-      <table class="contact-table">
+      <table class="contact-table dash-table-fixed">
+        <colgroup><col style="width: 34%;"><col style="width: 30%;"><col style="width: 18%;"><col style="width: 18%;"></colgroup>
         <thead><tr><th>Vị trí</th><th>Công ty</th><th>Ngày đăng</th><th>Đã đăng</th></tr></thead>
         <tbody id="pg-jd-stale" data-paginate-size="20">
           {% for j in jd_stale %}
@@ -211,9 +213,10 @@
       <h4>Khoảng lương theo ngành / level <span class="muted" style="font-weight: 400; color: var(--muted);">(VNĐ/tháng)</span></h4>
       {% if salary_ranges %}
       <div class="contact-table-wrap" style="border: none;">
-        <table class="contact-table">
+        <table class="contact-table dash-table-fixed">
+          <colgroup><col style="width: 30%;"><col style="width: 20%;"><col style="width: 32%;"><col style="width: 18%;"></colgroup>
           <thead><tr><th>Ngành</th><th>Level</th><th>Lương TB</th><th>Số mẫu</th></tr></thead>
-          <tbody id="pg-salary-ranges" data-paginate-size="25">
+          <tbody id="pg-salary-ranges" data-paginate-size="20">
             {% for r in salary_ranges %}
             <tr>
               <td>{{ r.industry }}</td>
@@ -249,7 +252,8 @@
     </p>
     {% if companies_no_contact %}
     <div class="contact-table-wrap">
-      <table class="contact-table">
+      <table class="contact-table dash-table-fixed">
+        <colgroup><col style="width: 28%;"><col style="width: 18%;"><col style="width: 34%;"><col style="width: 20%;"></colgroup>
         <thead><tr><th>Công ty</th><th>Thành phố</th><th>Lý do</th><th>Liên hệ cuối</th></tr></thead>
         <tbody id="pg-companies-no-contact" data-paginate-size="20">
           {% for c in companies_no_contact %}
@@ -277,9 +281,10 @@
       </p>
       {% if companies_expanding %}
       <div class="contact-table-wrap" style="border: none;">
-        <table class="contact-table">
+        <table class="contact-table dash-table-fixed">
+          <colgroup><col style="width: 70%;"><col style="width: 30%;"></colgroup>
           <thead><tr><th>Công ty</th><th>Job mới (30 ngày)</th></tr></thead>
-          <tbody id="pg-companies-expanding" data-paginate-size="30">
+          <tbody id="pg-companies-expanding" data-paginate-size="20">
             {% for c in companies_expanding %}
             <tr>
               <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
@@ -302,7 +307,8 @@
       </p>
       {% if companies_quiet %}
       <div class="contact-table-wrap" style="border: none;">
-        <table class="contact-table">
+        <table class="contact-table dash-table-fixed">
+          <colgroup><col style="width: 40%;"><col style="width: 35%;"><col style="width: 25%;"></colgroup>
           <thead><tr><th>Công ty</th><th>Job gần nhất</th><th>Đã im lặng</th></tr></thead>
           <tbody id="pg-companies-quiet" data-paginate-size="20">
             {% for c in companies_quiet %}
