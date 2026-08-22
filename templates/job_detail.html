@@ -87,6 +87,9 @@
           <span class="muted">{{ a.student.email }}{% if a.student.phone %} · {{ a.student.phone }}{% endif %}</span>
           <span class="muted">Ứng tuyển: {{ a.applied_at|format_date }}</span>
           {% if a.note %}<span class="muted">Ghi chú: {{ a.note }}</span>{% endif %}
+          {% if a.cv_url %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('student_cv_download', application_id=a.application_id) }}" target="_blank" style="margin-top:4px; display:inline-block;">📄 Xem CV</a>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>
@@ -116,11 +119,13 @@
 
     <section class="card">
       {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('job_apply', job_id=job.id) }}">
-          <button class="btn {{ 'btn-ghost' if already_applied else 'btn-primary' }} btn-block" type="submit" {{ 'disabled' if already_applied }}>
-            {{ '✅ Đã ứng tuyển' if already_applied else '📨 Ứng tuyển ngay' }}
+        {% if already_applied %}
+          <button class="btn btn-ghost btn-block" disabled>✅ Đã ứng tuyển</button>
+        {% else %}
+          <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('applyCvModal').style.display='flex'">
+            📨 Ứng tuyển ngay
           </button>
-        </form>
+        {% endif %}
         <form method="post" action="{{ url_for('job_toggle_save', job_id=job.id) }}" style="margin-top: 8px;"
               class="save-job-form" data-json-action="{{ url_for('job_toggle_save_json', job_id=job.id) }}"
               data-saved-label="🔖 Bỏ lưu job này" data-unsaved-label="🔖 Lưu job này" data-swap-emphasis="true">
@@ -188,6 +193,29 @@
   </div>
 </div>
 
+<!-- Modal Ứng tuyển nộp CV PDF -->
+<div id="applyCvModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Nộp hồ sơ ứng tuyển</h3>
+    <p style="margin: 8px 0 16px;">Vị trí: <strong>{{ job.position }}</strong> — {{ job.company }}</p>
+    <form method="post" action="{{ url_for('job_apply', job_id=job.id) }}" enctype="multipart/form-data">
+      <label style="display:block; margin-bottom:12px;">
+        <strong>File CV của bạn (PDF) <span style="color:#d9534f;">*</span></strong>
+        <input type="file" name="cv_file" accept=".pdf" required style="width:100%; margin-top:6px; padding:6px 0;">
+        <span class="muted" style="font-size:0.82em; display:block;">Định dạng .pdf, dung lượng tối đa 5MB.</span>
+      </label>
+      <label style="display:block; margin-bottom:16px;">
+        <strong>Ghi chú gửi Team SS (không bắt buộc)</strong>
+        <textarea name="note" rows="3" placeholder="Kinh nghiệm nổi bật, định hướng cá nhân..." style="width:100%; margin-top:6px;"></textarea>
+      </label>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('applyCvModal').style.display='none'">Hủy</button>
+        <button type="submit" class="btn btn-primary">Xác nhận nộp CV</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <style>
 .modal {
   position: fixed;
@@ -240,6 +268,7 @@ document.querySelectorAll('.modal').forEach(modal => {
     if (e.target === this) {
       if (this.id === 'jobStatusModal') closeJobStatusModal();
       if (this.id === 'jobDeleteModal') closeJobDeleteModal();
+      if (this.id === 'applyCvModal') this.style.display = 'none';
     }
   });
 });

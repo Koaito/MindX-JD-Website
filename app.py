@@ -739,8 +739,27 @@ def job_apply(job_id):
 
     access_token, _ = _auth_tokens_from_session()
     note = request.form.get("note", "").strip()
+    
+    # Validate CV file upload
+    cv_file = request.files.get("cv_file")
+    if not cv_file or cv_file.filename == "":
+        flash("Vui lòng đính kèm file CV (.pdf) khi ứng tuyển.", "error")
+        return redirect(url_for("job_detail", job_id=job_id))
+    
+    if not cv_file.filename.lower().endswith(".pdf"):
+        flash("Chỉ chấp nhận file CV định dạng PDF (.pdf).", "error")
+        return redirect(url_for("job_detail", job_id=job_id))
+
+    cv_bytes = cv_file.read()
+    if len(cv_bytes) > 5 * 1024 * 1024:  # 5MB
+        flash("File CV không được vượt quá 5MB.", "error")
+        return redirect(url_for("job_detail", job_id=job_id))
+    
     try:
-        application = backend_auth.apply_to_job(access_token, job_id, note)
+        application = backend_auth.apply_to_job(
+            access_token, job_id, note=note,
+            cv_file_bytes=cv_bytes, cv_filename=cv_file.filename
+        )
         flash(
             f"Đã ghi nhận ứng tuyển “{application['job_title']}” tại "
             f"{application['company_name']}. Team SS sẽ liên hệ bạn sớm.",
@@ -1937,6 +1956,24 @@ def student_activity_index():
     students = [u for u in all_users if u.get("role") == "user"]
 
     return render_template("student_activity.html", students=students)
+
+
+@app.route("/students/cv/<string:application_id>")
+@login_required
+def student_cv_download(application_id):
+    """Staff click link tải CV → redirect to Supabase signed URL."""
+    if not current_user.is_staff:
+        abort(403)
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        signed_url = backend_auth.get_cv_signed_url(access_token, application_id)
+        if not signed_url:
+            flash("Không thể tạo link tải CV lúc này.", "error")
+            return redirect(request.referrer or url_for("student_activity_index"))
+        return redirect(signed_url)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        return redirect(request.referrer or url_for("student_activity_index"))
 
 
 @app.route("/student-activity/<string:ss_user_id>")

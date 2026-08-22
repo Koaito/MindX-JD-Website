@@ -43,6 +43,13 @@
       <div class="ticket-meta">
         <span>📨 Đã ứng tuyển: {{ a.applied_at|format_date }}</span>
       </div>
+      {% if a.cv_url %}
+        <a class="btn btn-ghost btn-block" href="{{ url_for('student_cv_download', application_id=a.application_id) }}" target="_blank" rel="noopener" style="margin-top:8px;">
+          📄 Tải CV ứng tuyển
+        </a>
+      {% else %}
+        <span class="muted" style="font-size:0.85em; margin-top:6px; display:block;">(Chưa có file CV)</span>
+      {% endif %}
     </div>
   </article>
   {% endfor %}

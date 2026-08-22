@@ -194,13 +194,40 @@ def update_user_active_status(access_token: str, ss_user_id: str, is_active: boo
 # KHÁC, không phải chính mình).
 # ---------------------------------------------------------------------------
 
-def apply_to_job(access_token: str, job_id: str, note: str = "") -> dict:
-    """POST /me/applications. Backend tự chặn nếu job không ở trạng
-    thái OPEN (400) hoặc đã ứng tuyển rồi (409)."""
-    payload = {"job_id": job_id}
+def apply_to_job(access_token: str, job_id: str, note: str = "",
+                 cv_file_bytes: bytes = None, cv_filename: str = "cv.pdf") -> dict:
+    """POST /me/applications với multipart/form-data để upload CV.
+    Backend tự chặn nếu job không ở trạng thái OPEN (400) hoặc đã
+    ứng tuyển rồi (409). CV file bắt buộc (PDF, max 5MB)."""
+    url = f"{CRAWLER_API_URL}/me/applications"
+    headers = _headers(access_token)
+    headers.pop("Content-Type", None)  # Để requests tự sinh boundary cho multipart
+
+    data = {"job_id": job_id}
     if note:
-        payload["note"] = note
-    return _request("POST", "/me/applications", access_token=access_token, json=payload)
+        data["note"] = note
+
+    files = {
+        "cv_file": (cv_filename, cv_file_bytes, "application/pdf"),
+    }
+
+    try:
+        res = requests.post(url, headers=headers, data=data, files=files, timeout=REQUEST_TIMEOUT)
+    except requests.exceptions.RequestException as exc:
+        raise BackendAuthError(f"Không kết nối được tới backend: {exc}") from exc
+
+    if res.status_code in (200, 201):
+        return res.json()
+
+    try:
+        detail = res.json().get("detail", "")
+    except Exception:
+        detail = res.text[:300]
+
+    if res.status_code == 409:
+        raise BackendAuthError("Bạn đã ứng tuyển job này rồi.", status_code=409)
+
+    raise BackendAuthError(detail or f"Lỗi khi nộp hồ sơ ({res.status_code})", status_code=res.status_code)
 
 
 def list_my_applications(access_token: str) -> list:
@@ -212,6 +239,13 @@ def list_my_applications(access_token: str) -> list:
 def withdraw_application(access_token: str, job_id: str) -> None:
     """DELETE /me/applications/{job_id} — huỷ đơn ứng tuyển của chính mình."""
     _request("DELETE", f"/me/applications/{job_id}", access_token=access_token)
+
+
+def get_cv_signed_url(access_token: str, application_id: str) -> str:
+    """Staff lấy Signed URL từ backend để tải CV của học viên.
+    Chỉ staff (role ss_team) mới có quyền gọi endpoint này."""
+    data = _request("GET", f"/me/applications/{application_id}/cv-url", access_token=access_token)
+    return data.get("signed_url", "")
 
 
 def save_job(access_token: str, job_id: str) -> dict:
