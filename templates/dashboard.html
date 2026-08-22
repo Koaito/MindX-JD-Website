@@ -93,13 +93,16 @@
 
     <section class="card">
       <h4>Job theo địa điểm</h4>
-      {% for k, v in jobs_by_location.items() %}
-      <div class="bar-row">
-        <span class="bar-label">{{ k }}</span>
-        <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
-        <span class="bar-value">{{ v }}</span>
+      <div id="pg-jobs-by-location" data-paginate-size="25">
+        {% for k, v in jobs_by_location.items() %}
+        <div class="bar-row">
+          <span class="bar-label">{{ k }}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ (v / total_jobs * 100) if total_jobs else 0 }}%"></div></div>
+          <span class="bar-value">{{ v }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+      <div class="pagination-list-nav" data-paginate-for="pg-jobs-by-location"></div>
     </section>
 
     <section class="card">
@@ -115,13 +118,16 @@
 
     <section class="card">
       <h4>Công ty theo thành phố</h4>
-      {% for k, v in contacts_by_city.items() %}
-      <div class="bar-row">
-        <span class="bar-label">{{ k }}</span>
-        <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_contacts * 100) if total_contacts else 0 }}%"></div></div>
-        <span class="bar-value">{{ v }}</span>
+      <div id="pg-contacts-by-city" data-paginate-size="25">
+        {% for k, v in contacts_by_city.items() %}
+        <div class="bar-row">
+          <span class="bar-label">{{ k }}</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-alt" style="width: {{ (v / total_contacts * 100) if total_contacts else 0 }}%"></div></div>
+          <span class="bar-value">{{ v }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+      <div class="pagination-list-nav" data-paginate-for="pg-contacts-by-city"></div>
     </section>
   </div>
 
@@ -139,7 +145,7 @@
     <div class="contact-table-wrap">
       <table class="contact-table">
         <thead><tr><th>Vị trí</th><th>Công ty</th><th>Deadline</th><th>Còn lại</th></tr></thead>
-        <tbody>
+        <tbody id="pg-jd-needing-push" data-paginate-size="20">
           {% for j in jd_needing_push %}
           <tr>
             <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
@@ -151,6 +157,7 @@
         </tbody>
       </table>
     </div>
+    <div class="pagination-list-nav" data-paginate-for="pg-jd-needing-push"></div>
     {% else %}
     <p class="empty-note">Không có JD nào sắp hết hạn mà chưa có ai quan tâm — ổn.</p>
     {% endif %}
@@ -165,7 +172,7 @@
     <div class="contact-table-wrap">
       <table class="contact-table">
         <thead><tr><th>Vị trí</th><th>Công ty</th><th>Ngày đăng</th><th>Đã đăng</th></tr></thead>
-        <tbody>
+        <tbody id="pg-jd-stale" data-paginate-size="20">
           {% for j in jd_stale %}
           <tr>
             <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
@@ -177,6 +184,7 @@
         </tbody>
       </table>
     </div>
+    <div class="pagination-list-nav" data-paginate-for="pg-jd-stale"></div>
     {% else %}
     <p class="empty-note">Không có JD nào bị "ế" — mọi job đang tuyển đều đã có người quan tâm.</p>
     {% endif %}
@@ -205,7 +213,7 @@
       <div class="contact-table-wrap" style="border: none;">
         <table class="contact-table">
           <thead><tr><th>Ngành</th><th>Level</th><th>Lương TB</th><th>Số mẫu</th></tr></thead>
-          <tbody>
+          <tbody id="pg-salary-ranges" data-paginate-size="25">
             {% for r in salary_ranges %}
             <tr>
               <td>{{ r.industry }}</td>
@@ -222,6 +230,7 @@
           </tbody>
         </table>
       </div>
+      <div class="pagination-list-nav" data-paginate-for="pg-salary-ranges"></div>
       {% else %}
       <p class="empty-note">Chưa có đủ job có lương cụ thể (VNĐ/tháng) để tính trung bình.</p>
       {% endif %}
@@ -242,7 +251,7 @@
     <div class="contact-table-wrap">
       <table class="contact-table">
         <thead><tr><th>Công ty</th><th>Thành phố</th><th>Lý do</th><th>Liên hệ cuối</th></tr></thead>
-        <tbody>
+        <tbody id="pg-companies-no-contact" data-paginate-size="20">
           {% for c in companies_no_contact %}
           <tr>
             <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
@@ -254,6 +263,7 @@
         </tbody>
       </table>
     </div>
+    <div class="pagination-list-nav" data-paginate-for="pg-companies-no-contact"></div>
     {% else %}
     <p class="empty-note">Mọi công ty tiềm năng Cao đều đang có contact được theo dõi gần đây.</p>
     {% endif %}
@@ -269,7 +279,7 @@
       <div class="contact-table-wrap" style="border: none;">
         <table class="contact-table">
           <thead><tr><th>Công ty</th><th>Job mới (30 ngày)</th></tr></thead>
-          <tbody>
+          <tbody id="pg-companies-expanding" data-paginate-size="30">
             {% for c in companies_expanding %}
             <tr>
               <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
@@ -279,6 +289,7 @@
           </tbody>
         </table>
       </div>
+      <div class="pagination-list-nav" data-paginate-for="pg-companies-expanding"></div>
       {% else %}
       <p class="empty-note">Chưa có công ty nào đăng ≥2 job mới trong 30 ngày qua.</p>
       {% endif %}
@@ -293,7 +304,7 @@
       <div class="contact-table-wrap" style="border: none;">
         <table class="contact-table">
           <thead><tr><th>Công ty</th><th>Job gần nhất</th><th>Đã im lặng</th></tr></thead>
-          <tbody>
+          <tbody id="pg-companies-quiet" data-paginate-size="20">
             {% for c in companies_quiet %}
             <tr>
               <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
@@ -304,6 +315,7 @@
           </tbody>
         </table>
       </div>
+      <div class="pagination-list-nav" data-paginate-for="pg-companies-quiet"></div>
       {% else %}
       <p class="empty-note">Không có công ty nào im lặng quá lâu.</p>
       {% endif %}

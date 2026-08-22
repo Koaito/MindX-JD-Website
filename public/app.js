@@ -307,4 +307,78 @@
   // cards.css and public/css/08-dashboard.css): flex-wrap + flex-grow
   // makes every row, including a short last one, fill its own width
   // natively. No JS needed for this anymore.
+
+  // ---- Phân trang client-side cho các danh sách dài trong dashboard -----
+  //
+  // Thêm 08/2026: nhiều panel ở /dashboard (job theo địa điểm, công ty
+  // theo thành phố, JD cần đẩy/ế, khoảng lương, công ty thiếu contact/
+  // mở rộng/im lặng...) liệt kê TOÀN BỘ item server trả về trong 1 lần,
+  // không giới hạn — dữ liệu tăng lên là phải scroll rất dài. Khác các
+  // trang list chính (companies.html, index.html) vốn đã phân trang ở
+  // server (xem _pagination.html + Flask ?page=), các panel dashboard
+  // này nằm rải rác trong nhiều tab/card nhỏ nên phân trang phía CLIENT
+  // (ẩn/hiện bằng display) hợp lý hơn: không cần thêm route/query param
+  // cho từng panel, không mất vị trí tab đang xem khi bấm trang.
+  //
+  // Cách dùng trong template:
+  //   <div id="pg-xxx" data-paginate-size="20">
+  //     ...danh sách item (mỗi item là 1 phần tử con trực tiếp)...
+  //   </div>
+  //   <div class="pagination-list-nav" data-paginate-for="pg-xxx"></div>
+  // Nếu số item <= data-paginate-size thì không đụng gì tới DOM (không
+  // tạo nav rỗng) — tránh khoảng trắng thừa khi danh sách vốn đã ngắn.
+  function initClientListPagination() {
+    var containers = document.querySelectorAll("[data-paginate-size]");
+    Array.prototype.forEach.call(containers, function (container) {
+      var pageSize = parseInt(container.getAttribute("data-paginate-size"), 10);
+      if (!pageSize || pageSize < 1) pageSize = 20;
+
+      // .children (không phải .childNodes) nên tự bỏ qua text node/khoảng
+      // trắng giữa các thẻ do Jinja render ra — mỗi phần tử con trực tiếp
+      // (div.bar-row hoặc tr) là đúng 1 "item" cần phân trang.
+      var items = Array.prototype.slice.call(container.children);
+      if (items.length <= pageSize) return; // ngắn sẵn, không cần phân trang
+
+      var mount = document.querySelector('[data-paginate-for="' + container.id + '"]');
+      var totalPages = Math.ceil(items.length / pageSize);
+      var page = 1;
+
+      function render() {
+        var start = (page - 1) * pageSize;
+        var end = start + pageSize;
+        items.forEach(function (el, idx) {
+          el.style.display = (idx >= start && idx < end) ? "" : "none";
+        });
+        if (mount) {
+          mount.innerHTML =
+            '<span class="page-btn page-prev' + (page <= 1 ? ' is-disabled' : '') + '" data-pg-action="prev">‹ Trước</span>' +
+            '<span class="page-status">Trang ' + page + ' / ' + totalPages + ' (' + items.length + ' mục)</span>' +
+            '<span class="page-btn page-next' + (page >= totalPages ? ' is-disabled' : '') + '" data-pg-action="next">Sau ›</span>';
+        }
+      }
+
+      if (mount) {
+        mount.classList.add("pagination", "pagination-list-nav");
+        mount.addEventListener("click", function (e) {
+          var btn = e.target.closest("[data-pg-action]");
+          if (!btn || btn.classList.contains("is-disabled")) return;
+          if (btn.getAttribute("data-pg-action") === "prev" && page > 1) page -= 1;
+          if (btn.getAttribute("data-pg-action") === "next" && page < totalPages) page += 1;
+          render();
+          // Panel có thể cao hơn viewport (bảng dài) — cuộn nhẹ về đầu
+          // panel khi đổi trang để người dùng không bị "lạc" ở cuối danh
+          // sách cũ, nhưng "nearest" tránh giật trang nếu panel đã visible.
+          container.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+      }
+
+      render();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initClientListPagination);
+  } else {
+    initClientListPagination();
+  }
 })();

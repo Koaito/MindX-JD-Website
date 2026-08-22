@@ -162,3 +162,18 @@
   white-space: nowrap;
 }
 
+/* ---------------- Phân trang client-side (app.js: initClientListPagination) ---------------- */
+/* .pagination/.page-btn/.page-status gốc (10-pagination-responsive.css)
+   được thiết kế cho cuối trang list (companies.html, index.html) — viền
+   trên đậm + margin 28px hợp lý khi đứng riêng 1 mình cuối trang. Ở đây
+   panel nằm LỒNG trong .card cùng nhiều panel khác trong 1 tab, nên thu
+   nhỏ margin/padding và canh giữa cho gọn, đỡ chiếm chỗ. Element chỉ có
+   class này khi JS thực sự thêm nav (danh sách ngắn thì bỏ qua, xem
+   app.js) nên không cần lo item rỗng đứng chình ình khi không cần phân
+   trang. */
+.pagination-list-nav.pagination {
+  margin-top: 14px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
