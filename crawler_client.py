@@ -932,7 +932,7 @@ def export_entity(access_token, entity_type, file_format="xlsx"):
     return res.content, filename, content_type
 
 
-def _normalize_preview_row(raw: dict) -> dict:
+def _normalize_preview_row(raw: dict, id_field: str | None = None) -> dict:
     # Backend (api/services/preview_manager.py::build_preview) trả field
     # "existing_record" (không tách existing_data/existing_id riêng) và
     # "company_resolution": {"status": "resolved"|"needs_resolution",
@@ -942,19 +942,27 @@ def _normalize_preview_row(raw: dict) -> dict:
     # Backend KHÔNG có field "errors" ở từng dòng preview: lỗi validate
     # được chặn nguyên file ở bước upload (HTTP 422 trong import_preview()
     # bên dưới), không xuất hiện lẻ tẻ trong preview đã build xong.
+    #
+    # id_field: tên cột PK thật của entity (vd "job_id") — LẤY TỪ
+    # summary.id_field mà backend trả về (xem EntitySpec.id_field,
+    # api/services/entity_specs.py backend + _normalize_preview_summary()
+    # bên dưới, nơi gọi hàm này), KHÔNG tự đoán bằng map hardcode
+    # entity_type -> tên cột id ở tầng gọi (bản cũ ở đây từng có 1 dict
+    # {"job": "job_id", "company": "company_id", "contact": "contact_id"}
+    # ngay trong hàm — dễ quên cập nhật khi thêm entity mới, vì nó không
+    # nằm cạnh IMPORT_EXPORT_ENTITY_TYPES/CONFLICT_STATUS_LABELS là chỗ
+    # người sửa code tự nhiên nghĩ tới. Giờ backend là nguồn sự thật duy
+    # nhất cho tên cột id, module này chỉ đọc lại).
     company_resolution = raw.get("company_resolution") or {}
     status = raw.get("conflict_status") or "no_conflict"
+    existing_record = raw.get("existing_record")
     return {
         "row_index": raw.get("row_index"),
         "data": raw.get("data") or {},
         "conflict_status": status,
         "conflict_status_label": CONFLICT_STATUS_LABELS.get(status, status),
-        "existing_data": raw.get("existing_record"),
-        "existing_id": (raw.get("existing_record") or {}).get(
-            {"job": "job_id", "company": "company_id", "contact": "contact_id"}.get(
-                raw.get("_entity_type"), "id"
-            )
-        ) if raw.get("existing_record") else None,
+        "existing_data": existing_record,
+        "existing_id": (existing_record.get(id_field) if id_field else None) if existing_record else None,
         "needs_company_resolve": status == "pending_company_resolution",
         "resolved_company_id": company_resolution.get("company_id"),
         "resolved_company_name": company_resolution.get("company_name"),
@@ -967,19 +975,18 @@ def _normalize_preview_summary(raw: dict) -> dict:
     # Backend (ImportUploadResponse, api/schemas.py) lồng các số đếm
     # trong "summary" — KHÔNG ở top-level — và dùng tên field khác:
     # total_rows / new_records / conflicts / conflicts_inactive /
-    # pending_company_resolution (xem preview_manager.py::build_preview).
-    # Bản cũ ở đây đọc raw.get("total_rows"/"new_count"/...) thẳng ở
-    # top-level -> luôn miss, luôn fallback 0 (bug đã xác nhận 08/2026).
+    # pending_company_resolution / id_field (xem preview_manager.py::
+    # build_preview). Bản cũ ở đây đọc raw.get("total_rows"/"new_count"/
+    # ...) thẳng ở top-level -> luôn miss, luôn fallback 0 (bug đã xác
+    # nhận 08/2026).
     summary = raw.get("summary") or {}
     entity_type = raw.get("entity_type")
-    rows = []
-    for r in raw.get("rows", []):
-        r = dict(r)
-        r["_entity_type"] = entity_type
-        rows.append(_normalize_preview_row(r))
+    id_field = summary.get("id_field")
+    rows = [_normalize_preview_row(r, id_field=id_field) for r in raw.get("rows", [])]
     return {
         "preview_id": raw.get("preview_id"),
         "entity_type": entity_type,
+        "id_field": id_field,
         "total_rows": summary.get("total_rows", 0),
         "new_count": summary.get("new_records", 0),
         "conflict_count": summary.get("conflicts", 0),
