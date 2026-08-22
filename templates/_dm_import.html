@@ -295,7 +295,25 @@
       renderPage();
     }
 
-    fetch(url).then(function (res) { return res.json(); }).then(function (data) {
+    // X-Requested-With: fetch() không tự thêm header này như jQuery $.ajax,
+    // nhưng utils/decorators.py (staff_required) dựa vào nó để biết đây là
+    // gọi AJAX -> trả JSON lỗi thay vì redirect HTML (login/error page) khi
+    // session hết hạn/không đủ quyền. Thiếu header này thì fetch nhận về
+    // HTML rồi res.json() sẽ crash với lỗi "Unexpected token '<'" (hoặc im
+    // lặng luôn nếu response không đúng dạng JS mong đợi) -> modal mở ra
+    // nhưng phần body không hiện được nội dung nào cả. Bị mất khi refactor
+    // từ prompt()/alert() sang modal — thêm lại đây.
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } }).then(function (res) {
+      return res.json().catch(function () {
+        // Phòng trường hợp backend trả về thứ gì đó không phải JSON hợp lệ
+        // (vd: lỗi 500 không kèm body JSON, hoặc HTML login page) — báo lỗi
+        // rõ ràng thay vì để .catch() bên dưới hiện nguyên SyntaxError khó
+        // hiểu, hoặc tệ hơn là để modal đứng im lặng không có gì hiện ra.
+        throw new Error(res.status === 401 || res.status === 403
+          ? "Phiên đăng nhập đã hết hạn hoặc không đủ quyền — vui lòng tải lại trang."
+          : "Máy chủ trả về dữ liệu không hợp lệ (HTTP " + res.status + ").");
+      });
+    }).then(function (data) {
       if (data.error) {
         modalBody.innerHTML = '<p class="dm-modal-error">Không tải được danh sách công ty gợi ý: ' +
           escapeHtml(data.error) + '</p>';
