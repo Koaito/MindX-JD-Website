@@ -107,6 +107,7 @@
 .dm-stat-conflict strong { color: #B58000; }
 .dm-stat-inactive strong { color: #B23A22; }
 .dm-stat-resolve strong { color: #3A6FB0; }
+.dm-stat-level-resolve strong { color: #6B3FA0; }
 
 .dm-tag {
   display: inline-block;
@@ -124,6 +125,7 @@
    thật trả về từ backend (preview_manager.py) không có tag trước đó vì
    bản cũ statusTag() trong _dm_import.html chưa từng xử lý case này. */
 .dm-tag-resolve { background: #E3ECFB; color: #3A6FB0; }
+.dm-tag-level { background: #F1E6FB; color: #6B3FA0; }
 
 .dm-table-wrap {
   overflow-x: auto;
@@ -232,6 +234,22 @@
 .dm-resolve-ok { color: #2E8B57; font-weight: 500; }
 
 .dm-btn-choose-company { padding: 4px 0; font-size: 12.5px; align-self: flex-start; }
+
+.dm-resolve-raw {
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.dm-level-select {
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  max-width: 160px;
+}
 
 .dm-pagination { margin-top: 8px; margin-bottom: 20px; }
 

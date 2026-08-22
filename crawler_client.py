@@ -126,6 +126,14 @@ def _request(method, path, access_token=None, **kwargs):
 JOB_STATUS_MAP = {"OPEN": "Đang tuyển", "CLOSED": "Đã đóng"}
 JOB_STATUS_MAP_REV = {v: k for k, v in JOB_STATUS_MAP.items()}
 
+# Khớp 1:1 với LEVEL_CODE_VALUES (constants.py backend) — dùng làm nguồn
+# tĩnh cho dropdown "chọn lại level" ở bước Import (_dm_import.html,
+# 08/2026), truyền qua template context ở blueprints/data_management.py.
+# Nếu backend đổi danh sách này (thêm/bớt level) phải tự sửa tay ở đây
+# theo (khác GET /enums vốn tự động đồng bộ — xem docstring get_enums()
+# ở api/routers/meta.py backend — nhưng route đó cần thêm 1 lượt gọi
+# AJAX riêng lúc mở tab import, trong khi list 7 giá trị này gần như
+# không đổi nên tạm chấp nhận hardcode để đỡ round-trip mạng).
 LEVEL_CODES = ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead", "Manager"]
 
 WORK_TYPE_MAP = {"FULL_TIME": "Toàn thời gian", "PART_TIME": "Bán thời gian",
@@ -976,6 +984,14 @@ def _normalize_preview_row(raw: dict, id_field: str | None = None) -> dict:
         "resolved_company_id": company_resolution.get("company_id"),
         "resolved_company_name": company_resolution.get("company_name"),
         "company_suggestions": company_resolution.get("suggestions") or [],
+        # needs_level_resolve/level_code_raw (chỉ Job, 08/2026 — xem
+        # preview_manager.py::build_preview): TRỤC ĐỘC LẬP với
+        # conflict_status/needs_company_resolve ở trên — 1 dòng "no_conflict"
+        # vẫn có thể cần chọn lại level (level_code trong file không khớp
+        # 1 trong 7 giá trị hợp lệ dù đã chuẩn hoá hoa/thường), nên KHÔNG
+        # gộp vào conflict_status_label như 1 trạng thái riêng.
+        "needs_level_resolve": bool(raw.get("needs_level_resolve")),
+        "level_code_raw": raw.get("level_code_raw"),
         "errors": [],
     }
 
@@ -1002,6 +1018,7 @@ def _normalize_preview_summary(raw: dict) -> dict:
         "conflict_inactive_count": summary.get("conflicts_inactive", 0),
         "error_count": summary.get("errors", 0),
         "needs_company_resolve_count": summary.get("pending_company_resolution", 0),
+        "needs_level_resolve_count": summary.get("pending_level_resolution", 0),
         "expires_at": raw.get("expires_at"),
         "rows": rows,
     }
@@ -1103,13 +1120,15 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
           "row_index": int,
           "action": "create" | "update" | "skip" | "reactivate",
           "selected_company_id": str | None,  # chỉ khi needs_company_resolve
+          "level_code": str | None,  # chỉ khi needs_level_resolve (Job)
         }
     (giữ format list này ở tầng gọi vì _dm_import.html JS build ra sẵn
     dạng này) — nhưng payload GỬI LÊN BACKEND phải convert sang đúng
     contract thật:
         resolutions: {str(row_index): {"action": "skip"|"create"|"update",
                        "company_id": str|None,
-                       "confirm_reactivate": bool}}
+                       "confirm_reactivate": bool,
+                       "level_code": str|None}}
     (dict keyed theo row_index dạng CHUỖI, field tên "company_id" chứ
     không phải "selected_company_id", và action "reactivate" ở tầng gọi
     phải được dịch thành action="update" + confirm_reactivate=True vì
@@ -1119,10 +1138,24 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
     (vd "create_new_company") sẽ khiến CẢ REQUEST bị Pydantic reject
     422, không phải bị âm thầm bỏ qua — không được gửi field thừa.
 
-    Dòng "no_conflict"/"new" KHÔNG cần có trong resolutions — backend
+    "level_code" (08/2026, xem RowResolution + import_executor.py::
+    execute_import backend): BẮT BUỘC nếu dòng needs_level_resolve=true
+    (Job, level_code trong file không khớp 1 trong 7 giá trị hợp lệ dù
+    đã chuẩn hoá hoa/thường — xem preview_manager.py) VÀ action khác
+    "skip" — check này chạy TRƯỚC NHÁNH conflict_status trong
+    import_executor.py, nên áp dụng cho MỌI status kể cả "no_conflict"
+    (khác company_id, vốn chỉ liên quan status="pending_company_
+    resolution"). Chỉ gửi field này khi có giá trị (giống company_id) —
+    _dm_import.html JS chặn submit (disable nút xác nhận) nếu dòng cần
+    resolve level mà chưa chọn, nên tới được đây thì level_code coi như
+    đã hợp lệ hoặc dòng đó có action="skip".
+
+    Dòng "no_conflict"/"new" thường KHÔNG cần có trong resolutions — backend
     (import_executor.execute_import) LUÔN tạo mới dòng no_conflict bất
-    kể resolution có gì hay không (Requirement 6.3), nên tầng gọi có
-    thể lược các dòng này ra cho payload gọn, an toàn.
+    kể resolution có gì hay không (Requirement 6.3) — TRỪ dòng vừa
+    "no_conflict" vừa needs_level_resolve=true, bắt buộc phải có
+    resolution kèm level_code (xem trên), nên tầng gọi (_dm_import.html)
+    KHÔNG được lược các dòng này ra dù conflict_status="no_conflict".
 
     import_note: BẮT BUỘC, khác rỗng — app.py chặn submit nếu rỗng
     TRƯỚC khi gọi hàm này, nhưng vẫn để backend là nguồn xác thực cuối
@@ -1153,6 +1186,9 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
         company_id = entry.get("selected_company_id")
         if company_id:
             resolved["company_id"] = company_id
+        level_code = entry.get("level_code")
+        if level_code:
+            resolved["level_code"] = level_code
         resolutions_map[str(row_index)] = resolved
 
     payload = {"preview_id": preview_id, "resolutions": resolutions_map, "note": import_note}

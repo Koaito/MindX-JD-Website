@@ -46,6 +46,11 @@ def index():
         tab=tab,
         preview=preview,
         preview_id=preview_id,
+        # Nguồn 7 giá trị level_code hợp lệ cho dropdown "chọn lại level"
+        # ở bước Import (chỉ Job, dòng needs_level_resolve — xem
+        # _dm_import.html) — lấy từ crawler_client.LEVEL_CODES (khớp
+        # LEVEL_CODE_VALUES backend), KHÔNG hardcode lại trong template.
+        level_code_values=db_data.LEVEL_CODES,
     )
 
 

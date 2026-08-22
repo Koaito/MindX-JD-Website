@@ -40,6 +40,9 @@
     {% if preview.needs_company_resolve_count %}
     <div class="dm-stat dm-stat-resolve"><strong>{{ preview.needs_company_resolve_count }}</strong><span>Cần chọn công ty</span></div>
     {% endif %}
+    {% if preview.needs_level_resolve_count %}
+    <div class="dm-stat dm-stat-level-resolve"><strong>{{ preview.needs_level_resolve_count }}</strong><span>Cần chọn lại level</span></div>
+    {% endif %}
   </div>
   <!-- Đã bỏ ô "Dòng lỗi" (preview.error_count) 08/2026: backend
        (api/services/preview_manager.py::build_preview) không có đường
@@ -58,7 +61,9 @@
     Xem lại từng dòng bên dưới. Dòng <span class="dm-tag dm-tag-conflict">Trùng dữ liệu</span> cho phép chọn
     Bỏ qua/Cập nhật/Tạo mới. Dòng <span class="dm-tag dm-tag-inactive">Trùng — đã ngừng hoạt động</span> cần
     xác nhận riêng trước khi ghi đè + kích hoạt lại. Dòng có ô "Chọn công ty" phải chọn 1 công ty gợi ý
-    (hoặc chọn tạo mới) trước khi xác nhận.
+    (hoặc chọn tạo mới) trước khi xác nhận. Dòng <span class="dm-tag dm-tag-level">Cần chọn level</span> có
+    giá trị level trong file không khớp danh sách hợp lệ — phải chọn lại 1 level đúng trước khi xác nhận
+    (trừ khi bỏ qua dòng đó).
   </p>
 
   <div class="dm-table-wrap">
@@ -121,6 +126,10 @@
 
   var PREVIEW_DATA = {{ preview.rows|tojson }};
   var ENTITY_LABEL = {{ entity_labels[entity_type]|tojson }};
+  // 7 giá trị level_code hợp lệ (khớp LEVEL_CODE_VALUES backend) — nguồn
+  // cho dropdown "chọn lại level" ở dòng needs_level_resolve, truyền từ
+  // crawler_client.LEVEL_CODES qua blueprints/data_management.py::index().
+  var LEVEL_CODE_VALUES = {{ level_code_values|tojson }};
   var PAGE_SIZE = 50;
   var currentPage = 1;
 
@@ -133,12 +142,16 @@
   // resolution có gửi lên hay không), "conflict" -> mặc định "skip" (an
   // toàn, staff phải tự đổi sang update nếu muốn ghi đè), "conflict_inactive"
   // -> mặc định "skip" (bắt buộc bấm "Có" mới thành reactivate).
-  var state = {}; // row_index -> { action, selected_company_id, resolvedName }
+  var state = {}; // row_index -> { action, selected_company_id, resolvedName, level_code }
   PREVIEW_DATA.forEach(function (row) {
     state[row.row_index] = {
       action: row.conflict_status === "no_conflict" ? "create" : "skip",
       selected_company_id: row.resolved_company_id || null,
       resolvedName: row.resolved_company_name || null,
+      // level_code: chưa có giá trị mặc định nào hợp lệ để tự chọn hộ (7
+      // level đều là lựa chọn nghiệp vụ thật, không có "an toàn" như
+      // company) — staff BẮT BUỘC tự chọn qua dropdown, xem actionCell().
+      level_code: null,
     };
   });
 
@@ -162,16 +175,23 @@
   }
 
   function statusTag(row) {
+    // needs_level_resolve là trục ĐỘC LẬP với conflict_status (1 dòng có
+    // thể vừa "no_conflict"/"conflict"/... vừa cần chọn lại level cùng
+    // lúc) — nên badge level LUÔN cộng thêm vào SAU tag trạng thái chính,
+    // không thay thế nó.
+    var levelBadge = row.needs_level_resolve
+      ? ' <span class="dm-tag dm-tag-level">Cần chọn level</span>'
+      : '';
     if (row.conflict_status === "conflict_inactive") {
-      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>';
+      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge;
     }
     if (row.conflict_status === "conflict") {
-      return '<span class="dm-tag dm-tag-conflict">Trùng</span>';
+      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge;
     }
     if (row.conflict_status === "pending_company_resolution") {
-      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>';
+      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge;
     }
-    return '<span class="dm-tag dm-tag-new">Mới</span>';
+    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge;
   }
 
   function actionCell(row) {
@@ -187,6 +207,30 @@
       out += '<div class="dm-resolve-block" data-row="' + row.row_index + '">' +
              '<div class="dm-resolve-current ' + (s.selected_company_id ? "dm-resolve-ok" : "dm-resolve-pending") + '">' + label + '</div>' +
              '<button type="button" class="btn btn-text dm-btn-choose-company" data-row="' + row.row_index + '">Chọn công ty…</button>' +
+             '</div>';
+    }
+
+    // needs_level_resolve (chỉ Job, xem preview_manager.py backend):
+    // level_code trong file không khớp 1 trong 7 giá trị hợp lệ (dù đã
+    // chuẩn hoá hoa/thường) -> staff chọn lại qua dropdown tĩnh
+    // (LEVEL_CODE_VALUES). Không có lựa chọn "an toàn" để tự default
+    // (khác company: bỏ trống -> tự hiểu tạo mới) nên luôn bắt đầu ở
+    // trạng thái "Chưa chọn" cho tới khi staff tự chọn tay — xem
+    // isRowResolved() chặn nút Xác nhận nếu còn dòng nào action != skip
+    // mà chưa chọn level.
+    if (row.needs_level_resolve) {
+      var rawLabel = row.level_code_raw ? escapeHtml(row.level_code_raw) : "(rỗng)";
+      out += '<div class="dm-resolve-block" data-row="' + row.row_index + '">' +
+             '<div class="dm-resolve-current ' + (s.level_code ? "dm-resolve-ok" : "dm-resolve-pending") + '">' +
+             (s.level_code ? escapeHtml(s.level_code) : "Chưa chọn level") +
+             ' <span class="dm-resolve-raw">(file ghi: ' + rawLabel + ')</span>' +
+             '</div>' +
+             '<select class="dm-level-select" data-row="' + row.row_index + '">' +
+             '<option value="">-- Chọn level --</option>' +
+             LEVEL_CODE_VALUES.map(function (v) {
+               return '<option value="' + escapeHtml(v) + '"' + (s.level_code === v ? " selected" : "") + '>' + escapeHtml(v) + '</option>';
+             }).join('') +
+             '</select>' +
              '</div>';
     }
 
@@ -257,6 +301,12 @@
     var s = state[row.row_index];
     if (row.needs_company_resolve && !s.selected_company_id) return false;
     if (row.conflict_status === "conflict_inactive" && s.action !== "reactivate" && s.action !== "skip") return false;
+    // needs_level_resolve (xem import_executor.py backend): CHỈ bắt buộc
+    // chọn level khi action != "skip" — dòng "conflict"/"conflict_inactive"
+    // mà staff chọn Bỏ qua thì đằng nào cũng không ghi gì, không cần ép
+    // chọn level. Dòng "no_conflict" luôn action="create" (không đổi
+    // được qua UI) nên nhánh này LUÔN bắt buộc chọn level cho dòng đó.
+    if (row.needs_level_resolve && s.action !== "skip" && !s.level_code) return false;
     return true;
   }
 
@@ -366,19 +416,30 @@
     // Chỉ gửi lên các dòng cần resolve — dòng "no_conflict" backend luôn
     // tự tạo mới bất kể có resolution hay không (import_executor.py:
     // execute_import, Requirement 6.3), gửi thừa không sai nhưng không
-    // cần thiết. Field "selected_company_id" ở đây được crawler_client.py
-    // (tầng Flask) convert lại thành "company_id" đúng tên backend mong
-    // đợi trước khi gọi API — KHÔNG gửi field "create_new_company": rỗng
-    // (không chọn công ty nào) đã tự nghĩa là "tạo company mới theo tên
-    // trong file" ở phía backend, field lạ sẽ bị Pydantic
-    // (extra="forbid") reject cả request.
+    // cần thiết. NGOẠI LỆ (08/2026): dòng "no_conflict" mà
+    // needs_level_resolve=true VẪN PHẢI gửi resolution kèm level_code —
+    // check "level_code bắt buộc nếu needs_level_resolve && action != skip"
+    // trong import_executor.py chạy TRƯỚC nhánh theo conflict_status, áp
+    // dụng cho MỌI status kể cả no_conflict (khác company_id, vốn chỉ
+    // liên quan status="pending_company_resolution") — lược dòng này ra
+    // như cũ sẽ khiến backend nhận resolution rỗng, tạo job thiếu level
+    // (hoặc lỗi 422 nếu backend đổi sang chặn chặt hơn sau này). Field
+    // "selected_company_id" ở đây được crawler_client.py (tầng Flask)
+    // convert lại thành "company_id" đúng tên backend mong đợi trước khi
+    // gọi API — KHÔNG gửi field "create_new_company": rỗng (không chọn
+    // công ty nào) đã tự nghĩa là "tạo company mới theo tên trong file"
+    // ở phía backend, field lạ sẽ bị Pydantic (extra="forbid") reject cả
+    // request.
     return PREVIEW_DATA.filter(function (row) {
-      return row.conflict_status !== "no_conflict";
+      return row.conflict_status !== "no_conflict" || row.needs_level_resolve;
     }).map(function (row) {
       var s = state[row.row_index];
       var entry = { row_index: row.row_index, action: s.action };
       if (row.needs_company_resolve) {
         entry.selected_company_id = s.selected_company_id === "__new__" ? null : s.selected_company_id;
+      }
+      if (row.needs_level_resolve) {
+        entry.level_code = s.level_code;
       }
       return entry;
     });
@@ -405,6 +466,13 @@
   });
 
   document.getElementById("dm-preview-tbody").addEventListener("change", function (e) {
+    var levelSelect = e.target.closest(".dm-level-select");
+    if (levelSelect) {
+      var rowIndex = parseInt(levelSelect.getAttribute("data-row"), 10);
+      state[rowIndex].level_code = levelSelect.value || null;
+      renderPage();
+      return;
+    }
     var radio = e.target.closest(".dm-action-radios input[type=radio]");
     if (!radio) return;
     var block = radio.closest(".dm-action-radios");
