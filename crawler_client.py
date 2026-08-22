@@ -1045,21 +1045,38 @@ def get_import_preview(access_token, entity_type, preview_id):
 def get_company_suggestions(access_token, entity_type, preview_id, row_index):
     """GET /import/{entity_type}/preview/{preview_id}/company-suggestions?row_index=
     — danh sách công ty gợi ý (fuzzy match) cho 1 dòng cụ thể cần resolve
-    company (xem [giả định A]/[giả định B], company_resolver.py backend).
-    Trả list [{"company_id", "company_name", "tax_id", "score"}, ...],
-    KHÔNG tự chọn hộ — staff bấm chọn tay trên UI."""
+    company (xem company_resolver.py backend). Trả list
+    [{"company_id", "company_name", "tax_id", "score"}, ...], KHÔNG tự
+    chọn hộ — staff bấm chọn tay trên UI.
+
+    BUG FIX (08/2026): backend trả về OBJECT {"suggestions": [...]}
+    (CompanySuggestionsResponse — xem api/schemas.py), KHÔNG PHẢI list
+    trần. Code cũ gán thẳng raw = _request(...) rồi `for s in raw` —
+    lặp qua CÁC KEY của dict (chỉ có đúng 1 key "suggestions" — 1
+    chuỗi), rồi gọi s.get("company_id") trên chuỗi đó -> AttributeError
+    ('str' object has no attribute 'get'), Flask không bắt được lỗi
+    này (không phải CrawlerAPIError) -> trả về trang lỗi 500 dạng HTML.
+    Trình duyệt cố parse HTML đó thành JSON (res.json() ở
+    _dm_import.html) -> thất bại -> rơi vào .catch() và hiện đúng cái
+    alert "Lỗi kết nối khi tải danh sách công ty gợi ý ... (HTTP 500)"
+    mà bạn thấy khi bấm "Chọn công ty..." ở bước Import.
+
+    Field cũng bị sai tên: backend trả "similarity" (0-1), code cũ đọc
+    "score" (không tồn tại) -> luôn None -> UI luôn thiếu phần "độ khớp
+    x%" dù request có chạy được."""
     raw = _request(
         "GET", f"/import/{entity_type}/preview/{preview_id}/company-suggestions",
         access_token=access_token, params={"row_index": row_index},
-    ) or []
+    ) or {}
+    suggestions = raw.get("suggestions") or []
     return [
         {
             "company_id": s.get("company_id"),
             "company_name": s.get("company_name") or "",
             "tax_id": s.get("tax_id") or "",
-            "score": s.get("score"),
+            "score": s.get("similarity"),
         }
-        for s in raw
+        for s in suggestions
     ]
 
 
