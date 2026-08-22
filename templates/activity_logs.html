@@ -62,10 +62,12 @@
         <th style="width: 120px;">Hành động</th>
         <th>Đối tượng</th>
         <th style="width: 200px;">Công ty liên quan</th>
-        {% if view == 'manual' %}
+        <!-- Ghi chú/Actions LUÔN hiển thị (không chỉ view=manual) — từ
+             08/2026 vài action "tự động" (vd WITHDRAW_JOB_APPLICATION)
+             vẫn có thể có note do CHÍNH học viên ghi lúc huỷ ứng tuyển,
+             ẩn cột này ở tab "Tự động" sẽ làm mất note đó luôn. -->
         <th style="min-width: 250px;">Ghi chú</th>
         <th style="width: 100px;"></th>
-        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -97,7 +99,6 @@
             <span class="muted">—</span>
           {% endif %}
         </td>
-        {% if view == 'manual' %}
         <td>
           {% if log.note %}
             <div class="note-text">{{ log.note }}</div>
@@ -118,7 +119,6 @@
             </button>
           {% endif %}
         </td>
-        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
