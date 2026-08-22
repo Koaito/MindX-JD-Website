@@ -93,6 +93,23 @@
       Còn dòng chưa xử lý (chưa chọn công ty, hoặc chưa xác nhận trùng bản ghi ngừng hoạt động) — vui lòng xử lý hết trước khi xác nhận.
     </p>
   </form>
+
+  <!-- Modal chọn công ty gợi ý — thay cho window.prompt()/alert() cũ (không
+       hợp giao diện trang, không style được, không hoạt động tốt trên
+       mobile). 1 modal DÙNG CHUNG cho mọi dòng, JS chỉ đổi nội dung bên
+       trong mỗi lần mở (xem openCompanyPicker() bên dưới) thay vì render
+       N modal ẩn sẵn cho N dòng. -->
+  <div class="dm-modal-overlay" id="dm-company-modal" hidden>
+    <div class="dm-modal" role="dialog" aria-modal="true" aria-labelledby="dm-company-modal-title">
+      <div class="dm-modal-head">
+        <h3 id="dm-company-modal-title">Chọn công ty</h3>
+        <button type="button" class="dm-modal-close" id="dm-company-modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="dm-modal-body" id="dm-company-modal-body">
+        <!-- render bằng JS: danh sách gợi ý / trạng thái đang tải / lỗi -->
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -252,58 +269,80 @@
     hint.style.display = allResolved ? "none" : "block";
   }
 
+  // ---- Modal chọn công ty (thay window.prompt()/alert()) ----------------
+  var modalOverlay = document.getElementById("dm-company-modal");
+  var modalTitle = document.getElementById("dm-company-modal-title");
+  var modalBody = document.getElementById("dm-company-modal-body");
+  var modalCloseBtn = document.getElementById("dm-company-modal-close");
+
+  function closeCompanyModal() {
+    modalOverlay.hidden = true;
+  }
+
   function openCompanyPicker(rowIndex) {
     var suggestionsUrl = root.getAttribute("data-suggestions-url");
     var previewId = root.getAttribute("data-preview-id");
     var url = suggestionsUrl + "?preview_id=" + encodeURIComponent(previewId) + "&row_index=" + rowIndex;
 
-    // X-Requested-With: fetch() không tự thêm header này như jQuery $.ajax,
-    // nhưng utils/decorators.py (staff_required) dựa vào nó để biết đây là
-    // gọi AJAX -> trả JSON lỗi thay vì redirect HTML (login/error page) khi
-    // session hết hạn/không đủ quyền. Thiếu header này thì fetch nhận về
-    // HTML rồi res.json() sẽ crash với lỗi "Unexpected token '<'".
-    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } }).then(function (res) {
-      return res.json().catch(function () {
-        // Phòng trường hợp backend trả về thứ gì đó không phải JSON hợp lệ
-        // (vd: lỗi 500 không kèm body JSON) — báo lỗi rõ ràng thay vì để
-        // .catch() bên dưới hiện nguyên SyntaxError khó hiểu cho người dùng.
-        throw new Error(res.status === 401 || res.status === 403
-          ? "Phiên đăng nhập đã hết hạn hoặc không đủ quyền — vui lòng tải lại trang."
-          : "Máy chủ trả về dữ liệu không hợp lệ (HTTP " + res.status + ").");
-      });
-    }).then(function (data) {
+    modalTitle.textContent = "Chọn công ty cho dòng " + (rowIndex + 1);
+    modalBody.innerHTML = '<p class="dm-modal-loading">Đang tải danh sách công ty gợi ý…</p>';
+    modalOverlay.hidden = false;
+
+    function selectAndClose(companyId, label) {
+      state[rowIndex].selected_company_id = companyId;
+      state[rowIndex].resolvedName = label;
+      closeCompanyModal();
+      renderPage();
+    }
+
+    fetch(url).then(function (res) { return res.json(); }).then(function (data) {
       if (data.error) {
-        alert("Không tải được danh sách công ty gợi ý: " + data.error);
+        modalBody.innerHTML = '<p class="dm-modal-error">Không tải được danh sách công ty gợi ý: ' +
+          escapeHtml(data.error) + '</p>';
         return;
       }
       var suggestions = data.suggestions || [];
-      var lines = suggestions.map(function (s, i) {
-        return (i + 1) + ". " + s.company_name + (s.tax_id ? " (MST: " + s.tax_id + ")" : "") +
-               (s.score != null ? " — độ khớp " + Math.round(s.score * 100) + "%" : "");
-      });
-      var promptText = suggestions.length
-        ? "Chọn công ty cho dòng " + (rowIndex + 1) + ":\n" + lines.join("\n") + "\n\nNhập số thứ tự, hoặc 0 để tạo công ty mới, Cancel để bỏ qua:"
-        : "Không tìm thấy công ty gợi ý nào khớp cho dòng " + (rowIndex + 1) + ".\nNhập 0 để tạo công ty mới, Cancel để bỏ qua:";
-      var answer = prompt(promptText, "0");
-      if (answer === null) return;
-      var idx = parseInt(answer, 10);
-      if (isNaN(idx)) return;
-
-      if (idx === 0) {
-        state[rowIndex].selected_company_id = "__new__";
-        state[rowIndex].resolvedName = "Sẽ tạo công ty mới";
-      } else if (idx >= 1 && idx <= suggestions.length) {
-        var chosen = suggestions[idx - 1];
-        state[rowIndex].selected_company_id = chosen.company_id;
-        state[rowIndex].resolvedName = chosen.company_name;
+      var html = "";
+      if (suggestions.length) {
+        html += '<p class="dm-modal-hint">Chọn 1 công ty khớp nhất, hoặc tạo công ty mới bên dưới:</p>';
+        html += '<ul class="dm-modal-suggestion-list">';
+        suggestions.forEach(function (s) {
+          var pct = s.score != null ? Math.round(s.score * 100) : null;
+          html += '<li>' +
+            '<button type="button" class="dm-modal-suggestion" data-company-id="' + escapeHtml(s.company_id) + '" data-company-name="' + escapeHtml(s.company_name) + '">' +
+            '<span class="dm-modal-suggestion-name">' + escapeHtml(s.company_name) + '</span>' +
+            (s.tax_id ? '<span class="dm-modal-suggestion-tax">MST: ' + escapeHtml(s.tax_id) + '</span>' : '') +
+            (pct != null ? '<span class="dm-modal-suggestion-score">Độ khớp ' + pct + '%</span>' : '') +
+            '</button></li>';
+        });
+        html += '</ul>';
       } else {
-        return;
+        html += '<p class="dm-modal-hint">Không tìm thấy công ty gợi ý nào khớp cho dòng này.</p>';
       }
-      renderPage();
+      html += '<button type="button" class="btn btn-ghost dm-modal-create-new" id="dm-modal-create-new">+ Tạo công ty mới</button>';
+      modalBody.innerHTML = html;
+
+      modalBody.querySelectorAll(".dm-modal-suggestion").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          selectAndClose(btn.getAttribute("data-company-id"), btn.getAttribute("data-company-name"));
+        });
+      });
+      document.getElementById("dm-modal-create-new").addEventListener("click", function () {
+        selectAndClose("__new__", "Sẽ tạo công ty mới");
+      });
     }).catch(function (err) {
-      alert("Lỗi kết nối khi tải danh sách công ty gợi ý: " + err);
+      modalBody.innerHTML = '<p class="dm-modal-error">Lỗi kết nối khi tải danh sách công ty gợi ý: ' +
+        escapeHtml(String(err)) + '</p>';
     });
   }
+
+  modalCloseBtn.addEventListener("click", closeCompanyModal);
+  modalOverlay.addEventListener("click", function (e) {
+    if (e.target === modalOverlay) closeCompanyModal();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !modalOverlay.hidden) closeCompanyModal();
+  });
 
   function buildResolutionsPayload() {
     // Chỉ gửi lên các dòng cần resolve — dòng "no_conflict" backend luôn

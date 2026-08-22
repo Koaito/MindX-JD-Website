@@ -276,3 +276,121 @@
   .dm-stat { flex: 1 1 100px; padding: 10px 12px; }
   .dm-preview-table td, .dm-preview-table th { padding: 8px 10px; }
 }
+
+/* ---- Modal chọn công ty gợi ý (thay window.prompt()/alert() cũ) ---- */
+.dm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.dm-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 460px;
+  max-height: min(560px, 85vh);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 48px rgba(16, 30, 26, 0.22);
+}
+
+.dm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dm-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.dm-modal-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.dm-modal-close:hover { background: var(--bg); color: var(--ink); }
+
+.dm-modal-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+
+.dm-modal-hint { color: var(--ink-soft); font-size: 13px; margin: 0 0 12px; }
+.dm-modal-loading { color: var(--ink-soft); font-size: 13.5px; }
+.dm-modal-error { color: #B23A22; font-size: 13.5px; }
+
+.dm-modal-suggestion-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dm-modal-suggestion {
+  width: 100%;
+  text-align: left;
+  background: #FBFCFB;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--font-body);
+}
+
+.dm-modal-suggestion:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dm-modal-suggestion-name {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13.5px;
+  flex: 1 1 auto;
+}
+
+.dm-modal-suggestion-tax { color: var(--ink-soft); font-size: 12px; }
+
+.dm-modal-suggestion-score {
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--teal-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.dm-modal-create-new {
+  width: 100%;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.dm-modal-create-new:hover { border-color: var(--accent); color: var(--accent); }

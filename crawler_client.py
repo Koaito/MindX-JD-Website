@@ -712,6 +712,15 @@ def update_contact(access_token, company_id, contact_id, form, note) -> dict:
         "work_email": (form.get("email") or "").strip() or None,
         "social_link": (form.get("contact_link") or "").strip() or None,
         "phone_number": (form.get("phone") or "").strip() or None,
+        # BUG FIX (08/2026): field "source" (Nguồn tìm thấy) bị thiếu ở
+        # đây từ đầu — create_contact() có gửi field này (map sang
+        # found_source) nhưng update_contact() thì không, nên sửa ô
+        # "Nguồn tìm thấy" ở form Sửa người liên hệ luôn báo lưu thành
+        # công (PATCH vẫn chạy OK với 5 field còn lại) nhưng riêng field
+        # này không bao giờ tới được backend -> không lưu, không log.
+        # (Backend cũng thiếu found_source ở CompanyContactUpdate/
+        # update_company_contact() — đã sửa riêng ở repo scrap-jd-api.)
+        "found_source": (form.get("source") or "").strip() or None,
         "note": (note or "").strip() or None,
     }
     raw = _request("PATCH", f"/companies/{company_id}/contacts/{contact_id}", access_token=access_token, json=payload)
