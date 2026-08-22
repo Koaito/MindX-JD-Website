@@ -152,9 +152,15 @@ def import_confirm(entity_type):
         flash(str(exc), "error")
         return redirect(url_for("data_mgmt.index", entity=entity_type, tab="import", preview=preview_id))
 
+    # Lưu ý: backend (ImportConfirmResult) gộp chung "reactivate" vào
+    # "updated", không trả đếm riêng — result["reactivated"] hiện luôn =
+    # 0 phía crawler_client.py (xem docstring import_confirm() ở đó),
+    # nên KHÔNG hiện dòng "Kích hoạt lại: 0" gây hiểu nhầm là không có
+    # dòng nào được kích hoạt lại; số kích hoạt lại (nếu có) đã nằm
+    # trong "Cập nhật" ở trên.
     msg = (
         f"Import hoàn tất — Tạo mới: {result['created']}, Cập nhật: {result['updated']}, "
-        f"Bỏ qua: {result['skipped']}, Kích hoạt lại: {result['reactivated']}."
+        f"Bỏ qua: {result['skipped']}."
     )
     if result["errors"]:
         msg += f" ({len(result['errors'])} dòng lỗi, xem chi tiết bên dưới.)"

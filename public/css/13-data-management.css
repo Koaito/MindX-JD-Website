@@ -121,6 +121,10 @@
 .dm-tag-new { background: #E4F3E9; color: #2E8B57; }
 .dm-tag-conflict { background: #FCF1D8; color: #B58000; }
 .dm-tag-inactive { background: #FBE7E4; color: #B23A22; }
+/* Thêm cho conflict_status="pending_company_resolution" — trạng thái
+   thật trả về từ backend (preview_manager.py) không có tag trước đó vì
+   bản cũ statusTag() trong _dm_import.html chưa từng xử lý case này. */
+.dm-tag-resolve { background: #E3ECFB; color: #3A6FB0; }
 
 .dm-table-wrap {
   overflow-x: auto;

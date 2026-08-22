@@ -96,14 +96,19 @@
   var PAGE_SIZE = 50;
   var currentPage = 1;
 
-  // action mặc định theo conflict_status: "new" -> luôn create ngầm định
-  // (không hiện cột hành động), "conflict" -> mặc định "skip" (an toàn,
-  // staff phải tự đổi sang update nếu muốn ghi đè), "conflict_inactive"
+  // action mặc định theo conflict_status — giá trị thật trả về từ backend
+  // (api/services/preview_manager.py) là "no_conflict" | "conflict" |
+  // "conflict_inactive" | "pending_company_resolution", KHÔNG phải "new"
+  // (đối chiếu lại 08/2026, bản cũ dùng "new" nên nhánh này chưa từng
+  // khớp được với dữ liệu thật). "no_conflict" -> luôn create ngầm định
+  // (không hiện cột hành động — backend cũng tự tạo mới dòng này bất kể
+  // resolution có gửi lên hay không), "conflict" -> mặc định "skip" (an
+  // toàn, staff phải tự đổi sang update nếu muốn ghi đè), "conflict_inactive"
   // -> mặc định "skip" (bắt buộc bấm "Có" mới thành reactivate).
   var state = {}; // row_index -> { action, selected_company_id, resolvedName }
   PREVIEW_DATA.forEach(function (row) {
     state[row.row_index] = {
-      action: row.conflict_status === "new" ? "create" : "skip",
+      action: row.conflict_status === "no_conflict" ? "create" : "skip",
       selected_company_id: row.resolved_company_id || null,
       resolvedName: row.resolved_company_name || null,
     };
@@ -135,6 +140,9 @@
     if (row.conflict_status === "conflict") {
       return '<span class="dm-tag dm-tag-conflict">Trùng</span>';
     }
+    if (row.conflict_status === "pending_company_resolution") {
+      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>';
+    }
     return '<span class="dm-tag dm-tag-new">Mới</span>';
   }
 
@@ -142,9 +150,9 @@
     var s = state[row.row_index];
     var out = "";
 
-    if (row.errors && row.errors.length) {
-      out += '<div class="dm-row-errors">' + row.errors.map(function (e) { return escapeHtml(e); }).join("<br>") + '</div>';
-    }
+    // Lưu ý: backend không trả lỗi riêng theo từng dòng preview (file
+    // lỗi validate bị chặn nguyên file ở bước upload, trả 422 trước khi
+    // preview được build) — không còn field row.errors để hiện ở đây.
 
     if (row.needs_company_resolve) {
       var label = s.resolvedName ? escapeHtml(s.resolvedName) : "Chưa chọn công ty";
@@ -273,12 +281,22 @@
   }
 
   function buildResolutionsPayload() {
-    return PREVIEW_DATA.map(function (row) {
+    // Chỉ gửi lên các dòng cần resolve — dòng "no_conflict" backend luôn
+    // tự tạo mới bất kể có resolution hay không (import_executor.py:
+    // execute_import, Requirement 6.3), gửi thừa không sai nhưng không
+    // cần thiết. Field "selected_company_id" ở đây được crawler_client.py
+    // (tầng Flask) convert lại thành "company_id" đúng tên backend mong
+    // đợi trước khi gọi API — KHÔNG gửi field "create_new_company": rỗng
+    // (không chọn công ty nào) đã tự nghĩa là "tạo company mới theo tên
+    // trong file" ở phía backend, field lạ sẽ bị Pydantic
+    // (extra="forbid") reject cả request.
+    return PREVIEW_DATA.filter(function (row) {
+      return row.conflict_status !== "no_conflict";
+    }).map(function (row) {
       var s = state[row.row_index];
       var entry = { row_index: row.row_index, action: s.action };
       if (row.needs_company_resolve) {
         entry.selected_company_id = s.selected_company_id === "__new__" ? null : s.selected_company_id;
-        entry.create_new_company = s.selected_company_id === "__new__";
       }
       return entry;
     });

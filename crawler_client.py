@@ -874,14 +874,22 @@ IMPORT_EXPORT_ENTITY_TYPES = ["job", "company", "contact"]
 IMPORT_EXPORT_ENTITY_LABELS = {"job": "JD", "company": "Công ty", "contact": "Người liên hệ HR"}
 
 # Nhãn hiển thị cho conflict_status trả về từ conflict_detector backend
-# (xem preview row "conflict_status" bên dưới) — 3 trạng thái đã chốt:
-# không trùng (tạo mới bình thường), trùng với bản ghi ĐANG active (cho
-# chọn Skip/Update/Create), trùng với bản ghi INACTIVE/CLOSED/EXPIRED
-# (cảnh báo riêng, hỏi có ghi đè + kích hoạt lại không — xem [giả định B]).
+# (xem preview row "conflict_status" bên dưới) — 4 trạng thái thật sự trả
+# về bởi api/services/preview_manager.py + conflict_detector.py (đã đối
+# chiếu lại với backend 08/2026, KHÁC với bản nháp contract cũ 3 trạng
+# thái "new"/"conflict"/"conflict_inactive" từng viết ở đây trước khi
+# backend triển khai xong):
+#   - "no_conflict": không trùng, tạo mới bình thường
+#   - "conflict": trùng với bản ghi ĐANG active (cho chọn Skip/Update/Create)
+#   - "conflict_inactive": trùng với bản ghi INACTIVE/CLOSED/EXPIRED (cảnh
+#     báo riêng, hỏi có ghi đè + kích hoạt lại không)
+#   - "pending_company_resolution": (chỉ Job/Contact) company_name trong
+#     file chưa map thẳng ra được company_id, cần staff tự chọn
 CONFLICT_STATUS_LABELS = {
-    "new": "Dòng mới",
+    "no_conflict": "Dòng mới",
     "conflict": "Trùng dữ liệu",
     "conflict_inactive": "Trùng — bản ghi đã ngừng hoạt động",
+    "pending_company_resolution": "Cần chọn công ty",
 }
 
 
@@ -925,38 +933,61 @@ def export_entity(access_token, entity_type, file_format="xlsx"):
 
 
 def _normalize_preview_row(raw: dict) -> dict:
+    # Backend (api/services/preview_manager.py::build_preview) trả field
+    # "existing_record" (không tách existing_data/existing_id riêng) và
+    # "company_resolution": {"status": "resolved"|"needs_resolution",
+    # "company_id", "company_is_active", "suggestions": [...]}  (không
+    # phải "needs_company_resolve"/"resolved_company_id" phẳng như bản
+    # nháp contract cũ) — đối chiếu lại 08/2026, sửa cho khớp thật.
+    # Backend KHÔNG có field "errors" ở từng dòng preview: lỗi validate
+    # được chặn nguyên file ở bước upload (HTTP 422 trong import_preview()
+    # bên dưới), không xuất hiện lẻ tẻ trong preview đã build xong.
+    company_resolution = raw.get("company_resolution") or {}
+    status = raw.get("conflict_status") or "no_conflict"
     return {
         "row_index": raw.get("row_index"),
         "data": raw.get("data") or {},
-        "conflict_status": raw.get("conflict_status") or "new",
-        "conflict_status_label": CONFLICT_STATUS_LABELS.get(
-            raw.get("conflict_status") or "new", raw.get("conflict_status") or ""
-        ),
-        "existing_data": raw.get("existing_data"),
-        "existing_id": raw.get("existing_id"),
-        # needs_company_resolve: True khi dòng Job/Contact có tên công
-        # ty chưa map được thẳng ra company_id (xem [giả định A]) — FE
-        # phải hiện dropdown gợi ý (get_company_suggestions bên dưới)
-        # trước khi cho phép confirm dòng này.
-        "needs_company_resolve": raw.get("needs_company_resolve", False),
-        "resolved_company_id": raw.get("resolved_company_id"),
-        "resolved_company_name": raw.get("resolved_company_name"),
-        "errors": raw.get("errors") or [],
+        "conflict_status": status,
+        "conflict_status_label": CONFLICT_STATUS_LABELS.get(status, status),
+        "existing_data": raw.get("existing_record"),
+        "existing_id": (raw.get("existing_record") or {}).get(
+            {"job": "job_id", "company": "company_id", "contact": "contact_id"}.get(
+                raw.get("_entity_type"), "id"
+            )
+        ) if raw.get("existing_record") else None,
+        "needs_company_resolve": status == "pending_company_resolution",
+        "resolved_company_id": company_resolution.get("company_id"),
+        "resolved_company_name": company_resolution.get("company_name"),
+        "company_suggestions": company_resolution.get("suggestions") or [],
+        "errors": [],
     }
 
 
 def _normalize_preview_summary(raw: dict) -> dict:
+    # Backend (ImportUploadResponse, api/schemas.py) lồng các số đếm
+    # trong "summary" — KHÔNG ở top-level — và dùng tên field khác:
+    # total_rows / new_records / conflicts / conflicts_inactive /
+    # pending_company_resolution (xem preview_manager.py::build_preview).
+    # Bản cũ ở đây đọc raw.get("total_rows"/"new_count"/...) thẳng ở
+    # top-level -> luôn miss, luôn fallback 0 (bug đã xác nhận 08/2026).
+    summary = raw.get("summary") or {}
+    entity_type = raw.get("entity_type")
+    rows = []
+    for r in raw.get("rows", []):
+        r = dict(r)
+        r["_entity_type"] = entity_type
+        rows.append(_normalize_preview_row(r))
     return {
         "preview_id": raw.get("preview_id"),
-        "entity_type": raw.get("entity_type"),
-        "total_rows": raw.get("total_rows", 0),
-        "new_count": raw.get("new_count", 0),
-        "conflict_count": raw.get("conflict_count", 0),
-        "conflict_inactive_count": raw.get("conflict_inactive_count", 0),
-        "error_count": raw.get("error_count", 0),
-        "needs_company_resolve_count": raw.get("needs_company_resolve_count", 0),
+        "entity_type": entity_type,
+        "total_rows": summary.get("total_rows", 0),
+        "new_count": summary.get("new_records", 0),
+        "conflict_count": summary.get("conflicts", 0),
+        "conflict_inactive_count": summary.get("conflicts_inactive", 0),
+        "error_count": summary.get("errors", 0),
+        "needs_company_resolve_count": summary.get("pending_company_resolution", 0),
         "expires_at": raw.get("expires_at"),
-        "rows": [_normalize_preview_row(r) for r in raw.get("rows", [])],
+        "rows": rows,
     }
 
 
@@ -1029,26 +1060,69 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
     """POST /import/{entity_type}/confirm — chạy import thật trong 1
     transaction, ghi đúng 1 dòng audit_logs tổng hợp kèm import_note.
 
-    resolutions: list các dict, MỖI DÒNG preview cần resolve gửi lên 1
-    phần tử:
+    Đối chiếu lại với backend thật 08/2026 (api/schemas.py::
+    ImportConfirmRequest/RowResolution + api/services/import_executor.py)
+    — KHÁC hoàn toàn bản nháp contract cũ từng viết ở đây:
+
+    resolutions ở ĐÂY (tham số truyền vào hàm) vẫn là list các dict, MỖI
+    DÒNG preview cần resolve gửi lên 1 phần tử:
         {
           "row_index": int,
           "action": "create" | "update" | "skip" | "reactivate",
           "selected_company_id": str | None,  # chỉ khi needs_company_resolve
         }
-    Dòng "new" (không conflict, không cần resolve company) KHÔNG bắt
-    buộc phải có trong resolutions — backend mặc định action="create"
-    cho dòng nào không được liệt kê tường minh (giữ payload gọn, khớp
-    tinh thần "chỉ gửi lên phần user thực sự chọn").
+    (giữ format list này ở tầng gọi vì _dm_import.html JS build ra sẵn
+    dạng này) — nhưng payload GỬI LÊN BACKEND phải convert sang đúng
+    contract thật:
+        resolutions: {str(row_index): {"action": "skip"|"create"|"update",
+                       "company_id": str|None,
+                       "confirm_reactivate": bool}}
+    (dict keyed theo row_index dạng CHUỖI, field tên "company_id" chứ
+    không phải "selected_company_id", và action "reactivate" ở tầng gọi
+    phải được dịch thành action="update" + confirm_reactivate=True vì
+    backend không có action="reactivate" — xem RowResolution docstring,
+    bug đã từng khiến flow ghi đè + kích hoạt lại không bao giờ chạy).
+    Backend dùng model_config = ConfigDict(extra="forbid") nên field lạ
+    (vd "create_new_company") sẽ khiến CẢ REQUEST bị Pydantic reject
+    422, không phải bị âm thầm bỏ qua — không được gửi field thừa.
 
-    import_note: BẮT BUỘC, khác rỗng (câu 6 đã chốt) — app.py phải chặn
-    submit nếu rỗng TRƯỚC khi gọi hàm này, nhưng vẫn để backend là nguồn
-    xác thực cuối (422 nếu thiếu) phòng gọi thẳng.
+    Dòng "no_conflict"/"new" KHÔNG cần có trong resolutions — backend
+    (import_executor.execute_import) LUÔN tạo mới dòng no_conflict bất
+    kể resolution có gì hay không (Requirement 6.3), nên tầng gọi có
+    thể lược các dòng này ra cho payload gọn, an toàn.
 
-    Trả {"created": int, "updated": int, "skipped": int, "reactivated": int,
-    "errors": [...]}; preview bị XOÁ ở backend sau khi confirm thành công
-    (không gọi lại được preview_id này nữa)."""
-    payload = {"resolutions": resolutions, "import_note": import_note}
+    import_note: BẮT BUỘC, khác rỗng — app.py chặn submit nếu rỗng
+    TRƯỚC khi gọi hàm này, nhưng vẫn để backend là nguồn xác thực cuối
+    (422 nếu thiếu) phòng gọi thẳng. Backend nhận field tên "note", không
+    phải "import_note" (ImportConfirmRequest.note).
+
+    Trả {"created": int, "updated": int, "skipped": int}; backend
+    (ImportConfirmResult) KHÔNG có field "reactivated" riêng — action
+    reactivate được tính gộp vào "updated" (xem import_executor.py:
+    _apply_conflict_action, action="update" luôn summary.updated += 1
+    kể cả khi reactivate=True), nên field "reactivated" ở dict trả về
+    của hàm này giữ lại = 0 cố định chỉ để khỏi phải sửa lại chỗ gọi
+    hiển thị flash message, KHÔNG phản ánh số liệu thật — nếu cần đếm
+    riêng, phải sửa backend trả thêm field này.
+    preview bị XOÁ ở backend sau khi confirm thành công (không gọi lại
+    được preview_id này nữa)."""
+    resolutions_map = {}
+    for entry in resolutions:
+        row_index = entry.get("row_index")
+        if row_index is None:
+            continue
+        action = entry.get("action") or "skip"
+        confirm_reactivate = False
+        if action == "reactivate":
+            action = "update"
+            confirm_reactivate = True
+        resolved = {"action": action, "confirm_reactivate": confirm_reactivate}
+        company_id = entry.get("selected_company_id")
+        if company_id:
+            resolved["company_id"] = company_id
+        resolutions_map[str(row_index)] = resolved
+
+    payload = {"preview_id": preview_id, "resolutions": resolutions_map, "note": import_note}
     raw = _request(
         "POST", f"/import/{entity_type}/confirm", access_token=access_token, json=payload,
     ) or {}
@@ -1056,6 +1130,6 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
         "created": raw.get("created", 0),
         "updated": raw.get("updated", 0),
         "skipped": raw.get("skipped", 0),
-        "reactivated": raw.get("reactivated", 0),
+        "reactivated": 0,  # backend chưa trả field này riêng — xem docstring
         "errors": raw.get("errors") or [],
     }
