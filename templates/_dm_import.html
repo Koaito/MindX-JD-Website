@@ -37,11 +37,22 @@
     <div class="dm-stat dm-stat-new"><strong>{{ preview.new_count }}</strong><span>Dòng mới</span></div>
     <div class="dm-stat dm-stat-conflict"><strong>{{ preview.conflict_count }}</strong><span>Trùng dữ liệu</span></div>
     <div class="dm-stat dm-stat-inactive"><strong>{{ preview.conflict_inactive_count }}</strong><span>Trùng — đã ngừng hoạt động</span></div>
-    <div class="dm-stat dm-stat-error"><strong>{{ preview.error_count }}</strong><span>Dòng lỗi</span></div>
     {% if preview.needs_company_resolve_count %}
     <div class="dm-stat dm-stat-resolve"><strong>{{ preview.needs_company_resolve_count }}</strong><span>Cần chọn công ty</span></div>
     {% endif %}
   </div>
+  <!-- Đã bỏ ô "Dòng lỗi" (preview.error_count) 08/2026: backend
+       (api/services/preview_manager.py::build_preview) không có đường
+       nào tạo ra dòng lỗi trong 1 preview đã build xong — file có dòng
+       không hợp lệ bị chặn NGUYÊN FILE ở bước upload (HTTP 422 trong
+       import_preview() router, TRƯỚC KHI build_preview() được gọi, xem
+       validation_engine.py::validate_dataframe), nên preview.error_count
+       ở đây luôn = 0, không phản ánh gì thật — hiện ra chỉ gây hiểu nhầm
+       staff nghĩ hệ thống đã kiểm tra lỗi per-row mà không hề có. Nếu
+       sau này backend đổi sang cho phép import 1 phần (bỏ qua dòng lỗi,
+       import phần còn lại) thì field này mới có ý nghĩa trở lại — lúc
+       đó thêm lại ô này VÀ field errors thật trong summary backend
+       cùng lúc. -->
 
   <p class="dm-hint">
     Xem lại từng dòng bên dưới. Dòng <span class="dm-tag dm-tag-conflict">Trùng dữ liệu</span> cho phép chọn

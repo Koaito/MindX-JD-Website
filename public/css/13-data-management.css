@@ -105,8 +105,7 @@
 
 .dm-stat-new strong { color: #2E8B57; }
 .dm-stat-conflict strong { color: #B58000; }
-.dm-stat-inactive strong,
-.dm-stat-error strong { color: #B23A22; }
+.dm-stat-inactive strong { color: #B23A22; }
 .dm-stat-resolve strong { color: #3A6FB0; }
 
 .dm-tag {

@@ -94,10 +94,14 @@ def import_preview(entity_type):
         flash(str(exc), "error")
         return redirect(url_for("data_mgmt.index", entity=entity_type, tab="import"))
 
+    # Không hiện "N lỗi" ở đây (khác bản cũ) — cùng lý do đã bỏ ô "Dòng
+    # lỗi" khỏi _dm_import.html: preview['error_count'] luôn = 0 vì file
+    # có dòng lỗi bị chặn NGUYÊN FILE ở bước upload (422) trước khi tới
+    # được đây, không phải giá trị thật phản ánh dòng nào trong preview.
     flash(
         f"Đã đọc {preview['total_rows']} dòng — {preview['new_count']} dòng mới, "
         f"{preview['conflict_count']} trùng, {preview['conflict_inactive_count']} trùng bản ghi "
-        f"ngừng hoạt động, {preview['error_count']} lỗi.",
+        f"ngừng hoạt động.",
         "success",
     )
     return redirect(url_for(
