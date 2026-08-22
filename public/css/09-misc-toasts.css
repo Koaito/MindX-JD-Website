@@ -19,6 +19,13 @@
   border-radius: 9px;
   font-size: 13.5px;
   margin-bottom: 8px;
+  /* Thêm 08/2026: crawler_client.py::_format_import_errors_detail() giờ
+     nối nhiều dòng lỗi import bằng "\n" (mỗi dòng 1 lỗi validate) — mặc
+     định white-space:normal (browser default) gộp \n thành khoảng trắng,
+     khiến nhiều lỗi dính thành 1 câu dài không đọc nổi. pre-line giữ
+     xuống dòng thật nhưng vẫn gộp khoảng trắng thừa/wrap dài — không
+     ảnh hưởng các flash message 1 dòng hiện có (success/error thường). */
+  white-space: pre-line;
 }
 
 .flash-success { background: var(--teal-soft); color: var(--teal); border: 1px solid #BFE5DD; }

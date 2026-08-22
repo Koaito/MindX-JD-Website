@@ -1024,6 +1024,61 @@ def _normalize_preview_summary(raw: dict) -> dict:
     }
 
 
+def _format_import_errors_detail(detail) -> str:
+    """Backend (api/routers/import_export.py::import_preview) là DUY NHẤT
+    chỗ trả HTTPException.detail dạng OBJECT thay vì string trong toàn bộ
+    backend (đã grep 'detail={' khắp api/routers/, chỉ có đúng 1 kết quả)
+    — mọi route khác luôn trả detail dạng string thuần, các hàm khác
+    trong file này (đọc res.json().get("detail","") rồi dùng thẳng) vẫn
+    đúng, KHÔNG cần đổi.
+
+    Shape thật của detail khi file có dòng validate lỗi (422):
+        {"message": "File có dòng không hợp lệ...",
+         "errors": [{"row_number": int, "field_name": str, "rule": str,
+                      "message": str}, ...]}
+
+    BUG (08/2026, phát hiện qua ảnh chụp màn hình staff báo lỗi import
+    contact): import_preview() cũ gán thẳng
+    `detail = res.json().get("detail", "")` (ra 1 dict) rồi nhét vào
+    f-string `f"File không hợp lệ: {detail}"` — Python f-string gọi
+    str(dict) trên 1 dict lồng list-of-dict -> in NGUYÊN literal Python
+    (`{'message': ..., 'errors': [{'row_number': 4, ...}]}`) thẳng ra
+    flash message cho staff xem, không ai đọc nổi — dù nội dung lỗi bên
+    trong (mỗi error["message"]) thật ra đã viết sẵn dạng câu tiếng Việt
+    dễ hiểu ("Dòng 4, cột 'work_email': email không hợp lệ ...").
+
+    Hàm này tách riêng để format lại: nối error["message"] (ĐÃ viết sẵn
+    dễ đọc, không cần tự dựng câu từ row_number/field_name/rule) mỗi lỗi
+    1 dòng, giới hạn hiện tối đa 20 dòng đầu (file cho phép tới 5.000
+    dòng — lỗi hàng loạt kiểu sai nguyên 1 cột thì in hết ra vô ích, tràn
+    màn hình) + báo còn bao nhiêu lỗi khác nếu vượt quá. Nếu detail không
+    phải dict (route khác, hoặc backend đổi shape) -> trả thẳng str(detail)
+    làm fallback an toàn, không throw."""
+    if not isinstance(detail, dict):
+        return str(detail)
+    message = detail.get("message") or "File có dòng không hợp lệ."
+    errors = detail.get("errors") or []
+    if not errors:
+        return message
+    MAX_SHOWN = 20
+    lines = [message]
+    for err in errors[:MAX_SHOWN]:
+        err_message = err.get("message")
+        if err_message:
+            lines.append(f"- {err_message}")
+        else:
+            # Fallback nếu backend đổi shape sau này, thiếu sẵn "message"
+            # cho 1 error entry — vẫn dựng được câu tối thiểu từ 3 field
+            # còn lại thay vì bỏ trống dòng đó.
+            row = err.get("row_number", "?")
+            field = err.get("field_name", "?")
+            rule = err.get("rule", "?")
+            lines.append(f"- Dòng {row}, cột '{field}' (rule={rule}): không hợp lệ")
+    if len(errors) > MAX_SHOWN:
+        lines.append(f"... và {len(errors) - MAX_SHOWN} dòng lỗi khác.")
+    return "\n".join(lines)
+
+
 def import_preview(access_token, entity_type, file_storage):
     """POST /import/{entity_type}/preview — upload file (multipart), trả
     preview_id + summary (đếm dòng mới/conflict/lỗi) + toàn bộ rows để
@@ -1053,7 +1108,7 @@ def import_preview(access_token, entity_type, file_storage):
     if res.status_code == 403:
         raise CrawlerAPIError(detail or "Tài khoản không có quyền thực hiện thao tác này.", status_code=403)
     if res.status_code == 422:
-        raise CrawlerAPIError(f"File không hợp lệ: {detail}", status_code=422)
+        raise CrawlerAPIError(f"File không hợp lệ: {_format_import_errors_detail(detail)}", status_code=422)
     raise CrawlerAPIError(f"Backend lỗi {res.status_code} khi đọc preview: {detail}", status_code=res.status_code)
 
 
