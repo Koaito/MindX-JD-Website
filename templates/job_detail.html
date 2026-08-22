@@ -120,7 +120,9 @@
     <section class="card">
       {% if current_user.is_authenticated %}
         {% if already_applied %}
-          <button class="btn btn-ghost btn-block" disabled>✅ Đã ứng tuyển</button>
+          <button class="btn btn-ghost btn-block" type="button" onclick="document.getElementById('withdrawApplicationModal').style.display='flex'">
+            ✅ Đã ứng tuyển · Bấm để huỷ
+          </button>
         {% else %}
           <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('applyCvModal').style.display='flex'">
             📨 Ứng tuyển ngay
@@ -216,6 +218,27 @@
   </div>
 </div>
 
+<!-- Modal Huỷ ứng tuyển -->
+<div id="withdrawApplicationModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Huỷ ứng tuyển</h3>
+    <p style="margin: 8px 0 16px;">
+      Bạn sắp huỷ ứng tuyển vị trí <strong>{{ job.position }}</strong> — {{ job.company }}.
+      CV đã nộp sẽ bị xoá khỏi hệ thống, bạn có thể ứng tuyển lại sau nếu đổi ý.
+    </p>
+    <form method="post" action="{{ url_for('my_stuff.job_withdraw', job_id=job.id) }}">
+      <label style="display:block; margin-bottom:16px;">
+        <strong>Lý do huỷ (không bắt buộc)</strong>
+        <textarea name="note" rows="3" placeholder="Cho Team SS biết vì sao bạn đổi ý, để team hỗ trợ tốt hơn lần sau…" style="width:100%; margin-top:6px;"></textarea>
+      </label>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('withdrawApplicationModal').style.display='none'">Đóng</button>
+        <button type="submit" class="btn btn-danger">Xác nhận huỷ ứng tuyển</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <style>
 .modal {
   position: fixed;
@@ -269,6 +292,7 @@ document.querySelectorAll('.modal').forEach(modal => {
       if (this.id === 'jobStatusModal') closeJobStatusModal();
       if (this.id === 'jobDeleteModal') closeJobDeleteModal();
       if (this.id === 'applyCvModal') this.style.display = 'none';
+      if (this.id === 'withdrawApplicationModal') this.style.display = 'none';
     }
   });
 });

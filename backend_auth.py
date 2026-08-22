@@ -236,9 +236,14 @@ def list_my_applications(access_token: str) -> list:
     return _request("GET", "/me/applications", access_token=access_token)
 
 
-def withdraw_application(access_token: str, job_id: str) -> None:
-    """DELETE /me/applications/{job_id} — huỷ đơn ứng tuyển của chính mình."""
-    _request("DELETE", f"/me/applications/{job_id}", access_token=access_token)
+def withdraw_application(access_token: str, job_id: str, note: str = "") -> None:
+    """DELETE /me/applications/{job_id} — huỷ đơn ứng tuyển của chính mình.
+    note (không bắt buộc): lý do huỷ, học viên tự ghi ở modal huỷ ứng
+    tuyển — gửi qua query param (không phải body, DELETE có body dễ bị
+    một số proxy/middleware bỏ qua) — backend lưu vào audit_logs.note
+    của WITHDRAW_JOB_APPLICATION, xem api/routers/me.py::withdraw_application."""
+    params = {"note": note} if note else None
+    _request("DELETE", f"/me/applications/{job_id}", access_token=access_token, params=params)
 
 
 def get_cv_signed_url(access_token: str, application_id: str) -> str:

@@ -126,8 +126,9 @@ def job_withdraw(job_id):
     if current_user.is_staff:
         abort(404)
     access_token, _ = _auth_tokens_from_session()
+    note = request.form.get("note", "").strip()
     try:
-        backend_auth.withdraw_application(access_token, job_id)
+        backend_auth.withdraw_application(access_token, job_id, note=note)
         flash("Đã huỷ ứng tuyển.", "success")
     except BackendAuthError as exc:
         flash(str(exc), "error")

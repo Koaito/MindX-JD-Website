@@ -787,8 +787,9 @@ ACTION_TYPE_MAP = {
     "CREATE_COMPANY": "Thêm công ty", "UPDATE_COMPANY": "Sửa công ty", "DELETE_COMPANY": "Xoá công ty",
     "CREATE_CONTACT": "Thêm người liên hệ", "UPDATE_CONTACT": "Sửa người liên hệ",
     "DELETE_CONTACT": "Xoá người liên hệ", "ASSIGN_CONTACT": "Gán người phụ trách",
+    "APPLY_JOB": "Ứng viên nộp CV", "WITHDRAW_JOB_APPLICATION": "Ứng viên huỷ ứng tuyển",
 }
-ENTITY_TYPE_MAP = {"JOB": "JD", "COMPANY": "Công ty", "CONTACT": "Người liên hệ"}
+ENTITY_TYPE_MAP = {"JOB": "JD", "COMPANY": "Công ty", "CONTACT": "Người liên hệ", "APPLICATION": "Đơn ứng tuyển"}
 
 
 def _normalize_audit_log(raw: dict) -> dict:
