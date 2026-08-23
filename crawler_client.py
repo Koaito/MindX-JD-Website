@@ -1003,6 +1003,14 @@ def _normalize_preview_row(raw: dict, id_field: str | None = None) -> dict:
         # này (widget_type quyết định select/input type=date/input số/
         # input chữ, options chỉ có giá trị khi widget_type=="enum").
         "field_errors": raw.get("field_errors") or {},
+        # duplicate_match (08/2026, chỉ Contact — xem preview_manager.py::
+        # apply_field_fix() backend): chỉ có giá trị khi conflict_status
+        # "conflict" được set NGAY LÚC re-check trùng mờ tại chỗ (khác
+        # conflict phát hiện lúc build preview ban đầu, vốn không có field
+        # này) — {"match_score": 0.33/0.67/1.0, "matched_fields": [...]}.
+        # Pass-through nguyên shape backend trả, _dm_import.html tự hiện
+        # badge độ tin cậy match cạnh trạng thái "Trùng".
+        "duplicate_match": raw.get("duplicate_match"),
         "errors": [],
     }
 
@@ -1176,6 +1184,40 @@ def get_company_suggestions(access_token, entity_type, preview_id, row_index):
         }
         for s in suggestions
     ]
+
+
+def verify_field(access_token, entity_type, preview_id, row_index, field_name, value, id_field=None):
+    """POST /import/{entity_type}/preview/{preview_id}/rows/{row_index}/verify-field
+    — staff sửa 1 ô lỗi trên bảng preview, bấm nút "Xác nhận" cạnh ô đó
+    (thêm 08/2026, xem trao đổi thiết kế "cảnh báo trùng contact sau khi
+    sửa field lỗi"). Backend re-validate format field_name NGAY + (riêng
+    contact, khi field vừa sửa là work_email/social_link/phone_number)
+    re-check trùng mờ với DB — xem api/services/preview_manager.py::
+    apply_field_fix() backend cho toàn bộ logic.
+
+    Trả dict {"row": <row đã normalize qua _normalize_preview_row(), khớp
+    đúng shape mỗi phần tử preview.rows>, "field_error": {"rule","message"}
+    | None}. field_error != None nghĩa là field VẪN CÒN lỗi sau khi sửa —
+    backend KHÔNG lưu gì trong case này, "row" trả về vẫn là dòng CŨ (chưa
+    đổi), _dm_import.html chỉ cần hiện field_error ngay tại ô, không cần
+    ghi đè PREVIEW_DATA.
+
+    id_field: tên cột PK thật của entity (vd "job_id") — route verify-field
+    chỉ trả 1 row, KHÔNG có summary.id_field kèm theo (khác response
+    preview đầy đủ), nên tầng gọi (blueprints/data_management.py) phải tự
+    truyền vào từ preview đã load sẵn trong session, để _normalize_preview_row()
+    tính đúng "existing_id" nếu dòng chuyển sang conflict."""
+    payload = {"field_name": field_name, "value": value}
+    raw = _request(
+        "POST",
+        f"/import/{entity_type}/preview/{preview_id}/rows/{row_index}/verify-field",
+        access_token=access_token, json=payload,
+    ) or {}
+    row = raw.get("row")
+    return {
+        "row": _normalize_preview_row(row, id_field=id_field) if row else None,
+        "field_error": raw.get("field_error"),
+    }
 
 
 def import_confirm(access_token, entity_type, preview_id, resolutions, import_note):

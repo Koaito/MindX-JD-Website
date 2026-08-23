@@ -134,6 +134,56 @@ def company_suggestions(entity_type):
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
 
 
+@data_mgmt_bp.route("/data-management/import/<string:entity_type>/verify-field", methods=["POST"])
+@staff_required
+def verify_field(entity_type):
+    """AJAX endpoint — staff sửa 1 ô lỗi trên bảng preview, bấm nút "Xác
+    nhận" cạnh ô đó -> gọi backend re-validate + (contact) re-check trùng
+    mờ ngay tại đó, KHÔNG đợi tới bước confirm cuối (xem trao đổi thiết kế
+    "cảnh báo trùng contact sau khi sửa field lỗi", 08/2026).
+
+    Dùng _call_authed (KHÔNG gọi thẳng db_data.verify_field với access_token
+    như company_suggestions() ở trên đang làm) — company_suggestions() là
+    bản CŨ, thiếu logic tự refresh token khi access token hết hạn (401),
+    đã ghi chú là bug đã biết trong helpers.py::_call_authed docstring;
+    route mới này không lặp lại lỗi đó."""
+    if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
+        abort(404)
+
+    payload = request.get_json(silent=True) or {}
+    preview_id = payload.get("preview_id", "")
+    field_name = payload.get("field_name", "")
+    value = payload.get("value", "")
+    try:
+        row_index = int(payload.get("row_index"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "row_index không hợp lệ"}), 400
+
+    if not preview_id or not field_name:
+        return jsonify({"error": "Thiếu preview_id hoặc field_name"}), 400
+
+    # id_field: lấy từ preview đã load trước đó (đọc lại preview 1 lần từ
+    # backend — KHÔNG lưu id_field vào session để tránh lệch dữ liệu nếu
+    # preview đổi giữa chừng) để _normalize_preview_row() tính đúng
+    # existing_id nếu dòng chuyển sang trạng thái "conflict" (khớp cách
+    # get_import_preview() ở index() đang làm).
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        preview = db_data.get_import_preview(access_token, entity_type, preview_id)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    id_field = preview["id_field"] if preview else None
+
+    try:
+        result = _call_authed(
+            db_data.verify_field, entity_type, preview_id, row_index, field_name, value,
+            id_field=id_field,
+        )
+        return jsonify(result)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+
+
 @data_mgmt_bp.route("/data-management/import/<string:entity_type>/confirm", methods=["POST"])
 @staff_required
 def import_confirm(entity_type):

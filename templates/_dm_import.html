@@ -30,7 +30,8 @@
      data-entity-type="{{ entity_type }}"
      data-preview-id="{{ preview.preview_id }}"
      data-confirm-url="{{ url_for('data_mgmt.import_confirm', entity_type=entity_type) }}"
-     data-suggestions-url="{{ url_for('data_mgmt.company_suggestions', entity_type=entity_type) }}">
+     data-suggestions-url="{{ url_for('data_mgmt.company_suggestions', entity_type=entity_type) }}"
+     data-verify-field-url="{{ url_for('data_mgmt.verify_field', entity_type=entity_type) }}">
 
   <div class="dm-preview-summary">
     <div class="dm-stat"><strong>{{ preview.total_rows }}</strong><span>Tổng số dòng</span></div>
@@ -66,7 +67,8 @@
     <li><span class="dm-tag dm-tag-inactive">Trùng — đã ngừng hoạt động</span> Cần xác nhận riêng trước khi ghi đè + kích hoạt lại.</li>
     <li><span class="dm-tag dm-tag-resolve">Cần chọn công ty</span> Phải chọn 1 công ty gợi ý (hoặc chọn tạo mới) trước khi xác nhận.</li>
     <li><span class="dm-tag dm-tag-level">Cần chọn level</span> Giá trị level trong file không khớp danh sách hợp lệ — phải chọn lại 1 level đúng trước khi xác nhận (trừ khi bỏ qua dòng đó).</li>
-    <li><span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span> Có ô dữ liệu sai định dạng/thiếu — ô đó được tô đỏ ngay trên bảng, sửa trực tiếp tại chỗ (không cần tải lại file), kèm ghi chú lỗi ngay bên dưới ô (trừ khi bỏ qua dòng đó).</li>
+    <li><span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span> Có ô dữ liệu sai định dạng/thiếu — ô đó được tô đỏ ngay trên bảng, sửa trực tiếp tại chỗ (không cần tải lại file), kèm ghi chú lỗi ngay bên dưới ô (trừ khi bỏ qua dòng đó). Sửa xong bấm nút <strong>Xác nhận</strong> cạnh ô để kiểm tra ngay.</li>
+    <li><span class="dm-tag dm-tag-dup-warn">Nghi ngờ trùng</span> Sau khi sửa 1 ô (email/SĐT/link mạng xã hội), hệ thống phát hiện có thể trùng với người liên hệ đã có trong hệ thống — xem độ khớp và chọn Bỏ qua/Cập nhật/Tạo mới giống dòng Trùng dữ liệu.</li>
   </ul>
 
   <div class="dm-table-wrap">
@@ -207,16 +209,26 @@
     var fixBadge = row.needs_field_fix
       ? ' <span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span>'
       : '';
+    // dupBadge (thêm 08/2026 — xem preview_manager.py::apply_field_fix()
+    // backend): chỉ có giá trị khi conflict_status "conflict" được set
+    // bởi CHÍNH lần re-check trùng mờ tại chỗ (verify-field), khác
+    // "conflict" phát hiện sẵn lúc build preview ban đầu (row.duplicate_match
+    // null trong case đó) — hiện thêm badge riêng để staff phân biệt 2
+    // nguồn gốc conflict, dù cả 2 đều dùng chung UI Skip/Update/Create.
+    var dupBadge = row.duplicate_match
+      ? ' <span class="dm-tag dm-tag-dup-warn">Nghi ngờ trùng ' +
+        Math.round(row.duplicate_match.match_score * 100) + '%</span>'
+      : '';
     if (row.conflict_status === "conflict_inactive") {
-      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge + fixBadge;
+      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge + fixBadge + dupBadge;
     }
     if (row.conflict_status === "conflict") {
-      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge + fixBadge;
+      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge + fixBadge + dupBadge;
     }
     if (row.conflict_status === "pending_company_resolution") {
-      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge + fixBadge;
+      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge + fixBadge + dupBadge;
     }
-    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge + fixBadge;
+    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge + fixBadge + dupBadge;
   }
 
   // fieldCell(row, col): render 1 ô dữ liệu (cột `col`) trên bảng preview.
@@ -255,9 +267,24 @@
         '" data-row="' + row.row_index + '" data-field="' + escapeHtml(col) +
         '" value="' + escapeHtml(val) + '">';
     }
+    // Nút "Xác nhận" (thêm 08/2026) — staff sửa xong 1 ô, bấm nút này để
+    // re-check NGAY tại đó (format + với contact, trùng mờ với DB) thay vì
+    // đợi tới lúc bấm "Xác nhận nhập dữ liệu" cuối trang mới biết còn sai.
+    // Text nút đổi tạm thời thành "Đang kiểm tra…" lúc fetch đang chạy
+    // (xem verifyFieldCell()) để staff biết đã bấm, tránh bấm lặp nhiều
+    // lần liên tiếp trong lúc chờ network.
+    var verifyBtn = '<button type="button" class="dm-btn-verify-field" ' +
+      'data-row="' + row.row_index + '" data-field="' + escapeHtml(col) + '">Xác nhận</button>';
+    // dm-field-verify-note: chỗ hiện lỗi RIÊNG trả về từ verify-field (khác
+    // .dm-field-error-note vốn hiện lỗi GỐC từ lúc build preview) — tách
+    // riêng vì lỗi verify có thể khác lỗi gốc sau khi staff sửa (vd gõ
+    // đúng định dạng ngày nhưng sai 1 ký tự khác) và cần ẩn/hiện độc lập
+    // không đụng vào field_errors[col] gốc (chỉ đổi khi verify THÀNH CÔNG,
+    // xem verifyFieldCell()).
     return '<div class="dm-field-fix" data-row="' + row.row_index + '" data-field="' + escapeHtml(col) + '">' +
-      widget +
+      '<div class="dm-field-fix-row">' + widget + verifyBtn + '</div>' +
       '<p class="dm-field-error-note">' + escapeHtml(err.message) + '</p>' +
+      '<p class="dm-field-verify-note" id="dm-verify-note-' + row.row_index + '-' + escapeHtml(col) + '"></p>' +
       '</div>';
   }
 
@@ -436,6 +463,121 @@
     modalOverlay.hidden = true;
   }
 
+  // ---- Xác nhận sửa 1 ô tại chỗ (verify-field, 08/2026) ------------------
+  // verifyFieldCell(rowIndex, field, btnEl): staff bấm nút "Xác nhận" cạnh
+  // 1 ô đang sửa -> gọi backend re-validate NGAY (format field_name +, với
+  // contact, re-check trùng mờ nếu field vừa sửa là work_email/social_link/
+  // phone_number — xem preview_manager.py::apply_field_fix() backend).
+  //
+  // 2 nhánh kết quả:
+  //   - field_error != null: field vẫn sai -> hiện lỗi NGAY tại ô (note
+  //     riêng .dm-field-verify-note, KHÔNG đụng field_errors gốc/PREVIEW_DATA),
+  //     KHÔNG renderPage() lại (tránh mất giá trị staff vừa gõ ở ô khác).
+  //   - field_error == null: đã lưu thành công phía backend -> GHI ĐÈ
+  //     PREVIEW_DATA[rowIndex] bằng row mới trả về (có thể đã đổi
+  //     needs_field_fix/field_errors/conflict_status/duplicate_match), rồi
+  //     renderPage() lại toàn bảng để mọi badge/cột cập nhật đồng bộ (đơn
+  //     giản hơn vá tay từng phần DOM, và bấm "Xác nhận" là hành động rời
+  //     rạc như radioOpt/levelSelect nên mất vị trí cuộn 1 chút chấp nhận
+  //     được, khác input gõ liên tục ở field-input listener bên dưới).
+  function verifyFieldCell(rowIndex, field, btnEl) {
+    var verifyUrl = root.getAttribute("data-verify-field-url");
+    var previewId = root.getAttribute("data-preview-id");
+    var value = state[rowIndex].field_fixes[field] || "";
+    var noteEl = document.getElementById("dm-verify-note-" + rowIndex + "-" + field);
+
+    btnEl.disabled = true;
+    var originalLabel = btnEl.textContent;
+    btnEl.textContent = "Đang kiểm tra…";
+    if (noteEl) { noteEl.textContent = ""; noteEl.className = "dm-field-verify-note"; }
+
+    fetch(verifyUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({
+        preview_id: previewId, row_index: rowIndex, field_name: field, value: value,
+      }),
+    }).then(function (res) {
+      return res.json().catch(function () {
+        throw new Error(res.status === 401 || res.status === 403
+          ? "Phiên đăng nhập đã hết hạn hoặc không đủ quyền — vui lòng tải lại trang."
+          : "Máy chủ trả về dữ liệu không hợp lệ (HTTP " + res.status + ").");
+      });
+    }).then(function (data) {
+      if (data.error) {
+        if (noteEl) {
+          noteEl.textContent = data.error;
+          noteEl.className = "dm-field-verify-note dm-field-verify-error";
+        }
+        return;
+      }
+      if (data.field_error) {
+        if (noteEl) {
+          noteEl.textContent = data.field_error.message || "Giá trị vẫn không hợp lệ.";
+          noteEl.className = "dm-field-verify-note dm-field-verify-error";
+        }
+        return;
+      }
+      // Thành công — thay dòng cũ trong PREVIEW_DATA bằng row mới trả về,
+      // giữ nguyên vị trí trong mảng (tìm theo row_index, KHÔNG giả định
+      // rowIndex == mảng index — bảng có thể đã phân trang/lọc sau này).
+      var idx = PREVIEW_DATA.findIndex(function (r) { return r.row_index === rowIndex; });
+      if (idx !== -1 && data.row) {
+        var wasConflictStatus = PREVIEW_DATA[idx].conflict_status;
+        PREVIEW_DATA[idx] = data.row;
+        // Dòng vừa CHUYỂN sang "conflict" do phát hiện duplicate_match tại
+        // đây (trước đó "no_conflict" -> state.action đang là "create" mặc
+        // định lúc khởi tạo, xem PREVIEW_DATA.forEach ở trên) — action
+        // "create" giờ không còn đúng nghĩa (dòng này giờ CÓ existing_record
+        // để Skip/Update/Create chọn), reset về "skip" (an toàn, giống mọi
+        // dòng "conflict" khác) để staff phải tự quyết định lại, KHÔNG âm
+        // thầm giữ "create" cũ (dễ vô tình tạo bản trùng nếu staff không để
+        // ý badge mới xuất hiện).
+        if (wasConflictStatus !== "conflict" && data.row.conflict_status === "conflict") {
+          state[rowIndex].action = "skip";
+        }
+        // field_fixes trong state cần đồng bộ lại theo field_errors MỚI
+        // (có thể đã bớt đi field vừa sửa xong, hoặc — trường hợp hiếm —
+        // vẫn còn nếu backend đổi ý) — mồi lại đúng cách PREVIEW_DATA.forEach
+        // ban đầu đã làm, tránh field_fixes cũ lẫn field đã hết lỗi.
+        var freshFixes = {};
+        if (data.row.needs_field_fix) {
+          Object.keys(data.row.field_errors).forEach(function (fname) {
+            var existing = state[rowIndex].field_fixes[fname];
+            freshFixes[fname] = existing !== undefined ? existing
+              : (data.row.field_errors[fname].raw_value != null ? String(data.row.field_errors[fname].raw_value) : "");
+          });
+        }
+        state[rowIndex].field_fixes = freshFixes;
+      }
+      if (typeof window.showToast === "function") {
+        window.showToast(
+          data.row && data.row.duplicate_match
+            ? "Đã lưu — phát hiện nghi ngờ trùng với người liên hệ đã có, vui lòng xem lại."
+            : "Đã lưu thay đổi cho ô này.",
+          data.row && data.row.duplicate_match ? "error" : "success"
+        );
+      }
+      renderPage();
+    }).catch(function (err) {
+      if (noteEl) {
+        noteEl.textContent = String(err);
+        noteEl.className = "dm-field-verify-note dm-field-verify-error";
+      }
+    }).finally(function () {
+      // btnEl có thể đã bị renderPage() thay thế (innerHTML dựng lại toàn
+      // bộ tbody) trong nhánh thành công — chỉ khôi phục nếu nó vẫn còn
+      // trong DOM (nhánh lỗi, không renderPage()).
+      if (document.body.contains(btnEl)) {
+        btnEl.disabled = false;
+        btnEl.textContent = originalLabel;
+      }
+    });
+  }
+
   function openCompanyPicker(rowIndex) {
     var suggestionsUrl = root.getAttribute("data-suggestions-url");
     var previewId = root.getAttribute("data-preview-id");
@@ -563,6 +705,15 @@
   }
 
   document.getElementById("dm-preview-tbody").addEventListener("click", function (e) {
+    var verifyBtn = e.target.closest(".dm-btn-verify-field");
+    if (verifyBtn) {
+      verifyFieldCell(
+        parseInt(verifyBtn.getAttribute("data-row"), 10),
+        verifyBtn.getAttribute("data-field"),
+        verifyBtn
+      );
+      return;
+    }
     var chooseBtn = e.target.closest(".dm-btn-choose-company");
     if (chooseBtn) {
       openCompanyPicker(parseInt(chooseBtn.getAttribute("data-row"), 10));

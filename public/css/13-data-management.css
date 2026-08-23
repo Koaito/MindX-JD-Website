@@ -155,6 +155,12 @@
 /* needs_field_fix (08/2026) — cùng tông đỏ với dm-tag-inactive/dm-resolve-pending
    để nhất quán "cần chú ý, chưa xử lý xong" trong hệ màu sẵn có của trang. */
 .dm-tag-fix { background: #FBE7E4; color: #B23A22; }
+/* dm-tag-dup-warn (08/2026, xem preview_manager.py::apply_field_fix()
+   backend) — badge phụ cộng thêm khi verify-field phát hiện nghi ngờ
+   trùng contact ngay sau khi staff sửa 1 ô, tách màu cam đậm khác hẳn
+   dm-tag-conflict (vàng nhạt) để nổi bật hơn — đây là cảnh báo MỚI PHÁT
+   SINH ngay lúc đó, cần staff chú ý hơn 1 conflict đã biết từ đầu. */
+.dm-tag-dup-warn { background: #FCE4D6; color: #C2410C; }
 
 .dm-table-wrap {
   overflow-x: auto;
@@ -292,6 +298,61 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* dm-field-fix-row (08/2026) — bọc widget (input/select) + nút "Xác nhận"
+   trên cùng 1 hàng, nút luôn nằm sát cạnh ô đang sửa để staff không phải
+   rời mắt đi tìm nút submit chung cuối trang. */
+.dm-field-fix-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dm-field-fix-row .dm-field-input,
+.dm-field-fix-row .dm-field-select {
+  flex: 1 1 auto;
+  max-width: 160px;
+}
+
+.dm-btn-verify-field {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #B23A22;
+  background: var(--surface);
+  color: #B23A22;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dm-btn-verify-field:hover:not(:disabled) {
+  background: #FBE7E4;
+}
+
+.dm-btn-verify-field:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* dm-field-verify-note (08/2026) — thông báo riêng cho kết quả nút "Xác
+   nhận" tại ô (lỗi format sau khi sửa, hoặc lỗi mạng/máy chủ) — tách
+   khỏi .dm-field-error-note (vốn luôn hiện lỗi GỐC từ lúc build preview,
+   không đổi cho tới khi renderPage() chạy lại với dữ liệu mới). Rỗng thì
+   không chiếm chỗ (:empty), tránh khoảng trắng thừa dưới mỗi ô bình
+   thường chưa bấm Xác nhận lần nào. */
+.dm-field-verify-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.dm-field-verify-note:empty {
+  display: none;
+}
+.dm-field-verify-note.dm-field-verify-error {
+  color: #B23A22;
 }
 
 .dm-field-input,
