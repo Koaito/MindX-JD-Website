@@ -184,6 +184,49 @@ def verify_field(entity_type):
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
 
 
+@data_mgmt_bp.route("/data-management/import/<string:entity_type>/resolve-company", methods=["POST"])
+@staff_required
+def resolve_company(entity_type):
+    """AJAX endpoint — staff chọn 1 công ty (hoặc "Tạo công ty mới") trong
+    modal chọn công ty ở bước preview -> gọi backend re-check trùng NGAY
+    với company_id thật vừa chọn, KHÔNG chỉ đổi state cục bộ ở FE nữa
+    (08/2026, xem trao đổi thiết kế "vấn đề 2 & 3" — bug khiến UI hiện
+    "Sẽ tạo mới" cho dòng thật ra trùng, action ngầm gửi lên vẫn "skip").
+
+    Cùng pattern verify_field() ở trên (_call_authed để tự refresh token
+    hết hạn, tự đọc lại preview để lấy id_field truyền vào
+    _normalize_preview_row())."""
+    if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
+        abort(404)
+
+    payload = request.get_json(silent=True) or {}
+    preview_id = payload.get("preview_id", "")
+    company_id = payload.get("company_id")
+    try:
+        row_index = int(payload.get("row_index"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "row_index không hợp lệ"}), 400
+
+    if not preview_id:
+        return jsonify({"error": "Thiếu preview_id"}), 400
+
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        preview = db_data.get_import_preview(access_token, entity_type, preview_id)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    id_field = preview["id_field"] if preview else None
+
+    try:
+        result = _call_authed(
+            db_data.resolve_company, entity_type, preview_id, row_index, company_id,
+            id_field=id_field,
+        )
+        return jsonify(result)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+
+
 @data_mgmt_bp.route("/data-management/import/<string:entity_type>/confirm", methods=["POST"])
 @staff_required
 def import_confirm(entity_type):

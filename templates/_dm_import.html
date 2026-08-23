@@ -31,7 +31,8 @@
      data-preview-id="{{ preview.preview_id }}"
      data-confirm-url="{{ url_for('data_mgmt.import_confirm', entity_type=entity_type) }}"
      data-suggestions-url="{{ url_for('data_mgmt.company_suggestions', entity_type=entity_type) }}"
-     data-verify-field-url="{{ url_for('data_mgmt.verify_field', entity_type=entity_type) }}">
+     data-verify-field-url="{{ url_for('data_mgmt.verify_field', entity_type=entity_type) }}"
+     data-resolve-company-url="{{ url_for('data_mgmt.resolve_company', entity_type=entity_type) }}">
 
   <div class="dm-preview-summary">
     <div class="dm-stat"><strong>{{ preview.total_rows }}</strong><span>Tổng số dòng</span></div>
@@ -168,6 +169,15 @@
       action: row.conflict_status === "no_conflict" ? "create" : "skip",
       selected_company_id: row.resolved_company_id || null,
       resolvedName: row.resolved_company_name || null,
+      // wasPendingCompanyResolve (thêm 08/2026, xem sửa selectAndClose()):
+      // dòng này BAN ĐẦU cần staff tự chọn công ty (conflict_status =
+      // "pending_company_resolution" lúc build preview) — giữ NGUYÊN cờ
+      // này (KHÔNG cập nhật lại theo row mới khi resolve-company trả về,
+      // vì lúc đó conflict_status đã đổi sang no_conflict/conflict/...,
+      // needs_company_resolve tự nhiên thành false) để nút "Chọn công
+      // ty…" vẫn hiện SAU KHI đã chọn xong, cho staff đổi ý chọn lại công
+      // ty khác nếu cần — xem actionCell().
+      wasPendingCompanyResolve: row.conflict_status === "pending_company_resolution",
       // level_code: chưa có giá trị mặc định nào hợp lệ để tự chọn hộ (7
       // level đều là lựa chọn nghiệp vụ thật, không có "an toàn" như
       // company) — staff BẮT BUỘC tự chọn qua dropdown, xem actionCell().
@@ -219,16 +229,49 @@
       ? ' <span class="dm-tag dm-tag-dup-warn">Nghi ngờ trùng ' +
         Math.round(row.duplicate_match.match_score * 100) + '%</span>'
       : '';
+    // dupDetail (thêm 08/2026 — trước đây dupBadge chỉ hiện % mà không
+    // nói trùng VỚI CÁI GÌ: dữ liệu cần đã có sẵn ở row.existing_data
+    // (backend đã trả existing_record đầy đủ từ lâu, xem
+    // crawler_client.py::_normalize_preview_row) + row.duplicate_match.
+    // matched_fields, chỉ là FE chưa hiện — xem trao đổi thiết kế "vấn đề
+    // 1"). Hiện ngay dưới badge: tên + công ty người bị nghi trùng, field
+    // nào khớp (dịch sang tiếng Việt), và thông tin liên hệ hiện có của
+    // record đó để staff so sánh trực tiếp, khỏi phải tự tra DB.
+    var dupDetail = dupDetailLine(row);
     if (row.conflict_status === "conflict_inactive") {
-      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge + fixBadge + dupBadge;
+      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge + fixBadge + dupBadge + dupDetail;
     }
     if (row.conflict_status === "conflict") {
-      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge + fixBadge + dupBadge;
+      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge + fixBadge + dupBadge + dupDetail;
     }
     if (row.conflict_status === "pending_company_resolution") {
-      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge + fixBadge + dupBadge;
+      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge + fixBadge + dupBadge + dupDetail;
     }
-    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge + fixBadge + dupBadge;
+    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge + fixBadge + dupBadge + dupDetail;
+  }
+
+  // dupDetailLine(row): xem comment dupDetail ở statusTag() phía trên.
+  // CHỈ có nội dung khi duplicate_match VÀ existing_data đều có giá trị
+  // (duplicate_match chỉ được set bởi apply_field_fix() phía backend,
+  // hiện chỉ áp dụng cho Contact — xem preview_manager.py) — rỗng thì
+  // trả "" để statusTag() không thêm khoảng trắng/div rỗng thừa.
+  var DUP_FIELD_LABELS = { work_email: "Email", phone_number: "SĐT", social_link: "Link MXH" };
+  function dupDetailLine(row) {
+    var m = row.duplicate_match;
+    var ex = row.existing_data;
+    if (!m || !ex) return '';
+    var matchedLabels = (m.matched_fields || [])
+      .map(function (f) { return DUP_FIELD_LABELS[f] || f; })
+      .join(", ");
+    var companyName = row.data && row.data.company_name ? " (" + escapeHtml(row.data.company_name) + ")" : "";
+    var infoParts = [];
+    if (ex.work_email) infoParts.push("Email: " + escapeHtml(ex.work_email));
+    if (ex.phone_number) infoParts.push("SĐT: " + escapeHtml(ex.phone_number));
+    if (ex.social_link) infoParts.push("MXH: " + escapeHtml(ex.social_link));
+    var existingInfo = infoParts.length ? " — hiện có: " + infoParts.join(", ") : "";
+    return '<div class="dm-dup-detail">Nghi ngờ trùng ' + Math.round(m.match_score * 100) +
+      '% với ' + escapeHtml(ex.contact_name || "(chưa rõ tên)") + companyName +
+      ' — khớp: ' + matchedLabels + existingInfo + '</div>';
   }
 
   // fieldCell(row, col): render 1 ô dữ liệu (cột `col`) trên bảng preview.
@@ -300,7 +343,12 @@
     // lặp columns.forEach() ở renderPage()), KHÔNG hiện ở cột "Xử lý
     // dòng này" này — actionCell() chỉ còn lo company/level/conflict-action.
 
-    if (row.needs_company_resolve) {
+    // needs_company_resolve HOẶC wasPendingCompanyResolve (xem comment cờ
+    // này ở PREVIEW_DATA.forEach phía trên) — dòng ĐÃ resolve xong company
+    // (conflict_status giờ no_conflict/conflict/conflict_inactive) vẫn
+    // cần hiện lại nút "Chọn công ty…" để staff đổi ý chọn công ty khác
+    // nếu cần, KHÔNG chỉ hiện 1 lần lúc còn "pending_company_resolution".
+    if (row.needs_company_resolve || s.wasPendingCompanyResolve) {
       var label = s.resolvedName ? escapeHtml(s.resolvedName) : "Chưa chọn công ty";
       out += '<div class="dm-resolve-block" data-row="' + row.row_index + '">' +
              '<div class="dm-resolve-current ' + (s.selected_company_id ? "dm-resolve-ok" : "dm-resolve-pending") + '">' + label + '</div>' +
@@ -587,11 +635,62 @@
     modalBody.innerHTML = '<p class="dm-modal-loading">Đang tải danh sách công ty gợi ý…</p>';
     modalOverlay.hidden = false;
 
+    // selectAndClose (sửa 08/2026 — xem trao đổi thiết kế "vấn đề 2 & 3"):
+    // TRƯỚC ĐÂY chỉ set state cục bộ rồi đóng modal, KHÔNG hề báo backend
+    // — conflict_status của dòng vẫn treo "pending_company_resolution" tới
+    // tận lúc confirm, khiến actionCell() hiện sai (vd "Sẽ tạo mới" cho
+    // dòng thật ra trùng) và action ngầm gửi lên (mặc định "skip") không
+    // khớp với cái staff nhìn thấy. Giờ gọi resolve-company NGAY, dùng
+    // row đầy đủ backend trả về (đã re-check conflict thật) để ghi đè
+    // PREVIEW_DATA — actionCell()/statusTag() tự động render đúng nhánh
+    // theo conflict_status THẬT, không cần biết gì thêm.
     function selectAndClose(companyId, label) {
-      state[rowIndex].selected_company_id = companyId;
-      state[rowIndex].resolvedName = label;
-      closeCompanyModal();
-      renderPage();
+      var resolveUrl = root.getAttribute("data-resolve-company-url");
+      var previewId = root.getAttribute("data-preview-id");
+
+      modalBody.innerHTML = '<p class="dm-modal-loading">Đang kiểm tra trùng lặp cho công ty vừa chọn…</p>';
+
+      fetch(resolveUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          preview_id: previewId, row_index: rowIndex, company_id: companyId,
+        }),
+      }).then(function (res) {
+        return res.json().catch(function () {
+          throw new Error(res.status === 401 || res.status === 403
+            ? "Phiên đăng nhập đã hết hạn hoặc không đủ quyền — vui lòng tải lại trang."
+            : "Máy chủ trả về dữ liệu không hợp lệ (HTTP " + res.status + ").");
+        });
+      }).then(function (data) {
+        if (data.error) {
+          modalBody.innerHTML = '<p class="dm-modal-error">Không lưu được lựa chọn công ty: ' +
+            escapeHtml(data.error) + '</p>';
+          return;
+        }
+        state[rowIndex].selected_company_id = companyId;
+        state[rowIndex].resolvedName = label;
+        if (data.row) {
+          var idx = PREVIEW_DATA.findIndex(function (r) { return r.row_index === rowIndex; });
+          if (idx !== -1) PREVIEW_DATA[idx] = data.row;
+        }
+        closeCompanyModal();
+        if (typeof window.showToast === "function" && data.row) {
+          window.showToast(
+            data.row.conflict_status === "conflict" || data.row.conflict_status === "conflict_inactive"
+              ? "Đã lưu công ty — phát hiện dòng này trùng với dữ liệu đã có, vui lòng chọn Bỏ qua/Cập nhật/Tạo mới."
+              : "Đã lưu công ty cho dòng này.",
+            data.row.conflict_status === "conflict" || data.row.conflict_status === "conflict_inactive" ? "error" : "success"
+          );
+        }
+        renderPage();
+      }).catch(function (err) {
+        modalBody.innerHTML = '<p class="dm-modal-error">Lỗi kết nối khi lưu lựa chọn công ty: ' +
+          escapeHtml(String(err)) + '</p>';
+      });
     }
 
     // X-Requested-With: fetch() không tự thêm header này như jQuery $.ajax,

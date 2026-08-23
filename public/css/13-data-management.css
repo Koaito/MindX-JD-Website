@@ -162,6 +162,17 @@
    SINH ngay lúc đó, cần staff chú ý hơn 1 conflict đã biết từ đầu. */
 .dm-tag-dup-warn { background: #FCE4D6; color: #C2410C; }
 
+/* dm-dup-detail (08/2026, xem _dm_import.html::dupDetailLine()) — dòng
+   chi tiết dưới dm-tag-dup-warn, hiện tên/công ty người bị nghi trùng +
+   field khớp + thông tin liên hệ hiện có, cùng tông màu cam đậm với badge
+   để rõ đây là phần mở rộng của cùng 1 cảnh báo. */
+.dm-dup-detail {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #C2410C;
+}
+
 .dm-table-wrap {
   overflow-x: auto;
   border-radius: 8px;

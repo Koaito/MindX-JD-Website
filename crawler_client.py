@@ -1220,6 +1220,40 @@ def verify_field(access_token, entity_type, preview_id, row_index, field_name, v
     }
 
 
+def resolve_company(access_token, entity_type, preview_id, row_index, company_id, id_field=None):
+    """POST /import/{entity_type}/preview/{preview_id}/rows/{row_index}/resolve-company
+    — staff chọn 1 công ty (hoặc "Tạo công ty mới") trong modal chọn công
+    ty ở bước preview, cho dòng needs_company_resolve (thêm 08/2026, xem
+    trao đổi thiết kế "vấn đề 2 & 3": trước đây modal chỉ đổi state cục bộ
+    ở FE, KHÔNG hề gọi backend re-check trùng, khiến UI hiện sai — dòng
+    thật ra trùng nhưng hiện "Sẽ tạo mới", action ngầm gửi lên vẫn là
+    "skip" mặc định). Route generic theo entity_type — dùng chung cho cả
+    job lẫn contact (khác verify-field, hiện chỉ contact).
+
+    company_id: "<uuid>" công ty staff chọn, hoặc None/"__new__" = xác
+    nhận không công ty gợi ý nào đúng, sẽ tạo công ty mới theo
+    company_name trong file (backend tự hiểu, xem
+    api/schemas.py::ResolveCompanyRequest).
+
+    Trả dict {"row": <row đã normalize qua _normalize_preview_row(), khớp
+    đúng shape mỗi phần tử preview.rows>} — CHỈ 1 field "row" (khác
+    verify_field() có thêm "field_error", route này không có khái niệm
+    lỗi format vì company_id không phải dữ liệu staff tự gõ).
+
+    id_field: tên cột PK thật của entity (vd "job_id") — cùng lý do
+    verify_field() cần, route resolve-company chỉ trả 1 row, không có
+    summary.id_field kèm theo — tầng gọi (blueprints/data_management.py)
+    tự truyền vào từ preview đã load sẵn trong session."""
+    payload = {"company_id": None if company_id in (None, "__new__") else company_id}
+    raw = _request(
+        "POST",
+        f"/import/{entity_type}/preview/{preview_id}/rows/{row_index}/resolve-company",
+        access_token=access_token, json=payload,
+    ) or {}
+    row = raw.get("row")
+    return {"row": _normalize_preview_row(row, id_field=id_field) if row else None}
+
+
 def import_confirm(access_token, entity_type, preview_id, resolutions, import_note):
     """POST /import/{entity_type}/confirm — chạy import thật trong 1
     transaction, ghi đúng 1 dòng audit_logs tổng hợp kèm import_note.
