@@ -101,7 +101,7 @@
       <a class="btn btn-ghost" href="{{ url_for('data_mgmt.index', entity=entity_type, tab='import') }}">Huỷ, tải file khác</a>
     </div>
     <p class="dm-hint dm-hint-muted" id="dm-confirm-blocked-hint">
-      Còn dòng chưa xử lý (chưa chọn công ty, hoặc chưa xác nhận trùng bản ghi ngừng hoạt động) — vui lòng xử lý hết trước khi xác nhận.
+      Còn dòng chưa xử lý (chưa chọn công ty, chưa chọn level, chưa bấm "Xác nhận" cạnh ô sửa lỗi, hoặc chưa xác nhận trùng bản ghi ngừng hoạt động) — vui lòng xử lý hết trước khi xác nhận.
     </p>
   </form>
 
@@ -183,6 +183,19 @@
       // company) — staff BẮT BUỘC tự chọn qua dropdown, xem actionCell().
       level_code: null,
       field_fixes: fieldFixes,
+      // verified_fields (fix bug 08/2026, staff báo "sửa sai vẫn được
+      // chấp nhận"): set các field_name ĐÃ bấm nút "Xác nhận" cạnh ô và
+      // backend xác nhận hợp lệ (verifyFieldCell() thành công). TRƯỚC ĐÂY
+      // isRowResolved() chỉ gọi isFieldFixValid() — hàm này chỉ check
+      // "không rỗng" + vài rule format cơ bản theo widget_type
+      // (number/date/email/enum), nhưng field kiểu TEXT tự do (vd
+      // company_name, contact_name) không có widget_type nào trong nhóm
+      // đó -> luôn coi là hợp lệ chỉ cần gõ CÁI GÌ ĐÓ không rỗng (kể cả
+      // ký tự vô nghĩa như ";"), staff không cần bấm "Xác nhận" cũng lọt
+      // qua được nút submit cuối trang. Giờ bắt buộc MỌI field lỗi đều
+      // phải qua verify-field thành công (nằm trong set này) mới coi là
+      // đã sửa xong, không tin ngầm giá trị staff gõ nhưng chưa xác nhận.
+      verified_fields: {},
     };
   });
 
@@ -205,14 +218,32 @@
       .replace(/"/g, "&quot;");
   }
 
-  function statusTag(row) {
+  function statusTag(row, s) {
     // needs_level_resolve là trục ĐỘC LẬP với conflict_status (1 dòng có
     // thể vừa "no_conflict"/"conflict"/... vừa cần chọn lại level cùng
     // lúc) — nên badge level LUÔN cộng thêm vào SAU tag trạng thái chính,
     // không thay thế nó.
-    var levelBadge = row.needs_level_resolve
+    //
+    // FIX (bug staff báo 08/2026): trước đây badge này chỉ đọc
+    // row.needs_level_resolve — giá trị TĨNH trả về từ backend lúc build
+    // preview, KHÔNG BAO GIỜ đổi sau đó dù staff đã chọn xong level ở
+    // dropdown (dm-level-select chỉ set state[rowIndex].level_code cục
+    // bộ, cố ý KHÔNG gọi backend verify — xem comment ở listener "change"
+    // phía dưới). Hậu quả: staff chọn xong level, dropdown hiện đúng giá
+    // trị đã chọn, nhưng badge tím "Cần chọn level" vẫn treo nguyên =>
+    // tưởng chưa xong / không rõ có cần làm gì thêm không.
+    //
+    // Sửa: badge giờ đọc theo STATE cục bộ (đã chọn hay chưa), khớp đúng
+    // với điều kiện thật sự chặn nút "Xác nhận nhập dữ liệu" ở
+    // isFieldFixValid()/isRowResolved() (chỉ chặn khi needs_level_resolve
+    // && action !== "skip" && chưa có s.level_code) — badge và nút Xác
+    // nhận giờ LUÔN đồng bộ 1 nguồn sự thật duy nhất.
+    var levelStillPending = row.needs_level_resolve && s && !s.level_code && (!s || s.action !== "skip");
+    var levelBadge = levelStillPending
       ? ' <span class="dm-tag dm-tag-level">Cần chọn level</span>'
-      : '';
+      : (row.needs_level_resolve && s && s.level_code
+          ? ' <span class="dm-tag dm-tag-level-ok">Đã chọn level</span>'
+          : '');
     // needs_field_fix (08/2026): trục ĐỘC LẬP thứ 3, giống needs_level_resolve
     // — 1 dòng có thể vừa "conflict" vừa cần chọn level vừa cần sửa field
     // khác cùng lúc, nên badge này cũng LUÔN cộng thêm, không thay thế tag chính.
@@ -425,7 +456,7 @@
       // gốc là làm nổi bật dòng cần staff để ý.
       html += '<tr class="' + (row.conflict_status !== "no_conflict" ? "dm-row-flag" : "") + '">';
       html += "<td class='muted'>" + (row.row_index + 1) + "</td>";
-      html += "<td>" + statusTag(row) + "</td>";
+      html += "<td>" + statusTag(row, state[row.row_index]) + "</td>";
       columns.forEach(function (col) {
         var hasFieldError = row.field_errors && row.field_errors[col];
         html += "<td" + (hasFieldError ? " class='dm-cell-field-fix'" : "") + ">" + fieldCell(row, col) + "</td>";
@@ -462,10 +493,18 @@
   // trường đó, chỉ check type cơ bản theo widget_type).
   function isFieldFixValid(row) {
     var errs = row.field_errors || {};
-    var fixes = state[row.row_index].field_fixes;
+    var s = state[row.row_index];
+    var fixes = s.field_fixes;
     for (var fname in errs) {
       var val = (fixes[fname] || "").trim();
       if (!val) return false;
+      // FIX (08/2026): bắt buộc field này đã được bấm "Xác nhận" và
+      // backend xác nhận hợp lệ (verified_fields[fname] === true) — trước
+      // đây chỉ check format cơ bản theo widget_type, field TEXT tự do
+      // (company_name, contact_name...) không thuộc nhóm nào bên dưới nên
+      // luôn pass dù chưa qua verify-field thật, staff gõ ký tự vô nghĩa
+      // vẫn lọt qua nút submit cuối trang mà không hề được cảnh báo.
+      if (!s.verified_fields[fname]) return false;
       var err = errs[fname];
       if (err.widget_type === "number" && isNaN(Number(val))) return false;
       if (err.widget_type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
@@ -600,6 +639,11 @@
           });
         }
         state[rowIndex].field_fixes = freshFixes;
+        // Field vừa verify (tham số `field` của hàm này) đã được backend
+        // xác nhận hợp lệ -> đánh dấu verified. Field khác (nếu dòng còn
+        // field lỗi khác chưa sửa) giữ nguyên trạng thái verified cũ —
+        // không reset toàn bộ, chỉ field vừa xác nhận mới đổi.
+        state[rowIndex].verified_fields[field] = true;
       }
       if (typeof window.showToast === "function") {
         window.showToast(
@@ -853,6 +897,11 @@
       var fsRowIndex = parseInt(fieldSelect.getAttribute("data-row"), 10);
       var fsField = fieldSelect.getAttribute("data-field");
       state[fsRowIndex].field_fixes[fsField] = fieldSelect.value;
+      // FIX (08/2026, cùng lý do như .dm-field-input ở trên): giá trị vừa
+      // chọn chưa qua verify-field lại — gỡ cờ verified cũ nếu có.
+      if (state[fsRowIndex].verified_fields[fsField]) {
+        delete state[fsRowIndex].verified_fields[fsField];
+      }
       updateConfirmState();
       return;
     }
@@ -879,6 +928,15 @@
     var rowIndex = parseInt(input.getAttribute("data-row"), 10);
     var field = input.getAttribute("data-field");
     state[rowIndex].field_fixes[field] = input.value;
+    // FIX (08/2026): giá trị vừa gõ CHƯA được backend xác nhận lại — gỡ
+    // cờ verified nếu field này từng verify-pass trước đó (staff sửa
+    // tiếp sau khi đã bấm "Xác nhận" 1 lần), tránh giữ verified=true
+    // "mồ côi" ứng với giá trị CŨ đã bị gõ đè, khiến nút submit cuối
+    // trang tưởng nhầm field này vẫn ổn dù giá trị hiện tại chưa hề qua
+    // kiểm tra.
+    if (state[rowIndex].verified_fields[field]) {
+      delete state[rowIndex].verified_fields[field];
+    }
     updateConfirmState();
   });
 

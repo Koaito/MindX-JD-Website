@@ -152,6 +152,11 @@
    bản cũ statusTag() trong _dm_import.html chưa từng xử lý case này. */
 .dm-tag-resolve { background: #E3ECFB; color: #3A6FB0; }
 .dm-tag-level { background: #F1E6FB; color: #6B3FA0; }
+/* dm-tag-level-ok: badge thay thế dm-tag-level SAU khi staff đã chọn xong
+   level ở dropdown (xem statusTag() JS) — xanh nhạt để phân biệt rõ với
+   tím "còn phải làm gì đó", tránh badge đứng yên gây hiểu nhầm đã xong
+   hay chưa (bug báo 08/2026). */
+.dm-tag-level-ok { background: #E3F3E9; color: #2E8B57; }
 /* needs_field_fix (08/2026) — cùng tông đỏ với dm-tag-inactive/dm-resolve-pending
    để nhất quán "cần chú ý, chưa xử lý xong" trong hệ màu sẵn có của trang. */
 .dm-tag-fix { background: #FBE7E4; color: #B23A22; }
@@ -294,7 +299,8 @@
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--ink);
-  max-width: 160px;
+  min-width: 140px;
+  max-width: 200px;
 }
 
 /* ---- Sửa tại chỗ cho ô dữ liệu lỗi (needs_field_fix, 08/2026) ---- */
@@ -323,7 +329,8 @@
 .dm-field-fix-row .dm-field-input,
 .dm-field-fix-row .dm-field-select {
   flex: 1 1 auto;
-  max-width: 160px;
+  min-width: 140px;
+  max-width: 220px;
 }
 
 .dm-btn-verify-field {
@@ -374,8 +381,19 @@
   border: 1px solid #E0958A;
   background: var(--surface);
   color: var(--ink);
-  max-width: 200px;
+  min-width: 140px;
+  max-width: 220px;
   width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ô lỗi field-fix nằm trong td của bảng nhiều cột — nếu không ép min-width
+   cho chính <td>, table layout auto sẽ co cột này lại theo nội dung ngắn
+   nhất trong cột (badge/text ở dòng khác), khiến input bên trong bị nén
+   nhỏ hơn cả min-width khai báo dù CSS input đã đúng (phát hiện qua staff
+   report ô field-fix nhỏ tới mức không gõ được, 08/2026). */
+.dm-cell-field-fix {
+  min-width: 160px;
 }
 
 .dm-field-input:focus,
