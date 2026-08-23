@@ -42,8 +42,33 @@
 
 .dm-export-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
 
-.dm-hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; margin: 0 0 18px; }
+.dm-hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
 .dm-hint-muted { margin-top: 14px; margin-bottom: 0; font-size: 12.5px; }
+
+/* Danh sách giải thích nhãn trạng thái (thay cho 1 đoạn văn dài, thêm
+   08/2026) — mỗi trạng thái 1 dòng riêng, nhãn màu đặt ở đầu dòng để
+   staff quét mắt là khớp được ngay với tag đang thấy trên bảng, không
+   phải đọc hết 1 đoạn văn dài để tìm đúng câu giải thích cho tag mình
+   đang thắc mắc. */
+.dm-hint-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dm-hint-list li {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.dm-hint-list .dm-tag {
+  margin-right: 6px;
+  vertical-align: 1px;
+}
 
 .dm-export-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 

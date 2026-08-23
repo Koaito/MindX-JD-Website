@@ -60,16 +60,14 @@
        đó thêm lại ô này VÀ field errors thật trong summary backend
        cùng lúc. -->
 
-  <p class="dm-hint">
-    Xem lại từng dòng bên dưới. Dòng <span class="dm-tag dm-tag-conflict">Trùng dữ liệu</span> cho phép chọn
-    Bỏ qua/Cập nhật/Tạo mới. Dòng <span class="dm-tag dm-tag-inactive">Trùng — đã ngừng hoạt động</span> cần
-    xác nhận riêng trước khi ghi đè + kích hoạt lại. Dòng có ô "Chọn công ty" phải chọn 1 công ty gợi ý
-    (hoặc chọn tạo mới) trước khi xác nhận. Dòng <span class="dm-tag dm-tag-level">Cần chọn level</span> có
-    giá trị level trong file không khớp danh sách hợp lệ — phải chọn lại 1 level đúng trước khi xác nhận
-    (trừ khi bỏ qua dòng đó). Dòng <span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span> có ô dữ liệu sai
-    định dạng/thiếu — ô đó được tô đỏ ngay trên bảng, sửa trực tiếp tại chỗ (không cần tải lại file), kèm
-    ghi chú lỗi ngay bên dưới ô (trừ khi bỏ qua dòng đó).
-  </p>
+  <p class="dm-hint">Xem lại từng dòng bên dưới. Ý nghĩa các nhãn trạng thái:</p>
+  <ul class="dm-hint-list">
+    <li><span class="dm-tag dm-tag-conflict">Trùng dữ liệu</span> Cho phép chọn Bỏ qua / Cập nhật / Tạo mới.</li>
+    <li><span class="dm-tag dm-tag-inactive">Trùng — đã ngừng hoạt động</span> Cần xác nhận riêng trước khi ghi đè + kích hoạt lại.</li>
+    <li><span class="dm-tag dm-tag-resolve">Cần chọn công ty</span> Phải chọn 1 công ty gợi ý (hoặc chọn tạo mới) trước khi xác nhận.</li>
+    <li><span class="dm-tag dm-tag-level">Cần chọn level</span> Giá trị level trong file không khớp danh sách hợp lệ — phải chọn lại 1 level đúng trước khi xác nhận (trừ khi bỏ qua dòng đó).</li>
+    <li><span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span> Có ô dữ liệu sai định dạng/thiếu — ô đó được tô đỏ ngay trên bảng, sửa trực tiếp tại chỗ (không cần tải lại file), kèm ghi chú lỗi ngay bên dưới ô (trừ khi bỏ qua dòng đó).</li>
+  </ul>
 
   <div class="dm-table-wrap">
     <table class="dm-preview-table" id="dm-preview-table">
