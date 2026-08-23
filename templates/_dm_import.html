@@ -341,7 +341,16 @@
 
     var html = "";
     pageRows.forEach(function (row) {
-      html += '<tr class="' + (row.conflict_status !== "new" ? "dm-row-flag" : "") + '">';
+      // Bug (08/2026, phát hiện lúc rà lại toàn bộ FE): trước đây so sánh
+      // với "new" — giá trị này KHÔNG BAO GIỜ xuất hiện thật (backend trả
+      // "no_conflict" cho dòng mới, xem preview_manager.py), nên điều
+      // kiện luôn true và class dm-row-flag (nền vàng nhạt, xem
+      // 13-data-management.css) bị gán cho MỌI dòng kể cả dòng bình
+      // thường không cần chú ý gì. Sửa lại đúng giá trị thật —
+      // dm-row-flag giờ chỉ áp cho dòng "conflict"/"conflict_inactive"/
+      // "pending_company_resolution" (khác "no_conflict"), đúng ý định
+      // gốc là làm nổi bật dòng cần staff để ý.
+      html += '<tr class="' + (row.conflict_status !== "no_conflict" ? "dm-row-flag" : "") + '">';
       html += "<td class='muted'>" + (row.row_index + 1) + "</td>";
       html += "<td>" + statusTag(row) + "</td>";
       columns.forEach(function (col) {
