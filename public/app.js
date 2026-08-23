@@ -57,6 +57,14 @@
     }, 3200);
   }
 
+  // showToast() được dùng lại (thêm 08/2026) từ script riêng trong
+  // _dm_import.html (bảng preview import — báo "còn dòng chưa xử lý
+  // xong" khi bấm Xác nhận mà chưa sửa hết field lỗi) — script đó nằm
+  // trong 1 IIFE khác (đóng theo <script> riêng của template), không
+  // truy cập được showToast() cục bộ ở đây, nên expose ra window thay
+  // vì viết lại y hệt UI toast 1 lần nữa ở template.
+  window.showToast = showToast;
+
   // ---- Async save/unsave job (no full page reload) ----------------------
   //
   // Matches the existing <form action=".../toggle-save"> markup used on

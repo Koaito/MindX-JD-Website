@@ -43,6 +43,9 @@
     {% if preview.needs_level_resolve_count %}
     <div class="dm-stat dm-stat-level-resolve"><strong>{{ preview.needs_level_resolve_count }}</strong><span>Cần chọn lại level</span></div>
     {% endif %}
+    {% if preview.needs_field_fix_count %}
+    <div class="dm-stat dm-stat-fix"><strong>{{ preview.needs_field_fix_count }}</strong><span>Cần sửa dữ liệu</span></div>
+    {% endif %}
   </div>
   <!-- Đã bỏ ô "Dòng lỗi" (preview.error_count) 08/2026: backend
        (api/services/preview_manager.py::build_preview) không có đường
@@ -63,7 +66,9 @@
     xác nhận riêng trước khi ghi đè + kích hoạt lại. Dòng có ô "Chọn công ty" phải chọn 1 công ty gợi ý
     (hoặc chọn tạo mới) trước khi xác nhận. Dòng <span class="dm-tag dm-tag-level">Cần chọn level</span> có
     giá trị level trong file không khớp danh sách hợp lệ — phải chọn lại 1 level đúng trước khi xác nhận
-    (trừ khi bỏ qua dòng đó).
+    (trừ khi bỏ qua dòng đó). Dòng <span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span> có ô dữ liệu sai
+    định dạng/thiếu — ô đó được tô đỏ ngay trên bảng, sửa trực tiếp tại chỗ (không cần tải lại file), kèm
+    ghi chú lỗi ngay bên dưới ô (trừ khi bỏ qua dòng đó).
   </p>
 
   <div class="dm-table-wrap">
@@ -142,8 +147,23 @@
   // resolution có gửi lên hay không), "conflict" -> mặc định "skip" (an
   // toàn, staff phải tự đổi sang update nếu muốn ghi đè), "conflict_inactive"
   // -> mặc định "skip" (bắt buộc bấm "Có" mới thành reactivate).
-  var state = {}; // row_index -> { action, selected_company_id, resolvedName, level_code }
+  var state = {}; // row_index -> { action, selected_company_id, resolvedName, level_code, field_fixes }
   PREVIEW_DATA.forEach(function (row) {
+    // field_fixes: field_name -> giá trị staff sửa trên ô (string thô,
+    // gửi thẳng lên backend để re-validate lúc confirm — xem
+    // import_executor.py::_apply_field_fixes). Mồi sẵn bằng raw_value
+    // (giá trị gốc trong file, nếu có) để staff sửa NHANH thay vì gõ lại
+    // từ đầu — vd sai định dạng ngày "23/08/2026" thì ô input vẫn hiện
+    // sẵn "23/08/2026" cho staff sửa thành "2026-08-23", chỉ rule
+    // "required" có raw_value=null (ô vốn để trống trong file) nên field
+    // đó bắt đầu rỗng.
+    var fieldFixes = {};
+    if (row.needs_field_fix) {
+      Object.keys(row.field_errors).forEach(function (fname) {
+        var raw = row.field_errors[fname].raw_value;
+        fieldFixes[fname] = raw !== null && raw !== undefined ? String(raw) : "";
+      });
+    }
     state[row.row_index] = {
       action: row.conflict_status === "no_conflict" ? "create" : "skip",
       selected_company_id: row.resolved_company_id || null,
@@ -152,6 +172,7 @@
       // level đều là lựa chọn nghiệp vụ thật, không có "an toàn" như
       // company) — staff BẮT BUỘC tự chọn qua dropdown, xem actionCell().
       level_code: null,
+      field_fixes: fieldFixes,
     };
   });
 
@@ -182,25 +203,77 @@
     var levelBadge = row.needs_level_resolve
       ? ' <span class="dm-tag dm-tag-level">Cần chọn level</span>'
       : '';
+    // needs_field_fix (08/2026): trục ĐỘC LẬP thứ 3, giống needs_level_resolve
+    // — 1 dòng có thể vừa "conflict" vừa cần chọn level vừa cần sửa field
+    // khác cùng lúc, nên badge này cũng LUÔN cộng thêm, không thay thế tag chính.
+    var fixBadge = row.needs_field_fix
+      ? ' <span class="dm-tag dm-tag-fix">Cần sửa dữ liệu</span>'
+      : '';
     if (row.conflict_status === "conflict_inactive") {
-      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge;
+      return '<span class="dm-tag dm-tag-inactive">Ngừng hoạt động</span>' + levelBadge + fixBadge;
     }
     if (row.conflict_status === "conflict") {
-      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge;
+      return '<span class="dm-tag dm-tag-conflict">Trùng</span>' + levelBadge + fixBadge;
     }
     if (row.conflict_status === "pending_company_resolution") {
-      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge;
+      return '<span class="dm-tag dm-tag-resolve">Cần chọn công ty</span>' + levelBadge + fixBadge;
     }
-    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge;
+    return '<span class="dm-tag dm-tag-new">Mới</span>' + levelBadge + fixBadge;
+  }
+
+  // fieldCell(row, col): render 1 ô dữ liệu (cột `col`) trên bảng preview.
+  // Khác actionCell() (render cột "Xử lý dòng này" RIÊNG, dùng cho
+  // company/level/conflict-action) — field_errors nằm NGAY TRÊN từng cột
+  // dữ liệu gốc (company_name, deadline, salary_min...), nên phải thay
+  // thế nội dung ô đó, không gộp chung vào actionCell(). Field không lỗi
+  // -> hiện text thường như cũ (escapeHtml(row.data[col])).
+  function fieldCell(row, col) {
+    var err = row.field_errors && row.field_errors[col];
+    if (!err) {
+      return escapeHtml(row.data[col]);
+    }
+    var s = state[row.row_index];
+    var val = s.field_fixes[col] !== undefined ? s.field_fixes[col] : "";
+    var id = "dm-field-" + row.row_index + "-" + col;
+    var widget;
+    if (err.widget_type === "enum") {
+      var opts = err.options || [];
+      widget = '<select class="dm-field-select" id="' + id + '" data-row="' + row.row_index + '" data-field="' + escapeHtml(col) + '">' +
+        '<option value="">-- Chọn --</option>' +
+        opts.map(function (o) {
+          return '<option value="' + escapeHtml(o) + '"' + (val === o ? " selected" : "") + '>' + escapeHtml(o) + '</option>';
+        }).join('') +
+        '</select>';
+    } else {
+      // date -> <input type=date> (theo cơ chế chọn tháng/năm chuẩn của
+      // trình duyệt); number -> <input type=number>; email -> <input
+      // type=email> (validate cơ bản ngay trên trình duyệt); còn lại
+      // (text) -> <input type=text> khung nhập chữ/số tự do.
+      var inputType = err.widget_type === "date" ? "date"
+        : err.widget_type === "number" ? "number"
+        : err.widget_type === "email" ? "email"
+        : "text";
+      widget = '<input class="dm-field-input" type="' + inputType + '" id="' + id +
+        '" data-row="' + row.row_index + '" data-field="' + escapeHtml(col) +
+        '" value="' + escapeHtml(val) + '">';
+    }
+    return '<div class="dm-field-fix" data-row="' + row.row_index + '" data-field="' + escapeHtml(col) + '">' +
+      widget +
+      '<p class="dm-field-error-note">' + escapeHtml(err.message) + '</p>' +
+      '</div>';
   }
 
   function actionCell(row) {
     var s = state[row.row_index];
     var out = "";
 
-    // Lưu ý: backend không trả lỗi riêng theo từng dòng preview (file
-    // lỗi validate bị chặn nguyên file ở bước upload, trả 422 trước khi
-    // preview được build) — không còn field row.errors để hiện ở đây.
+    // Cập nhật 08/2026: backend GIỜ CÓ trả lỗi riêng theo từng dòng
+    // preview (field_errors — file lỗi type/required/business-rule
+    // KHÔNG còn bị chặn nguyên file ở bước upload nữa, trừ
+    // required_column_missing thiếu hẳn 1 cột). Nhưng lỗi đó hiện NGAY
+    // TRÊN từng cột dữ liệu tương ứng (xem fieldCell(), gọi trong vòng
+    // lặp columns.forEach() ở renderPage()), KHÔNG hiện ở cột "Xử lý
+    // dòng này" này — actionCell() chỉ còn lo company/level/conflict-action.
 
     if (row.needs_company_resolve) {
       var label = s.resolvedName ? escapeHtml(s.resolvedName) : "Chưa chọn công ty";
@@ -272,7 +345,8 @@
       html += "<td class='muted'>" + (row.row_index + 1) + "</td>";
       html += "<td>" + statusTag(row) + "</td>";
       columns.forEach(function (col) {
-        html += "<td>" + escapeHtml(row.data[col]) + "</td>";
+        var hasFieldError = row.field_errors && row.field_errors[col];
+        html += "<td" + (hasFieldError ? " class='dm-cell-field-fix'" : "") + ">" + fieldCell(row, col) + "</td>";
       });
       html += "<td>" + actionCell(row) + "</td>";
       html += "</tr>";
@@ -297,6 +371,28 @@
     nav.innerHTML = html;
   }
 
+  // isFieldFixValid(row): kiểm tra sơ bộ phía CLIENT xem field_fixes đã
+  // đủ + hợp lệ theo widget_type chưa — CHỈ để chặn nút Xác nhận sớm,
+  // KHÔNG thay thế validate thật ở backend (import_executor.py::
+  // _apply_field_fixes re-validate lại toàn bộ bằng validate_single_field()
+  // y hệt lúc build preview, kể cả business rule liên trường như
+  // salary_max >= salary_min — check ở đây không biết những rule liên
+  // trường đó, chỉ check type cơ bản theo widget_type).
+  function isFieldFixValid(row) {
+    var errs = row.field_errors || {};
+    var fixes = state[row.row_index].field_fixes;
+    for (var fname in errs) {
+      var val = (fixes[fname] || "").trim();
+      if (!val) return false;
+      var err = errs[fname];
+      if (err.widget_type === "number" && isNaN(Number(val))) return false;
+      if (err.widget_type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+      if (err.widget_type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return false;
+      if (err.widget_type === "enum" && err.options && err.options.indexOf(val) === -1) return false;
+    }
+    return true;
+  }
+
   function isRowResolved(row) {
     var s = state[row.row_index];
     if (row.needs_company_resolve && !s.selected_company_id) return false;
@@ -307,6 +403,10 @@
     // chọn level. Dòng "no_conflict" luôn action="create" (không đổi
     // được qua UI) nên nhánh này LUÔN bắt buộc chọn level cho dòng đó.
     if (row.needs_level_resolve && s.action !== "skip" && !s.level_code) return false;
+    // needs_field_fix: cùng logic — chỉ bắt buộc sửa xong field lỗi khi
+    // action != "skip" (xem import_executor.py: "if row.get('needs_field_fix')
+    // and action != 'skip'"), khớp với needs_level_resolve ở trên.
+    if (row.needs_field_fix && s.action !== "skip" && !isFieldFixValid(row)) return false;
     return true;
   }
 
@@ -430,8 +530,15 @@
     // công ty nào) đã tự nghĩa là "tạo company mới theo tên trong file"
     // ở phía backend, field lạ sẽ bị Pydantic (extra="forbid") reject cả
     // request.
+    //
+    // needs_field_fix (08/2026): cùng ngoại lệ như needs_level_resolve —
+    // dòng "no_conflict" mà còn field lỗi vẫn PHẢI gửi resolution kèm
+    // field_fixes (import_executor.py::_apply_field_fixes chạy TRƯỚC
+    // nhánh theo conflict_status, áp dụng cho mọi status), lược ra như
+    // các dòng "no_conflict" bình thường sẽ khiến backend nhận resolution
+    // rỗng -> raise lỗi thiếu field_fixes lúc confirm.
     return PREVIEW_DATA.filter(function (row) {
-      return row.conflict_status !== "no_conflict" || row.needs_level_resolve;
+      return row.conflict_status !== "no_conflict" || row.needs_level_resolve || row.needs_field_fix;
     }).map(function (row) {
       var s = state[row.row_index];
       var entry = { row_index: row.row_index, action: s.action };
@@ -440,6 +547,9 @@
       }
       if (row.needs_level_resolve) {
         entry.level_code = s.level_code;
+      }
+      if (row.needs_field_fix) {
+        entry.field_fixes = s.field_fixes;
       }
       return entry;
     });
@@ -473,11 +583,45 @@
       renderPage();
       return;
     }
+    // .dm-field-select (widget_type=="enum" của field_errors) — nhánh
+    // RIÊNG với .dm-level-select ở trên dù cùng là <select>, vì 2 field
+    // khác nhau trong state (field_fixes[fname] vs level_code) và khác
+    // cả nguồn dữ liệu (LEVEL_CODE_VALUES cố định vs err.options theo
+    // từng field). Không renderPage() lại toàn bảng ở đây (khác
+    // dm-level-select) — staff chọn 1 giá trị enum xong là xong, nhưng
+    // re-render không cần thiết cũng làm mất vị trí cuộn nếu bảng dài;
+    // chỉ cần cập nhật state + trạng thái nút Xác nhận.
+    var fieldSelect = e.target.closest(".dm-field-select");
+    if (fieldSelect) {
+      var fsRowIndex = parseInt(fieldSelect.getAttribute("data-row"), 10);
+      var fsField = fieldSelect.getAttribute("data-field");
+      state[fsRowIndex].field_fixes[fsField] = fieldSelect.value;
+      updateConfirmState();
+      return;
+    }
     var radio = e.target.closest(".dm-action-radios input[type=radio]");
     if (!radio) return;
     var block = radio.closest(".dm-action-radios");
     var rowIndex = parseInt(block.getAttribute("data-row"), 10);
     state[rowIndex].action = radio.value;
+    updateConfirmState();
+  });
+
+  // .dm-field-input (widget_type "date"/"number"/"email"/"text" của
+  // field_errors) — bắt "input" (bắn liên tục lúc gõ), KHÔNG "change"
+  // (chỉ bắn lúc blur) để nút Xác nhận cập nhật trạng thái ngay khi
+  // staff gõ đủ, và CỐ Ý không gọi renderPage() ở đây (khác mọi listener
+  // khác trong file render lại toàn bảng) — renderPage() dựng lại
+  // innerHTML của <tbody> từ đầu, sẽ làm mất focus + vị trí con trỏ
+  // đang gõ dở giữa ô input ngay sau ký tự đầu tiên, rất khó chịu khi
+  // sửa field dài (vd email). updateConfirmState() không đụng DOM của
+  // bảng nên an toàn.
+  document.getElementById("dm-preview-tbody").addEventListener("input", function (e) {
+    var input = e.target.closest(".dm-field-input");
+    if (!input) return;
+    var rowIndex = parseInt(input.getAttribute("data-row"), 10);
+    var field = input.getAttribute("data-field");
+    state[rowIndex].field_fixes[field] = input.value;
     updateConfirmState();
   });
 
@@ -491,7 +635,29 @@
 
   document.getElementById("dm-import-note").addEventListener("input", updateConfirmState);
 
-  document.getElementById("dm-confirm-form").addEventListener("submit", function () {
+  document.getElementById("dm-confirm-form").addEventListener("submit", function (e) {
+    // Nút #dm-confirm-btn đã bị disable qua updateConfirmState() khi còn
+    // dòng chưa xử lý xong (an toàn phía UI) — nhưng vẫn check lại NGAY
+    // ĐÂY trước khi submit thật (vd Enter trong ô input đôi khi vẫn kích
+    // hoạt submit form ở 1 số trình duyệt dù nút submit đang disabled),
+    // và đổi từ chỉ hiện hint tĩnh dưới nút sang thêm toast góc màn hình
+    // (showToast() expose từ app.js, xem window.showToast) — dễ nhận ra
+    // hơn khi bảng preview dài, hint tĩnh nằm khuất dưới cuối trang.
+    var allResolved = PREVIEW_DATA.every(isRowResolved);
+    var noteFilled = document.getElementById("dm-import-note").value.trim().length > 0;
+    if (!allResolved || !noteFilled) {
+      e.preventDefault();
+      updateConfirmState();
+      if (typeof window.showToast === "function") {
+        window.showToast(
+          !noteFilled
+            ? "Vui lòng nhập ghi chú lần nhập trước khi xác nhận."
+            : "Còn dòng chưa xử lý xong (chưa chọn công ty/level, hoặc còn ô dữ liệu chưa sửa đúng) — vui lòng kiểm tra lại trước khi xác nhận.",
+          "error"
+        );
+      }
+      return;
+    }
     document.getElementById("dm-resolutions-input").value = JSON.stringify(buildResolutionsPayload());
   });
 

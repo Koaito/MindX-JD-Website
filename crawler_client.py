@@ -956,9 +956,13 @@ def _normalize_preview_row(raw: dict, id_field: str | None = None) -> dict:
     # "company_id", "company_is_active", "suggestions": [...]}  (không
     # phải "needs_company_resolve"/"resolved_company_id" phẳng như bản
     # nháp contract cũ) — đối chiếu lại 08/2026, sửa cho khớp thật.
-    # Backend KHÔNG có field "errors" ở từng dòng preview: lỗi validate
-    # được chặn nguyên file ở bước upload (HTTP 422 trong import_preview()
-    # bên dưới), không xuất hiện lẻ tẻ trong preview đã build xong.
+    # needs_field_fix/field_errors (thêm 08/2026 — xem preview_manager.py
+    # docstring): field lỗi type/required/business-rule KHÔNG còn chặn
+    # nguyên file ở bước upload nữa (trừ required_column_missing, vẫn
+    # reject cứng ở import_preview() bên dưới) — pass-through nguyên 2
+    # field này để _dm_import.html render ô sửa tại chỗ trên bảng
+    # preview, KHÔNG transform gì thêm (widget_type/options đã tính sẵn
+    # ở backend, xem entity_specs.field_widget_type/field_options).
     #
     # id_field: tên cột PK thật của entity (vd "job_id") — LẤY TỪ
     # summary.id_field mà backend trả về (xem EntitySpec.id_field,
@@ -992,6 +996,13 @@ def _normalize_preview_row(raw: dict, id_field: str | None = None) -> dict:
         # gộp vào conflict_status_label như 1 trạng thái riêng.
         "needs_level_resolve": bool(raw.get("needs_level_resolve")),
         "level_code_raw": raw.get("level_code_raw"),
+        "needs_field_fix": bool(raw.get("needs_field_fix")),
+        # field_errors: {field_name: {"rule","message","raw_value",
+        # "widget_type","options"}} — {} nếu needs_field_fix=false. Giữ
+        # nguyên key/shape backend trả, _dm_import.html đọc thẳng field
+        # này (widget_type quyết định select/input type=date/input số/
+        # input chữ, options chỉ có giá trị khi widget_type=="enum").
+        "field_errors": raw.get("field_errors") or {},
         "errors": [],
     }
 
@@ -1019,6 +1030,12 @@ def _normalize_preview_summary(raw: dict) -> dict:
         "error_count": summary.get("errors", 0),
         "needs_company_resolve_count": summary.get("pending_company_resolution", 0),
         "needs_level_resolve_count": summary.get("pending_level_resolution", 0),
+        # pending_field_fix_count (thêm 08/2026, xem preview_manager.py):
+        # tổng số dòng có needs_field_fix=true trong preview này — dùng
+        # để hiện ô thống kê "Cần sửa dữ liệu" trên _dm_import.html giống
+        # cách needs_company_resolve_count/needs_level_resolve_count đã
+        # hiện (chỉ hiện ô khi > 0, xem template).
+        "needs_field_fix_count": summary.get("pending_field_fix", 0),
         "expires_at": raw.get("expires_at"),
         "rows": rows,
     }
@@ -1176,6 +1193,7 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
           "action": "create" | "update" | "skip" | "reactivate",
           "selected_company_id": str | None,  # chỉ khi needs_company_resolve
           "level_code": str | None,  # chỉ khi needs_level_resolve (Job)
+          "field_fixes": dict[str, str] | None,  # chỉ khi needs_field_fix
         }
     (giữ format list này ở tầng gọi vì _dm_import.html JS build ra sẵn
     dạng này) — nhưng payload GỬI LÊN BACKEND phải convert sang đúng
@@ -1183,7 +1201,8 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
         resolutions: {str(row_index): {"action": "skip"|"create"|"update",
                        "company_id": str|None,
                        "confirm_reactivate": bool,
-                       "level_code": str|None}}
+                       "level_code": str|None,
+                       "field_fixes": dict[str, str]|None}}
     (dict keyed theo row_index dạng CHUỖI, field tên "company_id" chứ
     không phải "selected_company_id", và action "reactivate" ở tầng gọi
     phải được dịch thành action="update" + confirm_reactivate=True vì
@@ -1192,6 +1211,15 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
     Backend dùng model_config = ConfigDict(extra="forbid") nên field lạ
     (vd "create_new_company") sẽ khiến CẢ REQUEST bị Pydantic reject
     422, không phải bị âm thầm bỏ qua — không được gửi field thừa.
+
+    "field_fixes" (thêm 08/2026, xem RowResolution.field_fixes +
+    import_executor.py::_apply_field_fixes): BẮT BUỘC chứa đủ mọi field
+    còn trong needs_field_fix/field_errors của dòng đó nếu action khác
+    "skip" — backend re-validate lại giá trị staff sửa (không tin ngầm
+    FE), raise lỗi rõ ràng (422) nếu thiếu/còn sai sau khi sửa. Chỉ gửi
+    field này khi có giá trị, giống company_id/level_code ở trên — dòng
+    không needs_field_fix thì field_fixes luôn None, không gửi key rỗng
+    thừa lên backend.
 
     "level_code" (08/2026, xem RowResolution + import_executor.py::
     execute_import backend): BẮT BUỘC nếu dòng needs_level_resolve=true
@@ -1244,6 +1272,9 @@ def import_confirm(access_token, entity_type, preview_id, resolutions, import_no
         level_code = entry.get("level_code")
         if level_code:
             resolved["level_code"] = level_code
+        field_fixes = entry.get("field_fixes")
+        if field_fixes:
+            resolved["field_fixes"] = field_fixes
         resolutions_map[str(row_index)] = resolved
 
     payload = {"preview_id": preview_id, "resolutions": resolutions_map, "note": import_note}
