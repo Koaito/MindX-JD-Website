@@ -66,6 +66,7 @@
           </thead>
           <tbody>
             {% for c in active_contacts %}
+            {% set company_name = company.company %}
             <tr>
               <td><strong>{{ c.contact_name }}</strong></td>
               <td class="muted">{{ c.title or '—' }}</td>
@@ -76,6 +77,7 @@
                 {{ c.note or '—' }}
               </td>
               <td class="actions-cell">
+                {% include "_contact_email_template_button.html" with context %}
                 <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=company.id, contact_id=c.id) }}">Sửa</a>
                 <button class="btn btn-text btn-danger-text" onclick="showDeleteContactModal('{{ c.id }}', '{{ c.contact_name }}')">Xóa</button>
               </td>

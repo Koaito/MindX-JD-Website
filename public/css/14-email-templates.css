@@ -1,0 +1,143 @@
+/* Used by: nút "✉ Mẫu email" ở bảng contact (company_detail.html,
+   contacts.html) + popup chọn/soạn mẫu email (markup nằm trong
+   base.html vì popup dùng chung cho mọi trang, không riêng 1 template).
+   2 bước: danh sách mẫu (et-list-view) -> nội dung mẫu đã chọn, sửa
+   được, không ảnh hưởng bản gốc (et-detail-view). */
+
+.btn-email-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.et-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.et-modal-content {
+  background: var(--surface);
+  border-radius: var(--radius);
+  max-width: 640px;
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 12px 40px rgba(16, 30, 26, 0.2);
+}
+
+.et-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.et-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.et-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  padding: 4px;
+}
+
+.et-modal-close:hover { color: var(--ink); }
+
+.et-modal-sub {
+  color: var(--ink-soft);
+  margin: 4px 0 16px;
+  font-size: 14px;
+}
+
+.et-template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.et-template-item {
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.et-template-item:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.et-template-item strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.et-template-item span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.et-template-item .et-suggested-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--teal);
+  background: var(--teal-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.et-detail-title {
+  margin: 12px 0 10px;
+}
+
+.et-modal-body-textarea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.et-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.et-modal-actions .muted {
+  font-size: 13px;
+  color: var(--muted);
+}

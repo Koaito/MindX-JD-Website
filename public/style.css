@@ -28,3 +28,4 @@
 @import url('css/11-student-activity.css');      /* /student-activity: theo dõi học viên lưu/ứng tuyển JD */
 @import url('css/12-activity-logs.css');         /* /activity-logs: lịch sử thao tác audit log */
 @import url('css/13-data-management.css');       /* /data-management: xuất/nhập hàng loạt Job/Company/Contact */
+@import url('css/14-email-templates.css');       /* Popup chọn/soạn mẫu email liên hệ doanh nghiệp (nút "Mẫu email" ở bảng contact) */

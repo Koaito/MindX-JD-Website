@@ -20,7 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version('style.css') }}">
 </head>
-<body>
+<body data-staff-name="{{ current_user.full_name if current_user.is_authenticated else '' }}">
 <div class="shell">
   <aside class="sidebar">
     <div class="brand">
@@ -129,6 +129,39 @@
   </main>
 </div>
 <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+
+{# Popup chọn/soạn mẫu email liên hệ doanh nghiệp — DÙNG CHUNG cho mọi
+   nút "✉ Mẫu email" ở bảng contact (company_detail.html, contacts.html).
+   Chỉ 1 bản markup duy nhất ở base.html, JS (initEmailTemplateModal()
+   trong app.js) tự bơm dữ liệu contact đang bấm vào + xử lý 2 bước:
+   danh sách 6 mẫu -> nội dung mẫu đã chọn (sửa được, không lưu lại,
+   không ảnh hưởng bản gốc — đóng popup hoặc quay lại danh sách là mất
+   phần sửa). Không có form/route nào — chỉ copy, hệ thống không tự
+   gửi email. #}
+<div id="emailTemplateModal" class="et-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="etModalTitle">
+  <div class="et-modal-content">
+    <div class="et-modal-head">
+      <h3 id="etModalTitle">Mẫu email liên hệ doanh nghiệp</h3>
+      <button type="button" class="et-modal-close" id="etModalClose" aria-label="Đóng">✕</button>
+    </div>
+
+    <div id="etListView">
+      <p class="et-modal-sub" id="etListSub"></p>
+      <ul class="et-template-list" id="etTemplateList"></ul>
+    </div>
+
+    <div id="etDetailView" style="display:none;">
+      <button type="button" class="btn btn-text" id="etBackBtn">← Quay lại danh sách mẫu</button>
+      <h4 class="et-detail-title" id="etDetailTitle"></h4>
+      <textarea class="et-modal-body-textarea" id="etTemplateBody"></textarea>
+      <div class="et-modal-actions">
+        <span class="muted">Có thể sửa nội dung trước khi copy — không ảnh hưởng mẫu gốc.</span>
+        <button type="button" class="btn btn-primary" id="etCopyBtn">Copy nội dung</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version('app.js') }}"></script>
 </body>
 </html>

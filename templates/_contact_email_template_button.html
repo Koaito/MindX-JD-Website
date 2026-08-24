@@ -1,0 +1,21 @@
+{# Nút mở popup chọn mẫu email liên hệ doanh nghiệp — dùng chung ở MỌI
+   nơi hiển thị danh sách contact HR (company_detail.html: bảng contact
+   theo công ty; contacts.html: bảng contact gộp toàn hệ thống). Chỉ mở
+   1 popup dùng chung (markup nằm 1 lần trong base.html) + đọc data-*
+   dưới đây bằng JS (xem initEmailTemplateModal() trong public/app.js).
+   Không có route/submit nào — copy xong staff tự dán qua email thật
+   của họ, hệ thống không gửi email.
+
+   Cần truyền vào (từ template gọi, qua {% include %} với context):
+     c            : 1 dict contact (từ crawler_client._normalize_contact,
+                    cần .contact_name, .title, .status_raw)
+     company_name : tên công ty hiển thị (company_detail.html truyền
+                    company.company; contacts.html truyền c.company_name)
+#}
+<button type="button" class="btn btn-text btn-email-template"
+        data-company-name="{{ company_name }}"
+        data-contact-name="{{ c.contact_name or '' }}"
+        data-contact-title="{{ c.title or '' }}"
+        data-contact-status="{{ c.status_raw or 'UNCONTACTED' }}">
+  ✉ Mẫu email
+</button>
