@@ -8,7 +8,7 @@ from crawler_client import CrawlerAPIError
 import backend_auth
 from backend_auth import BackendAuthError
 from utils.decorators import staff_required
-from constants import INDUSTRIES, LEVELS, JOB_STATUSES
+from constants import INDUSTRIES, JOB_STATUSES
 from helpers import _auth_tokens_from_session, _parse_any_date, _jobs_by_month
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -243,7 +243,11 @@ def index():
         jobs, companies = [], []
 
     jobs_by_industry = {ind: sum(1 for j in jobs if j["industry"] == ind) for ind in INDUSTRIES}
-    jobs_by_level = {lv: sum(1 for j in jobs if j["level"] == lv) for lv in LEVELS}
+    # gọi trực tiếp get_level_codes() (không dùng LEVELS tĩnh từ constants)
+    # để mỗi request đều lấy đúng danh sách level_code mới nhất trong cache
+    # TTL 5 phút — nếu backend đổi enum, dashboard nhận được trong tối đa
+    # 5 phút mà không cần restart server.
+    jobs_by_level = {lv: sum(1 for j in jobs if j["level"] == lv) for lv in db_data.get_level_codes()}
     jobs_by_status = {st: sum(1 for j in jobs if j["status"] == st) for st in JOB_STATUSES}
     jobs_by_location = {}
     for j in jobs:

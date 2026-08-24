@@ -15,7 +15,11 @@ INDUSTRIES = [
     "Business Analysis", "UI/UX Design",
 ]
 
-LEVELS = db_data.LEVEL_CODES
+# ĐÃ XOÁ (08/2026): "LEVELS = db_data.LEVEL_CODES" hardcode tĩnh, resolve
+# 1 lần lúc app khởi động rồi đứng yên suốt vòng đời server. Mọi nơi cần
+# danh sách level_code giờ gọi thẳng crawler_client.get_level_codes()
+# (cache TTL 5 phút, tự đồng bộ GET /enums backend) tại thời điểm xử lý
+# request — xem blueprints/jobs.py, blueprints/dashboard.py.
 LOCATIONS = ["Hà Nội", "TP.HCM", "Remote", "Hybrid"]
 
 CITIES_VN = [

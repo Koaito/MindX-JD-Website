@@ -11,7 +11,7 @@ import backend_auth
 from backend_auth import BackendAuthError
 from utils.decorators import staff_required
 from constants import (
-    INDUSTRIES, LEVELS, LOCATIONS, JOB_STATUSES, JOBS_PER_PAGE,
+    INDUSTRIES, LOCATIONS, JOB_STATUSES, JOBS_PER_PAGE,
     WORK_TYPES, SALARY_TYPES, SALARY_PERIODS, CITIES_VN,
 )
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
@@ -77,7 +77,7 @@ def index():
         jobs, total_jobs, total_pages, page = [], 0, 1, 1
 
     return render_template(
-        "index.html", jobs=jobs, industries=INDUSTRIES, levels=LEVELS,
+        "index.html", jobs=jobs, industries=INDUSTRIES, levels=db_data.get_level_codes(),
         locations=LOCATIONS, statuses=JOB_STATUSES,
         filters={"q": q, "industry": industry, "level": level, "location": location, "status": status},
         pagination_filters={k: v for k, v in
@@ -161,7 +161,7 @@ def add():
             except CrawlerAPIError as exc2:
                 flash(str(exc2), "error")
                 companies = []
-            return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
+            return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
                                     locations=LOCATIONS, statuses=JOB_STATUSES,
                                     work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                                     cities_vn=CITIES_VN, companies=companies, job=request.form)
@@ -172,7 +172,7 @@ def add():
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         companies = []
-    return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
+    return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
                             locations=LOCATIONS, statuses=JOB_STATUSES,
                             work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                             cities_vn=CITIES_VN, companies=companies, job=None)
@@ -189,13 +189,13 @@ def edit(job_id):
             updated = _call_authed(db_data.update_job, job_id, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
+            return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
                                     locations=LOCATIONS, statuses=JOB_STATUSES,
                                     work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                                     job=job, edit_id=job_id)
         flash(f"Đã cập nhật job \"{updated['position']}\".", "success")
         return redirect(url_for("jobs.detail", job_id=job_id))
-    return render_template("add_job.html", industries=INDUSTRIES, levels=LEVELS,
+    return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
                             locations=LOCATIONS, statuses=JOB_STATUSES,
                             work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
                             job=job, edit_id=job_id)
