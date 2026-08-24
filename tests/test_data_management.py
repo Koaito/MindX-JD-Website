@@ -241,7 +241,13 @@ class TestImportConfirm:
         )
         assert resp.status_code == 302
 
-    def test_success_redirects_to_export_tab(self, staff_client, mocker):
+    def test_success_redirects_to_import_tab(self, staff_client, mocker):
+        # Sửa 08/2026 (staff báo bất tiện): TRƯỚC ĐÂY redirect về tab=export
+        # sau khi import thành công — staff cần import nhiều lượt liên tiếp
+        # phải tự bấm lại tab "Nhập dữ liệu" mỗi lần. Giờ ở lại tab=import
+        # (test này ĐÃ ĐỔI assertion so với bản cũ test_success_redirects_
+        # to_export_tab — đây là thay đổi hành vi CÓ CHỦ ĐÍCH, không phải
+        # regression).
         mocker.patch(
             "blueprints.data_management.db_data.get_level_codes",
             return_value=["Intern"],
@@ -259,4 +265,4 @@ class TestImportConfirm:
             follow_redirects=False,
         )
         assert resp.status_code == 302
-        assert "tab=export" in resp.headers["Location"]
+        assert "tab=import" in resp.headers["Location"]

@@ -36,7 +36,7 @@
       <span class="nav-text" id="sidebarToggleLabel">Thu gọn</span>
     </button>
 
-    <nav class="nav">
+    <nav class="nav" id="sidebarNav">
       <span class="nav-label">Việc làm</span>
       <a href="{{ url_for('jobs.index') }}" class="{{ 'active' if request.endpoint in ['jobs.index','jobs.detail'] else '' }}" title="Danh sách job">
         <span class="nav-ic">▤</span> <span class="nav-text">Danh sách job</span>

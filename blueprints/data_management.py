@@ -271,4 +271,9 @@ def import_confirm(entity_type):
     else:
         flash(msg, "success")
 
-    return redirect(url_for("data_mgmt.index", entity=entity_type, tab="export"))
+    # Sửa 08/2026 (staff báo bất tiện): TRƯỚC ĐÂY redirect về tab="export"
+    # sau khi import xong — staff cần import nhiều lượt liên tiếp phải tự
+    # bấm lại tab "Nhập dữ liệu" mỗi lần. Ở lại đúng tab "import" (trang
+    # sẽ hiện lại form upload rỗng vì không còn truyền preview= trên URL,
+    # sẵn sàng cho lượt import tiếp theo ngay).
+    return redirect(url_for("data_mgmt.index", entity=entity_type, tab="import"))

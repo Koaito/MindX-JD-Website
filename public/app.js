@@ -45,6 +45,41 @@
     initSidebarToggle();
   }
 
+  // ---- Sidebar nav scroll memory (thêm 08/2026, staff báo bất tiện) -----
+  //
+  // KHÁC sidebarCollapsed ở trên (thu gọn/mở rộng cả sidebar): đây là app
+  // Flask nhiều trang (MPA) — mỗi lần bấm 1 mục trong menu là tải lại
+  // TOÀN BỘ trang mới, .nav (khối menu có scroll riêng — xem overflow-y:
+  // auto trong 01-sidebar.css) render lại từ đầu và tự cuộn về đỉnh, dù
+  // staff đang ở mục cuối danh sách (vd "Xuất / Nhập dữ liệu" dưới mục
+  // "Quản trị") — phải cuộn lại từ đầu mỗi lần chuyển trang.
+  //
+  // Lưu scrollTop vào sessionStorage mỗi khi staff cuộn, khôi phục lại
+  // ngay khi trang mới tải xong — sessionStorage (không phải localStorage)
+  // vì vị trí cuộn chỉ có ý nghĩa trong phiên làm việc hiện tại, tự dọn
+  // sạch khi đóng tab/trình duyệt thay vì tồn mãi.
+  function initSidebarScrollMemory() {
+    var nav = document.getElementById("sidebarNav");
+    if (!nav) return;
+
+    try {
+      var saved = sessionStorage.getItem("sidebarNavScroll");
+      if (saved !== null) nav.scrollTop = parseInt(saved, 10) || 0;
+    } catch (e) { /* sessionStorage bị chặn — bỏ qua, sidebar về đầu như cũ */ }
+
+    nav.addEventListener("scroll", function () {
+      try {
+        sessionStorage.setItem("sidebarNavScroll", String(nav.scrollTop));
+      } catch (e) { /* bỏ qua, chỉ mất tính năng nhớ vị trí, không lỗi gì khác */ }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSidebarScrollMemory);
+  } else {
+    initSidebarScrollMemory();
+  }
+
   function showToast(message, kind) {
     var stack = document.getElementById("toast-stack");
     if (!stack) return;

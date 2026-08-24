@@ -312,6 +312,36 @@
   // thế nội dung ô đó, không gộp chung vào actionCell(). Field không lỗi
   // -> hiện text thường như cũ (escapeHtml(row.data[col])).
   function fieldCell(row, col) {
+    // needs_level_resolve (chỉ Job, xem preview_manager.py backend):
+    // level_code trong file không khớp 1 trong 7 giá trị hợp lệ (dù đã
+    // chuẩn hoá hoa/thường) -> staff chọn lại qua dropdown tĩnh
+    // (LEVEL_CODE_VALUES).
+    //
+    // Sửa 08/2026 (staff báo bất tiện): TRƯỚC ĐÂY dropdown này render ở
+    // actionCell() — cột "Xử lý dòng này" nằm TẬN CUỐI bảng, cách xa cột
+    // dữ liệu level_code thật (staff phải cuộn ngang qua rất nhiều cột để
+    // thấy cả 2 cùng lúc). Giờ render NGAY TẠI cột level_code — đúng chỗ
+    // staff đang nhìn khi thấy giá trị sai, không cần dò tìm cột khác.
+    // Widget giữ NGUYÊN class/data-attribute (dm-level-select, data-row)
+    // — listener "change" ở dưới dùng event delegation trên cả
+    // #dm-preview-tbody nên hoạt động y hệt dù đổi vị trí trong DOM.
+    if (col === "level_code" && row.needs_level_resolve) {
+      var s0 = state[row.row_index];
+      var rawLabel = row.level_code_raw ? escapeHtml(row.level_code_raw) : "(rỗng)";
+      return '<div class="dm-resolve-block" data-row="' + row.row_index + '">' +
+             '<div class="dm-resolve-current ' + (s0.level_code ? "dm-resolve-ok" : "dm-resolve-pending") + '">' +
+             (s0.level_code ? escapeHtml(s0.level_code) : "Chưa chọn level") +
+             ' <span class="dm-resolve-raw">(file ghi: ' + rawLabel + ')</span>' +
+             '</div>' +
+             '<select class="dm-level-select" data-row="' + row.row_index + '">' +
+             '<option value="">-- Chọn level --</option>' +
+             LEVEL_CODE_VALUES.map(function (v) {
+               return '<option value="' + escapeHtml(v) + '"' + (s0.level_code === v ? " selected" : "") + '>' + escapeHtml(v) + '</option>';
+             }).join('') +
+             '</select>' +
+             '</div>';
+    }
+
     var err = row.field_errors && row.field_errors[col];
     if (!err) {
       return escapeHtml(row.data[col]);
@@ -387,29 +417,10 @@
              '</div>';
     }
 
-    // needs_level_resolve (chỉ Job, xem preview_manager.py backend):
-    // level_code trong file không khớp 1 trong 7 giá trị hợp lệ (dù đã
-    // chuẩn hoá hoa/thường) -> staff chọn lại qua dropdown tĩnh
-    // (LEVEL_CODE_VALUES). Không có lựa chọn "an toàn" để tự default
-    // (khác company: bỏ trống -> tự hiểu tạo mới) nên luôn bắt đầu ở
-    // trạng thái "Chưa chọn" cho tới khi staff tự chọn tay — xem
-    // isRowResolved() chặn nút Xác nhận nếu còn dòng nào action != skip
-    // mà chưa chọn level.
-    if (row.needs_level_resolve) {
-      var rawLabel = row.level_code_raw ? escapeHtml(row.level_code_raw) : "(rỗng)";
-      out += '<div class="dm-resolve-block" data-row="' + row.row_index + '">' +
-             '<div class="dm-resolve-current ' + (s.level_code ? "dm-resolve-ok" : "dm-resolve-pending") + '">' +
-             (s.level_code ? escapeHtml(s.level_code) : "Chưa chọn level") +
-             ' <span class="dm-resolve-raw">(file ghi: ' + rawLabel + ')</span>' +
-             '</div>' +
-             '<select class="dm-level-select" data-row="' + row.row_index + '">' +
-             '<option value="">-- Chọn level --</option>' +
-             LEVEL_CODE_VALUES.map(function (v) {
-               return '<option value="' + escapeHtml(v) + '"' + (s.level_code === v ? " selected" : "") + '>' + escapeHtml(v) + '</option>';
-             }).join('') +
-             '</select>' +
-             '</div>';
-    }
+    // needs_level_resolve: dropdown "chọn lại level" giờ render NGAY TẠI
+    // cột level_code (xem fieldCell() ở trên, sửa 08/2026) — KHÔNG còn ở
+    // đây nữa. isRowResolved() vẫn chặn nút Xác nhận nếu còn dòng nào
+    // action != skip mà chưa chọn level, không đổi gì ở phần validate.
 
     if (row.conflict_status === "conflict") {
       out += '<div class="dm-action-radios" data-row="' + row.row_index + '">' +
@@ -458,7 +469,11 @@
       html += "<td class='muted'>" + (row.row_index + 1) + "</td>";
       html += "<td>" + statusTag(row, state[row.row_index]) + "</td>";
       columns.forEach(function (col) {
-        var hasFieldError = row.field_errors && row.field_errors[col];
+        // needs_level_resolve (sửa 08/2026): tô sáng ô level_code y hệt
+        // các ô field_errors khác, để staff dễ nhận ra cột này cần chú ý
+        // — dropdown giờ nằm ngay trong ô này (xem fieldCell()).
+        var hasFieldError = (row.field_errors && row.field_errors[col]) ||
+          (col === "level_code" && row.needs_level_resolve);
         html += "<td" + (hasFieldError ? " class='dm-cell-field-fix'" : "") + ">" + fieldCell(row, col) + "</td>";
       });
       html += "<td>" + actionCell(row) + "</td>";
