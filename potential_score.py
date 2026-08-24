@@ -47,34 +47,38 @@ def suggest_partnership_potential(company: dict, contacts: list) -> dict:
         "level": "HIGH" | "MEDIUM" | "LOW",
         "score": int,          # điểm đạt được, 0-5
         "max_score": 5,
-        "reasons": [str, ...], # các tiêu chí ĐÃ đạt, hiển thị dạng tooltip
+        "reasons": [str, ...], # tiêu chí ĐÃ đạt (giữ lại cho code cũ/log)
+        "criteria": [          # ĐỦ 5 tiêu chí kèm trạng thái đạt/chưa đạt
+          {"label": str, "met": bool}, ...
+        ],
       }
     """
     jobs = company.get("jobs") or []
     reasons = []
+    criteria = []
+
+    def _add(label, met):
+        criteria.append({"label": label, "met": met})
+        if met:
+            reasons.append(label)
 
     has_open_entry_job = any(
         j.get("status_raw") == "OPEN" and j.get("level") in _ENTRY_LEVELS
         for j in jobs
     )
-    if has_open_entry_job:
-        reasons.append("Đang có job Intern/Fresher/Junior còn tuyển (OPEN)")
+    _add("Đang có job Intern/Fresher/Junior còn tuyển (OPEN)", has_open_entry_job)
 
     matches_target_industry = any(j.get("industry") in INDUSTRIES for j in jobs)
-    if matches_target_industry:
-        reasons.append("Có job thuộc đúng nhóm ngành MindX đào tạo (Code/Data/BA/UI-UX)")
+    _add("Có job thuộc đúng nhóm ngành MindX đào tạo (Code/Data/BA/UI-UX)", matches_target_industry)
 
     is_hn_hcm = (company.get("city") or "") in _HN_HCM
-    if is_hn_hcm:
-        reasons.append("Trụ sở/địa điểm tại Hà Nội hoặc TP.HCM")
+    _add("Trụ sở/địa điểm tại Hà Nội hoặc TP.HCM", is_hn_hcm)
 
     has_responded = any((c.get("status_raw") or "") in _RESPONDED_STATUSES for c in contacts)
-    if has_responded:
-        reasons.append("Đã từng có người liên hệ phản hồi hoặc đang hợp tác")
+    _add("Đã từng có người liên hệ phản hồi hoặc đang hợp tác", has_responded)
 
     has_company_size = bool((company.get("company_size") or "").strip())
-    if has_company_size:
-        reasons.append("Đã xác định được quy mô nhân sự")
+    _add("Đã xác định được quy mô nhân sự", has_company_size)
 
     score = sum([
         has_open_entry_job,
@@ -91,4 +95,4 @@ def suggest_partnership_potential(company: dict, contacts: list) -> dict:
     else:
         level = "LOW"
 
-    return {"level": level, "score": score, "max_score": 5, "reasons": reasons}
+    return {"level": level, "score": score, "max_score": 5, "reasons": reasons, "criteria": criteria}

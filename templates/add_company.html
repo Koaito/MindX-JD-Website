@@ -53,10 +53,22 @@
         {% for p in partnership_potentials %}<option value="{{ p }}" {{ 'selected' if company and company.partnership_potential == p }}>{{ p }}</option>{% endfor %}
       </select>
       {% if suggestion %}
-      <span class="potential-suggestion potential-suggestion-{{ suggestion.level|lower }}" title="{{ suggestion.reasons|join('; ') if suggestion.reasons else 'Chưa khớp tiêu chí nào trong 5 tiêu chí đang xét' }}">
-        🤖 Gợi ý: {{ suggestion.level_label }} ({{ suggestion.score }}/{{ suggestion.max_score }} tiêu chí)
+      <span class="potential-suggestion-wrap">
+        <span class="potential-suggestion potential-suggestion-{{ suggestion.level|lower }}">
+          Gợi ý: {{ suggestion.level_label }} ({{ suggestion.score }}/{{ suggestion.max_score }} tiêu chí)
+        </span>
+        <span class="potential-suggestion-tooltip" role="tooltip">
+          <strong>Tiêu chí đang xét:</strong>
+          <ul>
+            {% for c in suggestion.criteria %}
+            <li class="{{ 'is-met' if c.met else 'is-unmet' }}">
+              <span class="tick">{{ '✓' if c.met else '✗' }}</span> {{ c.label }}
+            </li>
+            {% endfor %}
+          </ul>
+        </span>
       </span>
-      <span class="potential-suggestion-note">Chỉ là gợi ý tự động — bạn tự quyết định có chọn theo hay không. Di chuột vào badge để xem tiêu chí đã khớp.</span>
+      <span class="potential-suggestion-note">Chỉ là gợi ý tự động — bạn tự quyết định có chọn theo hay không. Di chuột vào để xem chi tiết tiêu chí.</span>
       {% endif %}
     </label>
     {% if edit_id %}
