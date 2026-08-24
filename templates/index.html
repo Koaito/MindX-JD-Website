@@ -85,10 +85,10 @@
       <div class="ticket-meta">
         {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
         {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
-        <span>Nguồn: {{ job.source or '—' }}</span>
+        {% if job.source and job.source != 'MANUAL' %}<span>Nguồn: {{ job.source }}</span>{% endif %}
       </div>
       <div class="ticket-actions">
-        {% if job.jd_link %}
+        {% if job.jd_link and job.source != 'MANUAL' %}
         <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
         {% endif %}
         {% if current_user.is_authenticated %}

@@ -30,7 +30,7 @@
         {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
       </div>
       <div class="ticket-actions">
-        {% if job.jd_link %}
+        {% if job.jd_link and job.source != 'MANUAL' %}
         <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
         {% endif %}
         <form method="post" action="{{ url_for('my_stuff.job_toggle_save', job_id=job.id) }}"
