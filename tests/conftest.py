@@ -170,4 +170,10 @@ def student_client(flask_app, student_user, mocker):
         "full_name": student_user.full_name, "role": student_user.role,
         "must_change_password": False, "is_active": True,
     })
+    # app.py::inject_saved_job_ids là context_processor chạy TỰ ĐỘNG trên
+    # MỌI request của user không phải staff (xem app.py) — gọi
+    # backend_auth.list_my_saved_jobs() để tô sáng nút "đã lưu" trên mọi
+    # trang. Mock mặc định ở đây để MỌI test dùng student_client không
+    # cần tự nhớ mock lại — quên mock sẽ khiến test lỡ gọi network thật.
+    mocker.patch("app.backend_auth.list_my_saved_jobs", return_value=[])
     return _login_client(flask_app, student_user)
