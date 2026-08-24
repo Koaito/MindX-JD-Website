@@ -34,6 +34,36 @@ def index():
         flash(str(exc), "error")
         companies, cities, total_companies, total_pages, page = [], [], 0, 1, 1
 
+    # Gợi ý tiềm năng hợp tác NGAY TRÊN DANH SÁCH (thêm 08/2026) — trước
+    # đây suggestion chỉ tính ở trang /companies/<id>/edit vì cần
+    # company.jobs + contacts (GET /companies list KHÔNG kèm jobs, xem
+    # _normalize_company()). Ở đây dùng list_all_jobs()/list_all_contacts()
+    # (2 lệnh gọi TỔNG, đã dùng sẵn kiểu này ở dashboard.py) rồi group theo
+    # company_id trong Python — RẺ HƠN NHIỀU so với gọi get_company() +
+    # list_contacts() riêng cho từng công ty trong trang (per_page=20 dòng
+    # sẽ thành 40 lệnh gọi API nếu làm kiểu N+1). Không chặn trang nếu lỗi
+    # — chỉ đơn giản là chip "Tiềm năng" không có tooltip hover.
+    if companies:
+        access_token, _ = _auth_tokens_from_session()
+        try:
+            all_jobs = db_data.list_all_jobs()
+            all_contacts = db_data.list_all_contacts(access_token) if access_token else []
+        except CrawlerAPIError:
+            all_jobs, all_contacts = [], []
+
+        jobs_by_company = {}
+        for j in all_jobs:
+            jobs_by_company.setdefault(j["company_id"], []).append(j)
+        contacts_by_company = {}
+        for ct in all_contacts:
+            contacts_by_company.setdefault(ct["company_id"], []).append(ct)
+
+        for c in companies:
+            company_for_score = {**c, "jobs": jobs_by_company.get(c["id"], [])}
+            suggestion = suggest_partnership_potential(company_for_score, contacts_by_company.get(c["id"], []))
+            suggestion["level_label"] = db_data.PARTNERSHIP_POTENTIAL_MAP.get(suggestion["level"], suggestion["level"])
+            c["suggestion"] = suggestion
+
     return render_template(
         "companies.html", companies=companies, cities=cities,
         filters={"q": q, "city": city}, total_companies=total_companies,

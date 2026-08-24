@@ -58,6 +58,31 @@
    (Chưa đánh giá) so it never has to wrap and get clipped. */
 .col-potential { min-width: 110px; }
 
+/* Tooltip tiêu chí gợi ý ngay trên danh sách công ty (thêm 08/2026) —
+   để ss_team xem được lý do gợi ý mà KHÔNG cần bấm vào Sửa. Bọc chip
+   .fit-chip có sẵn trong 1 wrap để định vị tooltip, tái dùng nguyên
+   box .potential-suggestion-tooltip đã có ở 07-forms.css (trang Sửa
+   công ty) — tránh lặp lại CSS cho cùng 1 kiểu tooltip.
+   tabindex="0" trên wrap để bàn phím (Tab) cũng mở được tooltip qua
+   :focus, không chỉ hover chuột. */
+.fit-chip-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+.fit-chip-wrap:hover .potential-suggestion-tooltip,
+.fit-chip-wrap:focus .potential-suggestion-tooltip,
+.fit-chip-wrap:focus-within .potential-suggestion-tooltip {
+  display: block;
+}
+/* Danh sách công ty là bảng dài, chip nằm giữa cột — căn tooltip theo
+   giữa chip (không phải left:0 như ở form Sửa) để đỡ tràn ra ngoài
+   bảng khi chip ở gần mép trái. */
+.fit-chip-wrap .potential-suggestion-tooltip {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 /* Role chip (staff_activity.html "Vai trò" column) + "Bạn" badge next to
    your own name in the same table — small, neutral, reuses .fit-chip's
    sizing but its own color (not tied to partnership-potential meaning). */

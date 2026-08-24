@@ -59,7 +59,26 @@
         <td class="muted">{{ c.industry or '—' }}</td>
         <td>{{ c.city or '—' }}</td>
         <td class="muted">{{ c.company_size or '—' }}</td>
-        <td><span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span></td>
+        <td>
+          {% if c.suggestion %}
+          <span class="fit-chip-wrap" tabindex="0">
+            <span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span>
+            <span class="potential-suggestion-tooltip" role="tooltip">
+              <strong>🤖 Gợi ý: {{ c.suggestion.level_label }} ({{ c.suggestion.score }}/{{ c.suggestion.max_score }} tiêu chí)</strong>
+              <ul>
+                {% for crit in c.suggestion.criteria %}
+                <li class="{{ 'is-met' if crit.met else 'is-unmet' }}">
+                  <span class="tick">{{ '✓' if crit.met else '✗' }}</span> {{ crit.label }}
+                </li>
+                {% endfor %}
+              </ul>
+              <span class="potential-suggestion-note">Chỉ là gợi ý tự động — không phải đánh giá đã chốt.</span>
+            </span>
+          </span>
+          {% else %}
+          <span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span>
+          {% endif %}
+        </td>
         <td>
           {% if c.website %}
           <a class="btn btn-text" href="{{ c.website }}" target="_blank" rel="noopener">Website ↗</a>
