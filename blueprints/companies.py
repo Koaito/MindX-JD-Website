@@ -11,6 +11,7 @@ from backend_auth import BackendAuthError
 from utils.decorators import staff_required
 from constants import COMPANIES_PER_PAGE, PARTNERSHIP_POTENTIALS, CITIES_VN, CONTACT_STATUSES
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from potential_score import suggest_partnership_potential
 
 companies_bp = Blueprint("companies", __name__)
 
@@ -61,15 +62,31 @@ def edit(company_id):
     company = db_data.get_company(company_id)
     if not company:
         abort(404)
+
+    # Gợi ý tiềm năng hợp tác (thêm 08/2026) — CHỈ hiển thị ở trang sửa
+    # (company đã có sẵn), không tính ở trang thêm mới vì công ty vừa
+    # tạo chưa có job/contact nào, gợi ý sẽ luôn ra LOW vô nghĩa. Lấy
+    # thêm contacts (company đã có sẵn .jobs qua get_company() ở trên,
+    # nhưng KHÔNG có contacts — cần gọi riêng, giống cách detail() làm).
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        contacts_for_score = db_data.list_contacts(access_token, company_id)
+    except CrawlerAPIError:
+        # Không chặn trang sửa công ty chỉ vì lấy contacts lỗi — gợi ý
+        # thiếu dữ liệu contact vẫn còn hơn không hiện được cả trang.
+        contacts_for_score = []
+    suggestion = suggest_partnership_potential(company, contacts_for_score)
+    suggestion["level_label"] = db_data.PARTNERSHIP_POTENTIAL_MAP.get(suggestion["level"], suggestion["level"])
+
     if request.method == "POST":
         try:
             updated = _call_authed(db_data.update_company, company_id, request.form)
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
-            return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
+            return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN, suggestion=suggestion)
         flash(f"Đã cập nhật công ty {updated['company']}.", "success")
         return redirect(url_for("companies.detail", company_id=company_id))
-    return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
+    return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN, suggestion=suggestion)
 
 
 @companies_bp.route("/companies/<string:company_id>/delete", methods=["POST"])
