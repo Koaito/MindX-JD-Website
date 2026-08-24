@@ -6,6 +6,16 @@ thêm (08/2026), thay thế list LEVEL_CODE hardcode cũ.
 
 fixture `reset_enums_cache` (conftest.py, autouse) đảm bảo mỗi test
 dưới đây bắt đầu với cache rỗng.
+
+QUAN TRỌNG — mock đúng vị trí (sau khi tách crawler_client.py thành
+package, 08/2026): get_enums()/get_level_codes() giờ nằm trong
+crawler_client/enums.py và gọi lẫn nhau (get_level_codes -> get_enums
+-> _request) bằng tên cục bộ NGAY TRONG enums.py, không đi qua
+crawler_client/__init__.py ở call time. Patch tại "crawler_client._request"/
+"crawler_client.get_enums" (re-export ở __init__.py) KHÔNG có tác dụng gì
+với lời gọi nội bộ này — phải patch "crawler_client.enums._request"/
+"crawler_client.enums.get_enums" (đúng namespace nơi enums.py NHÌN THẤY
+tên đó), giống lý do đã ghi ở tests/test_data_management.py.
 """
 
 import pytest
@@ -20,7 +30,7 @@ import crawler_client
 class TestGetEnumsCache:
     def test_cache_miss_calls_backend(self, mocker):
         request_mock = mocker.patch(
-            "crawler_client._request", return_value={"level_code": ["Intern", "Junior"]}
+            "crawler_client.enums._request", return_value={"level_code": ["Intern", "Junior"]}
         )
         result = crawler_client.get_enums()
         assert result == {"level_code": ["Intern", "Junior"]}
@@ -28,7 +38,7 @@ class TestGetEnumsCache:
 
     def test_cache_hit_does_not_call_backend_again(self, mocker):
         request_mock = mocker.patch(
-            "crawler_client._request", return_value={"level_code": ["Intern"]}
+            "crawler_client.enums._request", return_value={"level_code": ["Intern"]}
         )
         crawler_client.get_enums()
         crawler_client.get_enums()
@@ -38,7 +48,7 @@ class TestGetEnumsCache:
 
     def test_stale_cache_triggers_refetch(self, mocker):
         request_mock = mocker.patch(
-            "crawler_client._request", return_value={"level_code": ["Intern"]}
+            "crawler_client.enums._request", return_value={"level_code": ["Intern"]}
         )
         crawler_client.get_enums()
         # Giả lập đã qua 301 giây (> TTL 300s)
@@ -48,7 +58,7 @@ class TestGetEnumsCache:
 
     def test_force_refresh_bypasses_fresh_cache(self, mocker):
         request_mock = mocker.patch(
-            "crawler_client._request", return_value={"level_code": ["Intern"]}
+            "crawler_client.enums._request", return_value={"level_code": ["Intern"]}
         )
         crawler_client.get_enums()
         crawler_client.get_enums(force_refresh=True)
@@ -58,14 +68,14 @@ class TestGetEnumsCache:
         """Nếu đã có cache thành công trước đó, backend lỗi lần sau ->
         vẫn trả cache CŨ (dù hết hạn) thay vì để trang trắng."""
         mocker.patch(
-            "crawler_client._request", return_value={"level_code": ["Intern", "Senior"]}
+            "crawler_client.enums._request", return_value={"level_code": ["Intern", "Senior"]}
         )
         first = crawler_client.get_enums()
         assert first == {"level_code": ["Intern", "Senior"]}
 
         crawler_client._enums_cache["fetched_at"] -= 301
         mocker.patch(
-            "crawler_client._request",
+            "crawler_client.enums._request",
             side_effect=crawler_client.CrawlerAPIError("backend sập"),
         )
         second = crawler_client.get_enums()
@@ -75,7 +85,7 @@ class TestGetEnumsCache:
         """Chưa từng cache thành công lần nào (vd app vừa khởi động) VÀ
         backend lỗi -> trả {} rỗng, KHÔNG raise (caller tự lo fallback)."""
         mocker.patch(
-            "crawler_client._request",
+            "crawler_client.enums._request",
             side_effect=crawler_client.CrawlerAPIError("backend sập"),
         )
         result = crawler_client.get_enums()
@@ -85,16 +95,16 @@ class TestGetEnumsCache:
 class TestGetLevelCodes:
     def test_returns_values_from_enums(self, mocker):
         mocker.patch(
-            "crawler_client.get_enums", return_value={"level_code": ["Intern", "Middle"]}
+            "crawler_client.enums.get_enums", return_value={"level_code": ["Intern", "Middle"]}
         )
         assert crawler_client.get_level_codes() == ["Intern", "Middle"]
 
     def test_falls_back_when_enums_missing_key(self, mocker):
-        mocker.patch("crawler_client.get_enums", return_value={})
+        mocker.patch("crawler_client.enums.get_enums", return_value={})
         assert crawler_client.get_level_codes() == crawler_client._LEVEL_CODES_FALLBACK
 
     def test_falls_back_when_level_code_empty_list(self, mocker):
-        mocker.patch("crawler_client.get_enums", return_value={"level_code": []})
+        mocker.patch("crawler_client.enums.get_enums", return_value={"level_code": []})
         assert crawler_client.get_level_codes() == crawler_client._LEVEL_CODES_FALLBACK
 
     def test_fallback_list_has_7_values(self):
