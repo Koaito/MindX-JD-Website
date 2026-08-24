@@ -15,11 +15,6 @@ session (cookie ký server-side mặc định — đủ dùng cho quy mô đồ 
 bộ), KHÔNG lưu trong đối tượng BackendUser vì object này được dựng lại
 mỗi request bởi app.load_user() — xem app.py các hàm
 `_store_auth_tokens`/`_auth_tokens_from_session`.
-
-⚠️ File supabase_client.py / supabase_schema.sql / seed_supabase.py
-trong repo giờ KHÔNG còn được import/dùng ở đâu nữa — giữ lại tạm thời
-chỉ để tham khảo lịch sử, có thể xoá hẳn sau khi chắc chắn không cần
-rollback.
 """
 
 from flask_login import UserMixin
