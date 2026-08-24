@@ -1,0 +1,8 @@
+# Dependency CHỈ dùng cho phát triển/test cục bộ — Render KHÔNG đọc file
+# này lúc deploy (chỉ đọc requirements.txt gốc), nên thêm pytest ở đây
+# không ảnh hưởng gì tới production build.
+#
+# Cài: pip install -r requirements-dev.txt
+-r requirements.txt
+pytest>=8.3,<10
+pytest-mock>=3.14,<4
