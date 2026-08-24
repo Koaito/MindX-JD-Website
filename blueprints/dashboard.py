@@ -1,7 +1,7 @@
 """Dashboard blueprint - team SS homepage with insights"""
 
 from datetime import date, datetime
-from flask import Blueprint, render_template, flash
+from flask import Blueprint, render_template, flash, request
 
 import crawler_client as db_data
 from crawler_client import CrawlerAPIError
@@ -134,6 +134,55 @@ def _companies_high_potential_no_contact(companies, contacts, quiet_days=60):
             "last_contacted": most_recent,
         })
     result.sort(key=lambda c: c["last_contacted"] or date.min)
+    return result
+
+
+# Lựa chọn số ngày hợp lệ cho ô chọn trên dashboard (thêm 08/2026) — cố
+# định 1 danh sách nhỏ thay vì cho nhập số tự do, tránh staff gõ giá trị
+# vô lý (0, âm, quá lớn) làm bảng rỗng/vô nghĩa. 14 là mặc định đã chốt.
+FOLLOWUP_DAYS_OPTIONS = [7, 14, 30]
+FOLLOWUP_DAYS_DEFAULT = 14
+
+
+def _followup_days_arg():
+    """Đọc ?followup_days=N từ query string, chỉ chấp nhận giá trị nằm
+    trong FOLLOWUP_DAYS_OPTIONS — giá trị lạ/thiếu thì fallback về mặc
+    định thay vì lỗi 500 hoặc chấp nhận số bất kỳ."""
+    try:
+        value = int(request.args.get("followup_days", FOLLOWUP_DAYS_DEFAULT))
+    except (TypeError, ValueError):
+        return FOLLOWUP_DAYS_DEFAULT
+    return value if value in FOLLOWUP_DAYS_OPTIONS else FOLLOWUP_DAYS_DEFAULT
+
+
+def _contacts_needing_followup(contacts, quiet_days=14):
+    """Contact "đang mở" (chưa IN_PARTNERSHIP) mà im lặng ≥ quiet_days —
+    tính từ last_contacted, hoặc date_collected nếu CHƯA từng liên hệ lần
+    nào (last_contacted rỗng). Không phân biệt UNCONTACTED/EMAIL_SENT/
+    RESPONDED — coi mọi trạng thái chưa chốt hợp tác là "còn cần đẩy tiếp"
+    (thống nhất 08/2026, xem thảo luận #3 — khác _companies_high_potential_
+    no_contact() ở trên vốn chỉ xét công ty Cao và ngưỡng 60 ngày).
+
+    Tính on-the-fly mỗi lần load dashboard, giống các hàm _jd_*/_companies_*
+    khác trong file này — không lưu thêm cột DB nào, không cần migration.
+    contact chưa từng có date_collected lẫn last_contacted (dữ liệu thiếu)
+    thì bỏ qua, không tính là quá hạn để tránh báo nhầm hàng loạt.
+    """
+    today = datetime.now().date()
+    result = []
+    for c in contacts:
+        if (c.get("status_raw") or "") == "IN_PARTNERSHIP":
+            continue
+        if not c.get("is_active", True):
+            continue
+        last = _parse_any_date(c.get("last_contacted")) or _parse_any_date(c.get("date_collected"))
+        if last is None:
+            continue
+        quiet_for = (today - last).days
+        if quiet_for >= quiet_days:
+            result.append({**c, "quiet_days": quiet_for, "last_contacted_date": last,
+                            "never_contacted": not c.get("last_contacted")})
+    result.sort(key=lambda c: -c["quiet_days"])
     return result
 
 
@@ -295,6 +344,8 @@ def index():
     salary_ranges = _salary_ranges_by_industry_level(jobs)
 
     companies_no_contact = _companies_high_potential_no_contact(companies, all_contacts)
+    followup_days = _followup_days_arg()
+    contacts_needing_followup = _contacts_needing_followup(all_contacts, quiet_days=followup_days)
     companies_expanding, companies_quiet = _companies_job_activity(jobs, companies)
 
     monthly_recap = _monthly_recap(jobs, companies, engagement.get("monthly"))
@@ -315,6 +366,9 @@ def index():
         top_skills=top_skills,
         salary_ranges=salary_ranges,
         companies_no_contact=companies_no_contact,
+        contacts_needing_followup=contacts_needing_followup,
+        followup_days=followup_days,
+        followup_days_options=FOLLOWUP_DAYS_OPTIONS,
         companies_expanding=companies_expanding,
         companies_quiet=companies_quiet,
         recap=monthly_recap,

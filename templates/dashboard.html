@@ -246,6 +246,59 @@
 <div class="dashboard-tab" id="tab-doanh-nghiep" data-tab="doanh-nghiep">
 
   <section class="card" style="margin-bottom: 22px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+      <h4 style="margin: 0;">Contact cần follow-up <span class="muted" style="font-weight: 400; color: var(--muted);">({{ contacts_needing_followup|length }})</span></h4>
+      <form method="get" action="{{ url_for('dashboard.index') }}" style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+        <input type="hidden" name="tab" value="doanh-nghiep">
+        <label for="followup-days-select" class="muted">Im lặng từ</label>
+        <select id="followup-days-select" name="followup_days" onchange="this.form.submit()">
+          {% for d in followup_days_options %}
+          <option value="{{ d }}" {{ 'selected' if d == followup_days }}>{{ d }} ngày</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+    <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+      Contact chưa "Đang hợp tác" mà im lặng ≥ {{ followup_days }} ngày (tính từ lần liên hệ gần nhất, hoặc từ ngày thu thập nếu chưa từng liên hệ) — nên chủ động nhắn lại.
+    </p>
+    {% if contacts_needing_followup %}
+    <div class="contact-table-wrap">
+      <table class="contact-table dash-table-fixed">
+        <colgroup><col style="width: 22%;"><col style="width: 22%;"><col style="width: 16%;"><col style="width: 20%;"><col style="width: 20%;"></colgroup>
+        <thead><tr><th>Contact</th><th>Công ty</th><th>Trạng thái</th><th>Liên hệ cuối</th><th></th></tr></thead>
+        <tbody id="pg-contacts-followup" data-paginate-size="20">
+          {% for c in contacts_needing_followup %}
+          {% set company_name = c.company_name %}
+          <tr>
+            <td><strong>{{ c.contact_name }}</strong></td>
+            <td>
+              {% if c.company_id %}
+              <a href="{{ url_for('companies.detail', company_id=c.company_id) }}" style="color: var(--accent);">{{ c.company_name or '—' }}</a>
+              {% else %}
+              <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ c.status }}</td>
+            <td class="muted">
+              {% if c.never_contacted %}
+              <span class="reason-tag">Chưa từng liên hệ ({{ c.quiet_days }} ngày)</span>
+              {% else %}
+              {{ c.last_contacted_date|format_date }} <span class="muted">({{ c.quiet_days }} ngày trước)</span>
+              {% endif %}
+            </td>
+            <td class="actions-cell">{% include "_contact_email_template_button.html" with context %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-list-nav" data-paginate-for="pg-contacts-followup"></div>
+    {% else %}
+    <p class="empty-note">Không có contact nào đang bị bỏ ngỏ quá 14 ngày.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" style="margin-bottom: 22px;">
     <h4>Công ty tiềm năng cao nhưng thiếu contact <span class="muted" style="font-weight: 400; color: var(--muted);">({{ companies_no_contact|length }})</span></h4>
     <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
       Công ty có "Tiềm năng hợp tác" = Cao nhưng chưa có contact nào, hoặc mọi contact đã "nguội" (chưa liên hệ lại ≥ 60 ngày) — ưu tiên gọi/email trong tháng.
@@ -490,6 +543,14 @@
     url.searchParams.set("tab", tab);
     history.replaceState(null, "", url);
   });
+
+  // Đọc ?tab= lúc load trang (thêm 08/2026, cùng lúc thêm ô chọn số
+  // ngày follow-up) — trước đây ?tab= chỉ được GHI khi bấm tab, không
+  // bao giờ được ĐỌC lúc tải trang, nên link có ?tab=doanh-nghiep vẫn
+  // luôn mở ra tab "Tổng quan". Cần đọc lúc init để form đổi số ngày
+  // follow-up (submit GET, reload trang) không làm mất tab đang xem.
+  var initialTab = new URL(window.location.href).searchParams.get("tab");
+  if (initialTab) activate(initialTab);
 
   var params = new URLSearchParams(window.location.search);
   activate(params.get("tab") || "tong-quan");
