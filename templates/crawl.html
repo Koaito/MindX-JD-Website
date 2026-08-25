@@ -24,7 +24,7 @@
         Chọn ngành, bấm để bắt đầu 1 lượt crawl mới.
       {% endif %}
     </p>
-    <form method="post" action="{{ url_for('crawl.trigger') }}" class="form-grid">
+    <form method="post" action="{{ url_for('crawl.trigger') }}" class="form-grid form-card">
       <input type="hidden" name="source" value="{{ source }}">
       <label class="span-2">
         Ngành

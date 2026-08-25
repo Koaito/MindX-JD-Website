@@ -36,6 +36,18 @@
   opacity: 0.7;
 }
 
+/* Form trong .crawl-source-card cần thêm class .form-card (07-forms.css)
+   để kế thừa style label (flex-column, xuống dòng đúng) + input/select
+   (width 100%, padding, border) — thiếu class này là lý do label/input
+   không co giãn đúng (lỗi 08/2026). Nhưng .form-card tự có
+   background/border/padding riêng, trùng với .crawl-source-card đã có
+   sẵn 2 thứ đó -> override về 0/transparent để tránh viền đôi lồng nhau. */
+.crawl-source-card .form-card {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
 /* Badge trạng thái 'queued'/'running' — action log cũ (12-activity-logs.css)
    chỉ có success/warning/danger, không có màu trung tính cho "đang diễn
    ra" (khác hẳn ý nghĩa "Sửa" của warning). */
