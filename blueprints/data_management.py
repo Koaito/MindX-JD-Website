@@ -152,9 +152,15 @@ def export_preview_route(entity_type):
     KHÔNG xung đột namespace thật (Flask chỉ dùng tên hàm cho
     url_for('data_mgmt.export_preview_route'), db_data.export_preview
     luôn gọi qua module prefix), nhưng đặt tên khác cho rõ ràng khi đọc
-    code, đỡ nhầm "đang gọi route hay đang gọi hàm client"."""
+    code, đỡ nhầm "đang gọi route hay đang gọi hàm client".
+
+    entity_type sai trả JSON 404 (KHÔNG dùng abort(404) như export()
+    bên trên) — đây là route AJAX, abort() trả trang lỗi HTML mặc định
+    của Flask, khiến fetch().then(res => res.json()) ở _dm_export.html
+    crash vì cố parse HTML như JSON (cùng lý do staff_required() đã xử
+    lý riêng cho case chưa đăng nhập, xem utils/decorators.py)."""
     if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
-        abort(404)
+        return jsonify({"error": "entity_type không hợp lệ."}), 404
     filters = _parse_export_filters(request.args)
 
     try:
