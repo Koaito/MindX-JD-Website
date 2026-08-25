@@ -111,9 +111,11 @@
         </td>
         <td class="actions-cell">
           {% if log.actor_id == current_user.id and not log.note_required %}
-            <button 
-              class="btn btn-text" 
-              onclick="editNote('{{ log.id }}', '{{ log.note|replace('\'', '\\\'') }}', '{{ view }}')"
+            <button
+              type="button"
+              class="btn btn-text js-edit-note-btn"
+              data-update-url="{{ url_for('activity_logs.update_note', log_id=log.id, view=view) }}"
+              data-note="{{ log.note or '' }}"
             >
               Sửa note
             </button>
@@ -143,24 +145,79 @@
 </div>
 {% endif %}
 
+{# Modal "Sửa ghi chú" — thay cho window.prompt() cũ (hộp thoại thô của
+   trình duyệt, không style được, không hợp giao diện trang, không xuống
+   dòng được cho ghi chú dài). Chỉ 1 bản markup DÙNG CHUNG cho mọi dòng
+   (giống pattern .dm-modal ở tab Import data-management, .et-modal ở
+   popup mẫu email) — JS đọc data-update-url/data-note của nút "Sửa note"
+   vừa bấm để bơm vào <form> bên trong, KHÔNG render N modal ẩn sẵn cho
+   N dòng.
+
+   Vẫn là <form method="post"> submit thật (không AJAX) — giữ NGUYÊN
+   hành vi backend hiện có (route update_note() trả redirect + flash,
+   không trả JSON) để không phải sửa gì phía blueprints/activity_logs.py.
+   Textarea (thay vì input 1 dòng như prompt() cũ) — note vốn đã hỗ trợ
+   xuống dòng ở phía hiển thị (.note-text có white-space: pre-wrap) chỉ
+   là trước đây prompt() không cho gõ nhiều dòng để tận dụng. #}
+<div class="note-modal-overlay" id="note-modal-overlay" hidden>
+  <div class="note-modal" role="dialog" aria-modal="true" aria-labelledby="note-modal-title">
+    <div class="note-modal-head">
+      <h3 id="note-modal-title">Sửa ghi chú</h3>
+      <button type="button" class="note-modal-close" id="note-modal-close" aria-label="Đóng">×</button>
+    </div>
+    <form method="post" id="note-modal-form">
+      <textarea name="note" id="note-modal-textarea" rows="5" placeholder="Nhập ghi chú…"></textarea>
+      <div class="note-modal-actions">
+        <button type="button" class="btn btn-ghost" id="note-modal-cancel">Huỷ</button>
+        <button type="submit" class="btn btn-primary">Lưu ghi chú</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
-function editNote(logId, currentNote, view) {
-  const newNote = prompt('Nhập ghi chú mới:', currentNote);
-  if (newNote === null) return; // User clicked Cancel
-  
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/activity-logs/' + logId + '/note?view=' + view;
-  
-  const noteInput = document.createElement('input');
-  noteInput.type = 'hidden';
-  noteInput.name = 'note';
-  noteInput.value = newNote;
-  
-  form.appendChild(noteInput);
-  document.body.appendChild(form);
-  form.submit();
-}
+(function () {
+  "use strict";
+
+  var overlay = document.getElementById("note-modal-overlay");
+  if (!overlay) return;
+  var form = document.getElementById("note-modal-form");
+  var textarea = document.getElementById("note-modal-textarea");
+  var closeBtn = document.getElementById("note-modal-close");
+  var cancelBtn = document.getElementById("note-modal-cancel");
+
+  function openNoteModal(updateUrl, currentNote) {
+    form.action = updateUrl;
+    textarea.value = currentNote;
+    overlay.hidden = false;
+    // Focus + đặt con trỏ cuối chuỗi (thay vì chọn hết) — khớp cảm giác
+    // "sửa tiếp" của prompt() cũ, không phải gõ đè lại từ đầu.
+    textarea.focus();
+    var len = textarea.value.length;
+    textarea.setSelectionRange(len, len);
+  }
+
+  function closeNoteModal() {
+    overlay.hidden = true;
+  }
+
+  document.querySelectorAll(".js-edit-note-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      openNoteModal(btn.getAttribute("data-update-url"), btn.getAttribute("data-note") || "");
+    });
+  });
+
+  closeBtn.addEventListener("click", closeNoteModal);
+  cancelBtn.addEventListener("click", closeNoteModal);
+  // Bấm ra ngoài overlay (không phải bên trong .note-modal) -> đóng,
+  // giống hệt hành vi .dm-modal-overlay/.et-modal đang có.
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeNoteModal();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !overlay.hidden) closeNoteModal();
+  });
+})();
 </script>
 
 {% endblock %}

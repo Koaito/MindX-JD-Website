@@ -188,3 +188,91 @@
     display: none; /* Ẩn cột "Công ty" trên mobile */
   }
 }
+
+/* Modal "Sửa ghi chú" (thay window.prompt() cũ, 08/2026) — cố ý dùng
+   ĐÚNG bộ design token thật của app (var(--surface)/var(--radius)/
+   var(--ink)/var(--border)/var(--accent)...), KHÔNG dùng var(--primary)/
+   var(--text-secondary)/var(--bg-secondary) như phần còn lại của file
+   này — 3 biến đó KHÔNG được khai báo ở đâu trong 00-tokens.css (file
+   này viết TRƯỚC khi hệ thống token hiện tại chuẩn hoá, chưa từng được
+   dọn lại), css trình duyệt coi property tương ứng là invalid nên rơi về
+   giá trị mặc định/kế thừa — khiến tab-nav/badge ở trang này lệch màu
+   nhẹ so với phần còn lại của app dù không lỗi rõ ràng. Modal MỚI này
+   theo đúng token thật, khớp visual với .dm-modal (data-management) và
+   .et-modal (mẫu email) đang dùng ở nơi khác trong app. */
+.note-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.note-modal-overlay[hidden] { display: none; }
+
+.note-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 12px 40px rgba(16, 30, 26, 0.2);
+}
+
+.note-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.note-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.note-modal-close:hover { background: var(--bg); color: var(--ink); }
+
+#note-modal-form { padding: 16px 20px 20px; }
+
+#note-modal-textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  resize: vertical;
+}
+
+#note-modal-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.note-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
