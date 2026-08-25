@@ -50,3 +50,30 @@ def staff_required(view):
             return redirect(url_for("auth.change_password"))
         return view(*args, **kwargs)
     return wrapped
+
+
+def admin_required(view):
+    """Chỉ tài khoản role='admin' mới được vào — CHẶT HƠN
+    @staff_required (cho cả ss_team). Dùng cho trang "Crawl dữ liệu"
+    (08/2026, xem blueprints/crawl.py) — yêu cầu gốc "chỉ có quyền admin
+    mới thấy và dùng được", khớp đúng mức POST /crawl ở backend
+    (Depends(require_admin), chặt hơn GET /crawl/{run_id} + GET /crawl
+    chỉ cần 'ss_team').
+
+    Bọc LẠI @staff_required (không viết trùng lặp check is_authenticated/
+    must_change_password) — tự chạy is_staff trước, rồi mới check thêm
+    role=='admin'. Cùng cách xử lý JSON (_wants_json()) cho route
+    polling trạng thái crawl (GET /crawl/<run_id>/status.json) — thiếu
+    bước này sẽ khiến JS fetch().then(res => res.json()) crash nếu
+    ss_team thường cố gọi thẳng URL, giống lý do gốc staff_required đã
+    né ở docstring phía trên."""
+    @wraps(view)
+    @staff_required
+    def wrapped(*args, **kwargs):
+        if current_user.role != "admin":
+            if _wants_json():
+                return jsonify({"error": "Chức năng này chỉ dành cho tài khoản admin."}), 403
+            flash("Chức năng này chỉ dành cho tài khoản admin.", "error")
+            return redirect(url_for("jobs.index"))
+        return view(*args, **kwargs)
+    return wrapped

@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Crawl dữ liệu — MindX Career Hub{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Crawl dữ liệu</h1>
+    <p class="lede">Kích hoạt crawl JD từ TopCV/VietnamWorks, theo dõi tiến độ và tra lại lịch sử các lượt đã chạy.</p>
+  </div>
+</header>
+
+{# ================= Khu A — Kích hoạt crawl ================= #}
+<div class="crawl-sources">
+  {% for source, categories in sources.items() %}
+  {% set active = active_runs.get(source) %}
+  <div class="crawl-source-card {{ 'is-busy' if active else '' }}">
+    <h2>{{ source_labels.get(source, source) }}</h2>
+    <p class="crawl-source-sub">
+      {% if active %}
+        Đang có 1 lượt {{ status_labels.get(active.status, active.status)|lower }} — đợi xong hoặc xem tiến độ bên dưới.
+      {% else %}
+        Chọn ngành, bấm để bắt đầu 1 lượt crawl mới.
+      {% endif %}
+    </p>
+    <form method="post" action="{{ url_for('crawl.trigger') }}" class="form-grid">
+      <input type="hidden" name="source" value="{{ source }}">
+      <label class="span-2">
+        Ngành
+        <select name="category" required {{ 'disabled' if active }}>
+          {% for cat_key, cat_label in categories.items() %}
+            <option value="{{ cat_key }}">{{ cat_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="span-1">
+        Số trang
+        <input type="number" name="pages" min="1" max="20" placeholder="Mặc định 3" {{ 'disabled' if active }}>
+      </label>
+      <label class="span-1">
+        Tối đa job
+        <input type="number" name="max_jobs" min="1" max="1000" placeholder="Không giới hạn" {{ 'disabled' if active }}>
+      </label>
+      <div class="form-actions span-4">
+        <button type="submit" class="btn btn-primary" {{ 'disabled' if active }}>
+          {{ 'Đang crawl…' if active else 'Bắt đầu crawl' }}
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+{# ================= Khu B — Đang chạy (tối đa 2, 1/nguồn) ================= #}
+{% if active_runs %}
+<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Đang chạy</h2>
+<div class="crawl-sources" id="crawl-running-zone" style="margin-bottom: 32px;">
+  {% for source, run in active_runs.items() %}
+  <div class="dm-export-card crawl-running-card-wrap"
+       id="crawl-running-{{ source }}"
+       data-run-id="{{ run.run_id }}"
+       data-source="{{ source }}">
+    <div class="crawl-running-card">
+      <div>
+        <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+        <p class="crawl-running-meta" style="margin-top: 8px;">
+          {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
+          Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+        </p>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ================= Khu C — Lịch sử ================= #}
+<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử crawl</h2>
+
+<form class="filter-bar" method="get">
+  <select name="source">
+    <option value="">Mọi nguồn</option>
+    {% for src, label in source_labels.items() %}
+      <option value="{{ src }}" {{ 'selected' if filters.source == src }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status">
+    <option value="">Mọi trạng thái</option>
+    {% for st, label in status_labels.items() %}
+      <option value="{{ st }}" {{ 'selected' if filters.status == st }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="triggered_by">
+    <option value="">Mọi admin</option>
+    {% for u in admin_members %}
+      <option value="{{ u.ss_user_id }}" {{ 'selected' if filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.source or filters.status or filters.triggered_by %}
+    <a class="btn btn-text" href="{{ url_for('crawl.index') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count" id="crawl-history-count">{{ total_runs }} lượt phù hợp</p>
+
+{% if runs %}
+<div class="activity-table-wrap">
+  <table class="activity-table">
+    <thead>
+      <tr>
+        <th style="width: 130px;">Thời gian</th>
+        <th style="width: 130px;">Nguồn / Ngành</th>
+        <th style="width: 150px;">Người bấm</th>
+        <th style="width: 110px;">Trạng thái</th>
+        <th>Kết quả</th>
+      </tr>
+    </thead>
+    <tbody id="crawl-history-tbody">
+      {% for run in runs %}
+      <tr>
+        <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
+        <td>
+          {{ source_labels.get(run.source, run.source) }}<br>
+          <span class="muted" style="font-size: 12px;">{{ category_labels.get(run.source ~ ':' ~ run.category, run.category) }}</span>
+        </td>
+        <td>{{ run.triggered_by_name }}</td>
+        <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
+        <td>
+          {% if run.status == 'done' and run.stat_items %}
+            <div class="crawl-result-main">{{ run.stat_items[0][1] }} job mới</div>
+            <details class="crawl-result-details">
+              <summary>Xem đủ 8 chỉ số</summary>
+              <dl>
+                {% for label, value in run.stat_items %}
+                  <dt>{{ label }}</dt><dd>{{ value }}</dd>
+                {% endfor %}
+              </dl>
+            </details>
+          {% elif run.status == 'error' %}
+            <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Phân trang">
+  {% if page > 1 %}
+    <a class="page-link" href="{{ url_for('crawl.index', page=page-1, **pagination_filters) }}">‹ Trang trước</a>
+  {% endif %}
+  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="page-link" href="{{ url_for('crawl.index', page=page+1, **pagination_filters) }}">Trang sau ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state" id="crawl-history-empty">
+  <p>Chưa có lượt crawl nào khớp bộ lọc.</p>
+</div>
+{% endif %}
+
+{# ================= JS: poll trạng thái + tự thêm dòng lịch sử ================= #}
+<script>
+(function () {
+  "use strict";
+
+  var SOURCE_LABELS = {{ source_labels|tojson }};
+  var CATEGORY_LABELS = {{ category_labels|tojson }};
+  var STAT_LABELS = {{ stat_labels|tojson }};  // [[key, label], ...] đúng thứ tự backend
+  var STATUS_LABELS = {{ status_labels|tojson }};
+  var STATUS_BADGE = {"queued": "badge-info", "running": "badge-info", "done": "badge-success", "error": "badge-danger"};
+
+  function formatTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return pad(d.getHours()) + ":" + pad(d.getMinutes()) + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
+  function buildHistoryRow(run) {
+    var tr = document.createElement("tr");
+
+    var tdTime = document.createElement("td");
+    tdTime.className = "muted";
+    tdTime.textContent = formatTime(run.started_at);
+    tr.appendChild(tdTime);
+
+    var tdSrc = document.createElement("td");
+    var catLabel = CATEGORY_LABELS[run.source + ":" + run.category] || run.category;
+    tdSrc.innerHTML = (SOURCE_LABELS[run.source] || run.source) + "<br><span class=\"muted\" style=\"font-size:12px;\">" + catLabel + "</span>";
+    tr.appendChild(tdSrc);
+
+    var tdUser = document.createElement("td");
+    tdUser.textContent = run.triggered_by_name || "Hệ thống (tự động)";
+    tr.appendChild(tdUser);
+
+    var tdStatus = document.createElement("td");
+    var badge = document.createElement("span");
+    badge.className = "badge " + (STATUS_BADGE[run.status] || "badge-warning");
+    badge.textContent = STATUS_LABELS[run.status] || run.status;
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    var tdResult = document.createElement("td");
+    if (run.status === "done" && run.stats) {
+      var mainDiv = document.createElement("div");
+      mainDiv.className = "crawl-result-main";
+      mainDiv.textContent = (run.stats.inserted || 0) + " job mới";
+      tdResult.appendChild(mainDiv);
+
+      var details = document.createElement("details");
+      details.className = "crawl-result-details";
+      var summary = document.createElement("summary");
+      summary.textContent = "Xem đủ 8 chỉ số";
+      details.appendChild(summary);
+      var dl = document.createElement("dl");
+      STAT_LABELS.forEach(function (pair) {
+        var dt = document.createElement("dt");
+        dt.textContent = pair[1];
+        var dd = document.createElement("dd");
+        dd.textContent = run.stats[pair[0]] || 0;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      });
+      details.appendChild(dl);
+      tdResult.appendChild(details);
+    } else if (run.status === "error") {
+      var errDiv = document.createElement("div");
+      errDiv.className = "crawl-error-text";
+      errDiv.textContent = run.error || "Không rõ lỗi.";
+      tdResult.appendChild(errDiv);
+    } else {
+      tdResult.innerHTML = "<span class=\"muted\">—</span>";
+    }
+    tr.appendChild(tdResult);
+
+    return tr;
+  }
+
+  function prependHistoryRow(run) {
+    var tbody = document.getElementById("crawl-history-tbody");
+    var emptyState = document.getElementById("crawl-history-empty");
+    if (!tbody && emptyState) {
+      // Bảng đang rỗng (trang load lúc chưa có lịch sử nào) — không tự
+      // dựng lại toàn bộ khung bảng bằng JS (dễ lệch class/markup so
+      // với Jinja) — chỉ nhắc người dùng tải lại trang để thấy bảng.
+      return;
+    }
+    if (!tbody) return;
+    tbody.insertBefore(buildHistoryRow(run), tbody.firstChild);
+    var countEl = document.getElementById("crawl-history-count");
+    if (countEl) {
+      var n = parseInt(countEl.textContent, 10);
+      if (!isNaN(n)) countEl.textContent = (n + 1) + " lượt phù hợp";
+    }
+  }
+
+  function reenableSourceForm(source) {
+    var card = document.querySelector('.crawl-source-card form input[value="' + source + '"]');
+    if (!card) return;
+    var form = card.closest("form");
+    if (!form) return;
+    form.querySelectorAll("select, input, button").forEach(function (el) {
+      el.disabled = false;
+    });
+    var wrap = form.closest(".crawl-source-card");
+    if (wrap) wrap.classList.remove("is-busy");
+    var sub = wrap ? wrap.querySelector(".crawl-source-sub") : null;
+    if (sub) sub.textContent = "Chọn ngành, bấm để bắt đầu 1 lượt crawl mới.";
+    var btn = form.querySelector("button[type=submit]");
+    if (btn) btn.textContent = "Bắt đầu crawl";
+  }
+
+  function pollRun(card) {
+    var runId = card.getAttribute("data-run-id");
+    var source = card.getAttribute("data-source");
+
+    var timer = setInterval(function () {
+      fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          if (run.error) {
+            clearInterval(timer);
+            return;
+          }
+          if (run.status === "done" || run.status === "error") {
+            clearInterval(timer);
+            card.remove();  // Khu B chỉ hiện lượt ĐANG chạy — xong thì gỡ khỏi đây
+            prependHistoryRow(run);
+            reenableSourceForm(source);
+          }
+        })
+        .catch(function () {
+          // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp
+          // (KHÔNG dừng timer, khác trường hợp run.error ở trên vốn là
+          // lỗi nghiệp vụ rõ ràng như 404/403).
+        });
+    }, 4000);
+  }
+
+  document.querySelectorAll(".crawl-running-card-wrap").forEach(pollRun);
+})();
+</script>
+
+{% endblock %}

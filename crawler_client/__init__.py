@@ -95,6 +95,16 @@ from .audit_logs import (
     list_audit_logs,
     update_audit_log_note,
 )
+from .crawl import (
+    CRAWL_STAT_LABELS,
+    CRAWL_STATUS_LABELS,
+    CRAWL_STATUS_BADGE,
+    _normalize_crawl_run,
+    get_sources,
+    trigger_crawl,
+    get_crawl_status,
+    list_crawl_runs,
+)
 from .import_export import (
     IMPORT_EXPORT_ENTITY_TYPES,
     IMPORT_EXPORT_ENTITY_LABELS,
@@ -162,6 +172,13 @@ __all__ = [
     "ENTITY_TYPE_MAP",
     "list_audit_logs",
     "update_audit_log_note",
+    "CRAWL_STAT_LABELS",
+    "CRAWL_STATUS_LABELS",
+    "CRAWL_STATUS_BADGE",
+    "get_sources",
+    "trigger_crawl",
+    "get_crawl_status",
+    "list_crawl_runs",
     "IMPORT_EXPORT_ENTITY_TYPES",
     "IMPORT_EXPORT_ENTITY_LABELS",
     "CONFLICT_STATUS_LABELS",

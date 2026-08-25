@@ -115,6 +115,7 @@ from blueprints.students import students_bp
 from blueprints.staff_activity import staff_activity_bp
 from blueprints.activity_logs import activity_logs_bp
 from blueprints.data_management import data_mgmt_bp
+from blueprints.crawl import crawl_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(my_stuff_bp)
@@ -127,6 +128,7 @@ app.register_blueprint(students_bp)
 app.register_blueprint(staff_activity_bp)
 app.register_blueprint(activity_logs_bp)
 app.register_blueprint(data_mgmt_bp)
+app.register_blueprint(crawl_bp)
 
 
 # ---------------------------------------------------------------------------
