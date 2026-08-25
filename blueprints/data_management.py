@@ -9,6 +9,34 @@ from helpers import _auth_tokens_from_session, _call_authed
 
 data_mgmt_bp = Blueprint("data_mgmt", __name__)
 
+# Filter export thêm 08/2026 — khoá query param dùng chung giữa form filter
+# (_dm_export.html), route preview AJAX, và route tải file thật bên dưới.
+# Giữ 1 danh sách DUY NHẤT ở đây để 3 chỗ không tự gõ tay tên field lệch
+# nhau (vd 1 nơi gõ "companyId" nơi khác "company_id").
+_EXPORT_FILTER_PARAM_KEYS = (
+    "status", "is_active", "company_id", "date_field", "from_date", "to_date", "limit",
+)
+
+
+def _parse_export_filters(args):
+    """Đọc filter export từ query string (?status=...&from_date=...) ->
+    dict CHỈ gồm key có giá trị thật (bỏ trống = không lọc field đó) —
+    dùng chung cho route preview AJAX và route tải file thật, đảm bảo
+    "xem preview thấy gì thì tải đúng cái đó" (cùng 1 hàm parse, không
+    viết 2 lần dễ lệch nhau).
+
+    is_active nhận "true"/"false" từ <select> — KHÁC mọi filter khác
+    (chuỗi thô forward thẳng), cần convert vì backend (FastAPI
+    Query(bool)) nhận qua query string vẫn parse được "true"/"false" nên
+    thực ra không cần convert kiểu ở đây, chỉ cần đảm bảo giá trị rỗng
+    ("" — nghĩa là "Cả 2", không lọc) bị loại bỏ như filter khác."""
+    filters = {}
+    for key in _EXPORT_FILTER_PARAM_KEYS:
+        value = (args.get(key) or "").strip()
+        if value:
+            filters[key] = value
+    return filters
+
 
 @data_mgmt_bp.route("/data-management")
 @staff_required
@@ -38,6 +66,11 @@ def index():
         except CrawlerAPIError as exc:
             flash(str(exc), "error")
 
+    # enums.get_enums() cache TTL 5 phút (crawler_client/enums.py) — không
+    # round-trip mạng riêng cho job_status/contact_status ở đây, tái dùng
+    # đúng cache đã có sẵn cho level_code_values bên dưới.
+    enums = db_data.get_enums()
+
     return render_template(
         "data_management.html",
         entity_type=entity_type,
@@ -52,23 +85,46 @@ def index():
         # TTL 5 phút phía crawler_client.py), tự đồng bộ với backend thay
         # vì hardcode tĩnh như trước 08/2026.
         level_code_values=db_data.get_level_codes(),
+        # Filter export (thêm 08/2026, chỉ dùng khi tab == "export") —
+        # job_status/contact_status cho dropdown "Trạng thái", companies
+        # cho ô chọn công ty (tái dùng _company_combobox.html, cùng
+        # combobox đang dùng ở add_job.html/add_contact.html — công ty ở
+        # đây KHÔNG bắt buộc chọn, khác 2 trang kia). Chỉ tải khi đang ở
+        # tab export để không tốn round-trip /companies thừa lúc staff
+        # đang xem tab import.
+        job_status_values=enums.get("job_status", []),
+        contact_status_values=enums.get("contact_status", []),
+        # Nhãn tiếng Việt cho từng status value ở trên — TÁI DÙNG
+        # JOB_STATUS_MAP/CONTACT_STATUS_MAP đã có sẵn (jobs.py/contacts.py,
+        # dùng để hiển thị badge trạng thái ở trang danh sách), KHÔNG viết
+        # tay lại map thứ 3 riêng cho dropdown filter export.
+        job_status_labels=db_data.JOB_STATUS_MAP,
+        contact_status_labels=db_data.CONTACT_STATUS_MAP,
+        export_companies=db_data.list_all_companies() if tab == "export" else [],
     )
 
 
 @data_mgmt_bp.route("/data-management/export/<string:entity_type>")
 @staff_required
 def export(entity_type):
-    """Tải file export — gọi trực tiếp bằng GET (link <a>)"""
+    """Tải file export — gọi trực tiếp bằng GET (link/button JS set
+    window.location, KHÔNG phải AJAX — trình duyệt tự xử lý tải file từ
+    response Content-Disposition: attachment).
+
+    Nhận THÊM bộ query params filter (status/is_active/company_id/
+    date_field/from_date/to_date/limit, xem _parse_export_filters()) —
+    FE (_dm_export.html) luôn gọi route này với ĐÚNG filter vừa xem ở
+    bước preview (cùng querystring), không tự thêm/bớt gì ở giữa."""
     if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
         abort(404)
     file_format = request.args.get("format", "xlsx")
     if file_format not in ("xlsx", "csv"):
         file_format = "xlsx"
+    filters = _parse_export_filters(request.args)
 
-    access_token, _ = _auth_tokens_from_session()
     try:
         content, filename, content_type = _call_authed(
-            db_data.export_entity, entity_type, file_format
+            db_data.export_entity, entity_type, file_format, filters=filters
         )
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
@@ -79,6 +135,33 @@ def export(entity_type):
         mimetype=content_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@data_mgmt_bp.route("/data-management/export/<string:entity_type>/preview")
+@staff_required
+def export_preview_route(entity_type):
+    """AJAX — staff bấm "Xem trước" trên form filter (_dm_export.html)
+    -> gọi backend GET /export/{entity_type}/preview với ĐÚNG bộ filter
+    hiện có trên form -> trả JSON (total_matching/will_export/columns/
+    sample_rows) để JS render bảng preview tại chỗ, KHÔNG reload trang
+    (đã chốt dùng AJAX, cùng trải nghiệm với các thao tác preview đang
+    có ở tab Import — xem trao đổi thiết kế 08/2026).
+
+    Tên hàm route cố ý là export_preview_route (không phải export_preview)
+    để tránh trùng tên với db_data.export_preview import vào — 2 hàm
+    KHÔNG xung đột namespace thật (Flask chỉ dùng tên hàm cho
+    url_for('data_mgmt.export_preview_route'), db_data.export_preview
+    luôn gọi qua module prefix), nhưng đặt tên khác cho rõ ràng khi đọc
+    code, đỡ nhầm "đang gọi route hay đang gọi hàm client"."""
+    if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
+        abort(404)
+    filters = _parse_export_filters(request.args)
+
+    try:
+        preview = _call_authed(db_data.export_preview, entity_type, filters=filters)
+        return jsonify(preview)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
 
 
 @data_mgmt_bp.route("/data-management/import/<string:entity_type>/preview", methods=["POST"])

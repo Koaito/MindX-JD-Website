@@ -37,10 +37,48 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
-  max-width: 640px;
+  /* Rộng hơn bản cũ (640px, chỉ 2 nút tải) — thêm 08/2026: form filter +
+     bảng preview cần nhiều chỗ hơn nhiều, .dm-table-wrap tự cuộn ngang
+     nếu entity có nhiều cột (vd job) nên không cần giới hạn quá chặt. */
+  max-width: 960px;
 }
 
 .dm-export-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
+
+/* Filter export (thêm 08/2026) — dùng lại .form-grid (07-forms.css, chia
+   cột span-1/span-2...) cho đồng bộ layout với form khác trong app.
+   RIÊNG style input/select/label KHÔNG tự có (07-forms.css scope các rule
+   đó dưới .form-card, còn khối filter export nằm trong .dm-export-card —
+   tên khác nên không tự khớp selector) -> khai lại 1 bản tương đương ở
+   đây, scope theo .dm-export-filters, tránh phải bọc thêm 1 lớp .form-card
+   lồng trong .dm-export-card (2 lớp card border/padding chồng nhau xấu). */
+.dm-export-filters { margin-bottom: 18px; }
+.dm-export-filters .form-grid { margin-bottom: 4px; }
+.dm-export-filters .form-actions { margin-top: 14px; padding-top: 0; border-top: none; }
+
+.dm-export-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  min-width: 0;
+}
+
+.dm-export-filters input,
+.dm-export-filters select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  width: 100%;
+}
+
+#dm-export-preview-area { margin-bottom: 18px; }
 
 .dm-hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
 .dm-hint-muted { margin-top: 14px; margin-bottom: 0; font-size: 12.5px; }

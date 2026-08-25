@@ -82,6 +82,18 @@ class TestStaffRequiredHappyPath:
             "blueprints.data_management.db_data.get_level_codes",
             return_value=["Intern", "Fresher"],
         )
+        # Thêm 08/2026 (filter export): mặc định tab="export" -> index()
+        # còn gọi get_enums() (dropdown trạng thái) và list_all_companies()
+        # (ô chọn công ty) — mock cả 2 để test này KHÔNG phụ thuộc network,
+        # giữ đúng tinh thần chỉ test decorator như comment ở trên.
+        mocker.patch(
+            "blueprints.data_management.db_data.get_enums",
+            return_value={"job_status": ["OPEN", "CLOSED"], "contact_status": []},
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.list_all_companies",
+            return_value=[],
+        )
         resp = staff_client.get("/data-management")
         assert resp.status_code == 200
 
@@ -96,6 +108,14 @@ class TestStaffRequiredHappyPath:
         mocker.patch(
             "blueprints.data_management.db_data.get_level_codes",
             return_value=["Intern"],
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.get_enums",
+            return_value={"job_status": ["OPEN", "CLOSED"], "contact_status": []},
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.list_all_companies",
+            return_value=[],
         )
         admin_client = _login_client(flask_app, admin_user)
         resp = admin_client.get("/data-management")

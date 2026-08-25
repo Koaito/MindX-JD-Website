@@ -33,18 +33,55 @@ CONFLICT_STATUS_LABELS = {
 }
 
 
-def export_entity(access_token, entity_type, file_format="xlsx"):
+# Filter export thêm 08/2026 (xem trao đổi thiết kế "export chưa chọn
+# được lọc gì, chưa xem trước"): TRƯỚC ĐÂY export_entity() luôn lấy 100%
+# record, không cách nào lọc. Backend giờ có chung 1 bộ query params cho
+# CẢ export_preview() lẫn export_entity() (xem api/routers/import_export.py
+# ::_export_filter_params) — 2 hàm dưới đây CHỈ forward nguyên `filters`
+# dict thẳng làm query params, KHÔNG tự thêm/bớt gì, để giữ đúng nguyên
+# tắc "preview thấy gì thì tải đúng cái đó" tới tận phía backend thật.
+#
+# `filters` là dict rỗng hoặc gồm 1 số khoá trong _EXPORT_FILTER_KEYS —
+# route Flask (blueprints/data_management.py::_parse_export_filters) tự
+# lọc bỏ giá trị rỗng trước khi truyền vào đây, nên mọi giá trị trong
+# dict đã sẵn sàng gửi thẳng làm query param.
+_EXPORT_FILTER_KEYS = (
+    "status", "is_active", "company_id", "date_field", "from_date", "to_date", "limit",
+)
+
+
+def export_preview(access_token, entity_type, filters=None):
+    """GET /export/{entity_type}/preview — trả tổng số dòng khớp filter +
+    tối đa 20 dòng mẫu, KHÔNG sinh file. Dùng cho bước "Xem trước" trước
+    khi staff bấm tải file thật (route AJAX
+    data_mgmt.export_preview_route gọi hàm này).
+
+    Trả nguyên dict backend trả về (entity_type, total_matching,
+    will_export, columns, sample_rows) — không cần chuẩn hoá thêm vì
+    sample_rows chỉ hiển thị thô trên bảng preview, không có form nhập
+    liệu nào dựa vào field đã map như job/company/contact thường."""
+    params = {k: v for k, v in (filters or {}).items() if k in _EXPORT_FILTER_KEYS and v not in (None, "")}
+    return _request("GET", f"/export/{entity_type}/preview", access_token, params=params) or {}
+
+
+def export_entity(access_token, entity_type, file_format="xlsx", filters=None):
     """GET /export/{entity_type} — trả file nhị phân (CSV hoặc XLSX).
 
     Khác mọi hàm khác trong package này: trả về (content_bytes, filename,
     content_type) thay vì dict đã chuẩn hoá, vì đây là file tải xuống
     thẳng cho user (app.py dùng send_file/Response), không phải data
     hiển thị trên UI. Raise CrawlerAPIError nếu backend lỗi — app.py tự
-    bắt và flash, KHÔNG trả file rỗng để tránh user tải nhầm file hỏng."""
+    bắt và flash, KHÔNG trả file rỗng để tránh user tải nhầm file hỏng.
+
+    filters: cùng dict như export_preview() ở trên — không truyền gì
+    (None/{}) = lấy toàn bộ record, giữ đúng hành vi cũ 100% cho mọi nơi
+    khác trong code còn gọi export_entity() không kèm filter."""
     url = f"{CRAWLER_API_URL}/export/{entity_type}"
+    params = {"format": file_format}
+    params.update({k: v for k, v in (filters or {}).items() if k in _EXPORT_FILTER_KEYS and v not in (None, "")})
     try:
         res = requests.get(
-            url, headers=_headers(access_token), params={"format": file_format},
+            url, headers=_headers(access_token), params=params,
             timeout=REQUEST_TIMEOUT,
         )
     except requests.exceptions.RequestException as exc:

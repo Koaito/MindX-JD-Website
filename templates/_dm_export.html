@@ -1,15 +1,261 @@
 <div class="dm-panel">
-  <div class="dm-export-card">
+  <div class="dm-export-card" id="dm-export-root"
+       data-entity-type="{{ entity_type }}"
+       data-preview-url="{{ url_for('data_mgmt.export_preview_route', entity_type=entity_type) }}"
+       data-download-url="{{ url_for('data_mgmt.export', entity_type=entity_type) }}">
     <h2>Xuất {{ entity_labels[entity_type] }} ra file</h2>
-    <p class="dm-hint">Tải toàn bộ dữ liệu {{ entity_labels[entity_type]|lower }} hiện có trong hệ thống ra file — dùng để đối chiếu, chỉnh sửa hàng loạt bên ngoài rồi nhập lại qua tab Import.</p>
+    <p class="dm-hint">
+      Chọn điều kiện lọc bên dưới (bỏ trống = lấy toàn bộ), bấm <strong>"Xem trước"</strong> để
+      xem số dòng và mẫu dữ liệu thật trước khi tải, rồi mới bấm tải file — tránh tải nhầm file
+      sai dữ liệu như trước đây.
+    </p>
+
+    <div class="dm-export-filters">
+      <div class="form-grid">
+        {% if entity_type in ("job", "contact") %}
+        <label class="span-1">
+          <span>Trạng thái</span>
+          <select id="dm-export-status">
+            <option value="">— Tất cả —</option>
+            {% set status_values = job_status_values if entity_type == "job" else contact_status_values %}
+            {% set status_labels = job_status_labels if entity_type == "job" else contact_status_labels %}
+            {% for v in status_values %}
+            <option value="{{ v }}">{{ status_labels.get(v, v) }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+
+        {% if entity_type in ("company", "contact") %}
+        <label class="span-1">
+          <span>Còn hoạt động?</span>
+          <select id="dm-export-is-active">
+            <option value="">— Cả 2 —</option>
+            <option value="true">Đang hoạt động</option>
+            <option value="false">Đã ngừng hoạt động</option>
+          </select>
+        </label>
+        {% endif %}
+
+        {% if entity_type in ("job", "contact") %}
+        <label class="span-2">
+          <span>Công ty (bỏ trống = mọi công ty)</span>
+          {% set companies = export_companies %}
+          {% set field_name = "__dm_export_company_id" %}
+          {% set input_id = "dm-export-company-input" %}
+          {% set allow_new = false %}
+          {% set required = false %}
+          {% set selected_id = "" %}
+          {% set selected_label = "" %}
+          {% include "_company_combobox.html" %}
+        </label>
+        {% endif %}
+
+        <label class="span-1">
+          <span>Lọc theo cột ngày</span>
+          <select id="dm-export-date-field">
+            <option value="created_at">Ngày tạo</option>
+            <option value="updated_at">Ngày cập nhật</option>
+          </select>
+        </label>
+        <label class="span-1">
+          <span>Từ ngày</span>
+          <input type="date" id="dm-export-from-date">
+        </label>
+        <label class="span-1">
+          <span>Đến ngày</span>
+          <input type="date" id="dm-export-to-date">
+        </label>
+        <label class="span-1">
+          <span>Chỉ lấy N dòng mới nhất</span>
+          <input type="number" id="dm-export-limit" min="1" placeholder="Không giới hạn">
+        </label>
+      </div>
+      <p class="dm-hint dm-hint-muted">
+        Mẹo: nếu không cần lọc gì, chỉ cần điền ô "Chỉ lấy N dòng mới nhất" — hệ thống sẽ lấy
+        đúng N dòng {{ entity_labels[entity_type]|lower }} mới tạo gần đây nhất.
+      </p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" id="dm-export-preview-btn">Xem trước</button>
+      </div>
+    </div>
+
+    <div id="dm-export-preview-area" hidden>
+      <div class="dm-preview-summary">
+        <div class="dm-stat"><strong id="dm-export-total-matching">0</strong><span>Tổng số dòng khớp lọc</span></div>
+        <div class="dm-stat dm-stat-new"><strong id="dm-export-will-export">0</strong><span>Số dòng sẽ có trong file</span></div>
+      </div>
+      <div class="dm-table-wrap">
+        <table class="dm-preview-table" id="dm-export-preview-table">
+          <thead><tr id="dm-export-preview-thead-row"></tr></thead>
+          <tbody id="dm-export-preview-tbody"></tbody>
+        </table>
+      </div>
+      <p class="dm-hint dm-hint-muted" id="dm-export-sample-hint"></p>
+    </div>
+
+    <p class="dm-hint dm-hint-muted" id="dm-export-stale-hint" hidden>
+      Bộ lọc vừa thay đổi — bấm lại "Xem trước" để cập nhật bảng xem trước trước khi tải file.
+    </p>
 
     <div class="dm-export-actions">
-      <a class="btn btn-primary" href="{{ url_for('data_mgmt.export', entity_type=entity_type, format='xlsx') }}">
+      <button type="button" class="btn btn-primary" id="dm-export-download-xlsx" disabled>
         Tải file Excel (.xlsx)
-      </a>
-      <a class="btn btn-ghost" href="{{ url_for('data_mgmt.export', entity_type=entity_type, format='csv') }}">
+      </button>
+      <button type="button" class="btn btn-ghost" id="dm-export-download-csv" disabled>
         Tải file CSV (.csv)
-      </a>
+      </button>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var root = document.getElementById("dm-export-root");
+  if (!root) return;
+
+  var previewUrl = root.getAttribute("data-preview-url");
+  var downloadUrl = root.getAttribute("data-download-url");
+
+  var statusEl = document.getElementById("dm-export-status");
+  var isActiveEl = document.getElementById("dm-export-is-active");
+  var companyHiddenEl = document.getElementById("dm-export-company-input_value");
+  var dateFieldEl = document.getElementById("dm-export-date-field");
+  var fromDateEl = document.getElementById("dm-export-from-date");
+  var toDateEl = document.getElementById("dm-export-to-date");
+  var limitEl = document.getElementById("dm-export-limit");
+
+  var previewBtn = document.getElementById("dm-export-preview-btn");
+  var previewArea = document.getElementById("dm-export-preview-area");
+  var staleHint = document.getElementById("dm-export-stale-hint");
+  var xlsxBtn = document.getElementById("dm-export-download-xlsx");
+  var csvBtn = document.getElementById("dm-export-download-csv");
+
+  // Chỉ đúng querystring vừa được PREVIEW THÀNH CÔNG mới cho phép tải
+  // file — tránh trường hợp staff đổi filter sau khi xem trước rồi bấm
+  // tải luôn, khiến file tải về KHÔNG khớp bảng vừa xem (đúng tinh thần
+  // thiết kế "xem gì thì tải đúng cái đó").
+  var lastPreviewedQuery = null;
+
+  function collectFilterParams() {
+    var params = new URLSearchParams();
+    if (statusEl && statusEl.value) params.set("status", statusEl.value);
+    if (isActiveEl && isActiveEl.value) params.set("is_active", isActiveEl.value);
+    if (companyHiddenEl && companyHiddenEl.value) params.set("company_id", companyHiddenEl.value);
+    if (dateFieldEl && dateFieldEl.value) params.set("date_field", dateFieldEl.value);
+    if (fromDateEl && fromDateEl.value) params.set("from_date", fromDateEl.value);
+    if (toDateEl && toDateEl.value) params.set("to_date", toDateEl.value);
+    if (limitEl && limitEl.value) params.set("limit", limitEl.value);
+    return params;
+  }
+
+  function markStale() {
+    lastPreviewedQuery = null;
+    xlsxBtn.disabled = true;
+    csvBtn.disabled = true;
+    if (!previewArea.hidden) staleHint.hidden = false;
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function renderPreview(data) {
+    var columns = data.columns || [];
+    var rows = data.sample_rows || [];
+
+    document.getElementById("dm-export-total-matching").textContent = data.total_matching;
+    document.getElementById("dm-export-will-export").textContent = data.will_export;
+
+    var theadRow = document.getElementById("dm-export-preview-thead-row");
+    theadRow.innerHTML = columns.map(function (c) { return "<th>" + escapeHtml(c) + "</th>"; }).join("");
+
+    var tbody = document.getElementById("dm-export-preview-tbody");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="' + Math.max(columns.length, 1) + '">Không có dòng nào khớp bộ lọc.</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(function (row) {
+        return "<tr>" + columns.map(function (c) {
+          var v = row[c];
+          return "<td>" + escapeHtml(v == null ? "" : v) + "</td>";
+        }).join("") + "</tr>";
+      }).join("");
+    }
+
+    var sampleHint = document.getElementById("dm-export-sample-hint");
+    if (data.will_export > rows.length) {
+      sampleHint.textContent = "Đang hiện " + rows.length + " / " + data.will_export + " dòng sẽ xuất (mẫu đầu tiên) — file tải về sẽ có đủ " + data.will_export + " dòng.";
+    } else {
+      sampleHint.textContent = "";
+    }
+
+    previewArea.hidden = false;
+    staleHint.hidden = true;
+  }
+
+  function runPreview() {
+    var params = collectFilterParams();
+    previewBtn.disabled = true;
+    var originalLabel = previewBtn.textContent;
+    previewBtn.textContent = "Đang tải…";
+
+    fetch(previewUrl + "?" + params.toString(), {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    }).then(function (res) {
+      return res.json().catch(function () {
+        throw new Error(res.status === 401 || res.status === 403
+          ? "Phiên đăng nhập đã hết hạn hoặc không đủ quyền — vui lòng tải lại trang."
+          : "Máy chủ trả về dữ liệu không hợp lệ (HTTP " + res.status + ").");
+      });
+    }).then(function (data) {
+      if (data.error) {
+        if (typeof window.showToast === "function") {
+          window.showToast(data.error, "error");
+        }
+        markStale();
+        return;
+      }
+      renderPreview(data);
+      lastPreviewedQuery = params.toString();
+      xlsxBtn.disabled = false;
+      csvBtn.disabled = false;
+    }).catch(function (err) {
+      if (typeof window.showToast === "function") {
+        window.showToast(String(err), "error");
+      }
+      markStale();
+    }).finally(function () {
+      previewBtn.disabled = false;
+      previewBtn.textContent = originalLabel;
+    });
+  }
+
+  function downloadFile(format) {
+    if (lastPreviewedQuery == null) return;
+    window.location.href = downloadUrl + "?" + lastPreviewedQuery + "&format=" + format;
+  }
+
+  previewBtn.addEventListener("click", runPreview);
+  xlsxBtn.addEventListener("click", function () { downloadFile("xlsx"); });
+  csvBtn.addEventListener("click", function () { downloadFile("csv"); });
+
+  // Đổi bất kỳ filter nào sau khi đã xem trước -> bắt xem lại trước khi
+  // cho tải (xem markStale() ở trên). Ô chọn công ty (_company_combobox)
+  // đổi giá trị qua hidden input KHÔNG bắn event "change"/"input" chuẩn
+  // (app.js tự set .value bằng JS, không qua thao tác gõ trực tiếp của
+  // trình duyệt) — lắng "click" trên cả combobox panel để bắt luôn
+  // trường hợp chọn công ty làm stale bộ lọc.
+  [statusEl, isActiveEl, dateFieldEl].forEach(function (el) {
+    if (el) el.addEventListener("change", markStale);
+  });
+  [fromDateEl, toDateEl, limitEl].forEach(function (el) {
+    if (el) el.addEventListener("input", markStale);
+  });
+  var companyBox = companyHiddenEl ? companyHiddenEl.closest(".cbx") : null;
+  if (companyBox) companyBox.addEventListener("click", markStale);
+})();
+</script>
