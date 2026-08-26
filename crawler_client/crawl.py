@@ -1,196 +1,162 @@
-"""Crawl blueprint — trang "Crawl dữ liệu" (08/2026). CHỈ admin thấy và
-dùng được (khớp yêu cầu gốc, chặt hơn @staff_required cho ss_team đang
-dùng ở hầu hết trang quản trị khác) — xem utils/decorators.py::admin_required.
+"""
+Crawl — trang "Crawl dữ liệu" (08/2026, CHỈ admin thấy/dùng, xem
+utils/decorators.py::admin_required + blueprints/crawl.py). Gọi các
+endpoint backend: GET /sources, POST /crawl, GET /crawl/{run_id},
+GET /crawl (lịch sử), GET /crawl/{run_id}/logs, GET /crawl/latest-log-run
+— xem sql/migration_add_crawl_runs.sql và
+sql/migration_add_crawl_progress_logs.sql phía backend để biết đầy đủ
+thiết kế.
+"""
 
-Nguồn dữ liệu: bảng crawl_runs (Postgres, xem
-sql/migration_add_crawl_runs.sql phía backend) — thay cho _RUNS (RAM)
-cũ, sống bền qua restart server."""
+from .base import _request
 
-import math
+# Thứ tự + nhãn tiếng Việt cho 8 chỉ số trong `stats` (dict trả về từ
+# pipeline.run_pipeline() phía backend, xem docstring CrawlStatusOut).
+# Giữ CỐ ĐỊNH thứ tự này — dùng chung cho cả bảng lịch sử (server-render)
+# lẫn card "đang chạy" cập nhật qua JS (xem crawl.html, JS đọc lại đúng
+# 8 key này để không phải định nghĩa nhãn 2 lần ở 2 nơi).
+CRAWL_STAT_LABELS = [
+    ("inserted", "Job mới"),
+    ("fetched", "Tổng lấy về"),
+    ("skipped_duplicate", "Trùng URL (bỏ qua)"),
+    ("skipped_duplicate_repost", "Đăng lại (bỏ qua)"),
+    ("updated_existing", "Đã vá job cũ"),
+    ("skipped_fetch_failed", "Lỗi fetch JD (bỏ qua)"),
+    ("skipped_anonymous_employer", "NTD ẩn danh (bỏ qua)"),
+    ("errors", "Lỗi khác"),
+]
 
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
-from flask_login import current_user
-
-import backend_auth
-from backend_auth import BackendAuthError
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
-from utils.decorators import admin_required
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
-
-crawl_bp = Blueprint("crawl", __name__)
-
-# Nhãn hiển thị cho từng nguồn — KHÔNG lấy từ get_sources() (dict đó chỉ
-# có category, không có nhãn nguồn) — giữ khớp tay với 2 nguồn đã đăng ký
-# ở crawl_runner.py phía backend (careerviet CHƯA có adapter, xem lịch sử
-# trao đổi — cố tình không liệt kê ở đây).
-_SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks"}
-
-
-def _active_run_for_source(source):
-    """Trả dict crawl_run đang 'running' hoặc 'queued' cho 1 nguồn (ưu
-    tiên 'running' vì khả năng cao hơn 'queued' đứng lâu), hoặc None nếu
-    nguồn đó rảnh. Tối đa 2 lần gọi GET /crawl (KHÔNG gộp được 1 lần vì
-    backend chỉ nhận 1 giá trị status/lần gọi, xem
-    api/routers/crawl.py::list_crawl_runs) — chấp nhận được vì chỉ chạy
-    lúc load trang, cho đúng 2 nguồn (4 lệnh gọi tối đa, không phải vòng
-    lặp không giới hạn)."""
-    for status in ("running", "queued"):
-        result = _call_authed(db_data.list_crawl_runs, source=source, status=status, limit=1)
-        if result["items"]:
-            return result["items"][0]
-    return None
+CRAWL_STATUS_LABELS = {
+    "queued": "Đang chờ", "running": "Đang chạy",
+    "done": "Hoàn tất", "error": "Lỗi",
+}
+# Map sang class badge có sẵn (public/css/12-activity-logs.css) — thêm
+# badge-info riêng cho 'queued'/'running' (chưa có sẵn, xem
+# public/css/15-crawl.css, 2 màu status đó CHƯA tồn tại trong hệ badge
+# success/warning/danger cũ, vốn chỉ dành cho action log Thêm/Sửa/Xoá).
+CRAWL_STATUS_BADGE = {
+    "queued": "badge-info", "running": "badge-info",
+    "done": "badge-success", "error": "badge-danger",
+}
 
 
-@crawl_bp.route("/crawl")
-@admin_required
-def index():
-    """Trang chính — Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
-    1/nguồn), Khu C (lịch sử, filter + phân trang)."""
-    try:
-        sources = db_data.get_sources()
-    except CrawlerAPIError as exc:
-        flash(str(exc), "error")
-        sources = {}
-
-    active_runs = {}
-    for source in sources:
-        try:
-            run = _active_run_for_source(source)
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            run = None
-        if run:
-            active_runs[source] = run
-
-    # Filter lịch sử
-    f_source = request.args.get("source", "")
-    f_status = request.args.get("status", "")
-    f_triggered_by = request.args.get("triggered_by", "")
-
-    try:
-        page, per_page = _paginate_args(30)
-        offset = (page - 1) * per_page
-        result = _call_authed(
-            db_data.list_crawl_runs, source=f_source, status=f_status,
-            triggered_by=f_triggered_by, limit=per_page, offset=offset,
-        )
-        runs = result["items"]
-        total_runs = result["total"]
-        total_pages = max(1, math.ceil(total_runs / per_page))
-        if page > total_pages:
-            page = total_pages
-    except CrawlerAPIError as exc:
-        flash(str(exc), "error")
-        runs, total_runs, total_pages, page, per_page = [], 0, 1, 1, 30
-
-    # Dropdown "người bấm" — CHỈ admin (khớp POST /crawl chỉ admin bấm
-    # được, khác staff_members ở activity_logs.py gồm cả ss_team).
-    access_token, _ = _auth_tokens_from_session()
-    try:
-        all_users = backend_auth.list_users(access_token)
-        admin_members = [u for u in all_users if u.get("role") == "admin"]
-    except BackendAuthError as exc:
-        flash(str(exc), "error")
-        admin_members = []
-
-    # Nhãn category phẳng "source:category" -> label — dùng CẢ server
-    # render (Khu C) LẪN JS (Khu B tự thêm dòng lịch sử khi crawl xong,
-    # xem crawl.html script) để không phải định nghĩa nhãn 2 lần lệch
-    # nhau giữa Jinja và JS.
-    category_labels = {
-        f"{src}:{cat}": label
-        for src, cats in sources.items() for cat, label in cats.items()
+def _normalize_crawl_run(raw: dict) -> dict:
+    stats = raw.get("stats") or {}
+    return {
+        "run_id": raw.get("run_id"),
+        "status": raw.get("status") or "",
+        "status_label": CRAWL_STATUS_LABELS.get(raw.get("status"), raw.get("status") or ""),
+        "status_badge": CRAWL_STATUS_BADGE.get(raw.get("status"), "badge-warning"),
+        "source": raw.get("source") or "",
+        "category": raw.get("category") or "",
+        "pages": raw.get("pages"),
+        "max_jobs": raw.get("max_jobs"),
+        "triggered_by": raw.get("triggered_by"),
+        # None -> "Hệ thống (tự động)": dành sẵn cho crawl lịch tự động
+        # sau này (chưa làm), KHÔNG phải lỗi dữ liệu — cùng quy ước
+        # actor_name ở audit_logs.py.
+        "triggered_by_name": raw.get("triggered_by_name") or "Hệ thống (tự động)",
+        "started_at": raw.get("started_at"),
+        "finished_at": raw.get("finished_at"),
+        "stats": stats,
+        # Danh sách (label, value) đúng thứ tự CRAWL_STAT_LABELS — chỉ
+        # có khi status='done' (stats rỗng thì thôi, template tự ẩn).
+        "stat_items": [(label, stats.get(key, 0)) for key, label in CRAWL_STAT_LABELS] if stats else [],
+        "error": raw.get("error") or "",
+        # 08/2026 (heartbeat/tiến độ real-time, xem docstring backend
+        # api/schemas/crawl.py::CrawlStatusOut) — snapshot mới nhất
+        # {"fetched", "inserted", "last_update"}, None nếu chưa có
+        # heartbeat nào (status vẫn 'queued', hoặc lượt crawl chạy
+        # TRƯỚC KHI tính năng này tồn tại).
+        "progress": raw.get("progress"),
     }
 
-    return render_template(
-        "crawl.html",
-        sources=sources, source_labels=_SOURCE_LABELS,
-        active_runs=active_runs, category_labels=category_labels,
-        runs=runs, total_runs=total_runs, page=page, total_pages=total_pages, per_page=per_page,
-        status_labels=db_data.CRAWL_STATUS_LABELS, stat_labels=db_data.CRAWL_STAT_LABELS,
-        admin_members=admin_members,
-        filters={"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
-        pagination_filters={k: v for k, v in
-                             {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
-    )
+
+def get_sources() -> dict:
+    """GET /sources — KHÔNG cần access_token (route backend chỉ yêu cầu
+    X-API-Key, tự thêm sẵn trong mọi _request() — không có JWT nào ở
+    đây), khác hẳn các hàm bên dưới đều bắt buộc access_token thật.
+
+    Trả {"topcv": {"data-analyst": "Data Analyst", ...}, "vietnamworks": {...}}
+    — CHỈ 2 nguồn (careerviet chưa có adapter đăng ký ở crawl_runner.py
+    phía backend, xem lịch sử trao đổi — KHÔNG phải thiếu sót ở đây)."""
+    return _request("GET", "/sources") or {}
 
 
-@crawl_bp.route("/crawl/trigger", methods=["POST"])
-@admin_required
-def trigger():
-    source = request.form.get("source", "").strip()
-    category = request.form.get("category", "").strip()
-    pages_raw = request.form.get("pages", "").strip()
-    max_jobs_raw = request.form.get("max_jobs", "").strip()
+def trigger_crawl(access_token, *, source, category, pages=None, max_jobs=None) -> dict:
+    """POST /crawl — trả {"run_id": ..., "status": "queued"} NGAY, KHÔNG
+    đợi crawl xong (có thể mất vài phút — vài chục phút).
 
-    pages = int(pages_raw) if pages_raw.isdigit() else None
-    max_jobs = int(max_jobs_raw) if max_jobs_raw.isdigit() else None
+    BẮT BUỘC access_token của admin (role='admin' thật, backend
+    require_admin sẽ trả 403 nếu ss_team thường gọi) — route Flask gọi
+    hàm này PHẢI tự chặn trước bằng @admin_required (xem
+    blueprints/crawl.py), không dựa vào backend 403 làm lớp chặn duy
+    nhất (lớp chặn chính ở frontend để UX rõ ràng hơn, backend là lớp
+    chặn cuối phòng gọi thẳng URL).
 
-    try:
-        result = _call_authed(
-            db_data.trigger_crawl, source=source, category=category,
-            pages=pages, max_jobs=max_jobs,
-        )
-        flash(
-            f"Đã bắt đầu crawl {_SOURCE_LABELS.get(source, source)} "
-            f"(run_id={result['run_id'][:8]}...). Theo dõi tiến độ ở khu 'Đang chạy' bên dưới.",
-            "success",
-        )
-    except CrawlerAPIError as exc:
-        if exc.status_code == 409:
-            # Message backend đã sẵn tiếng Việt, dễ hiểu (xem
-            # db.ActiveCrawlExistsError phía backend) — hiện thẳng,
-            # không viết lại.
-            flash(str(exc), "error")
-        else:
-            flash(str(exc), "error")
-
-    return redirect(url_for("crawl.index"))
+    Raise CrawlerAPIError(status_code=409) nếu nguồn này đang có 1 lượt
+    'queued'/'running' chưa xong — nơi gọi (route) PHẢI bắt riêng để
+    flash đúng message backend trả (đã sẵn tiếng Việt, dễ hiểu)."""
+    payload = {"source": source, "category": category}
+    if pages is not None:
+        payload["pages"] = pages
+    if max_jobs is not None:
+        payload["max_jobs"] = max_jobs
+    return _request("POST", "/crawl", access_token=access_token, json=payload)
 
 
-@crawl_bp.route("/crawl/<string:run_id>/status.json")
-@admin_required
-def status_json(run_id):
-    """JSON polling — JS ở crawl.html gọi định kỳ tới khi status
-    'done'/'error'. @admin_required tự trả JSON lỗi (không redirect
-    HTML) khi bị chặn quyền, xem docstring decorator."""
-    try:
-        run = _call_authed(db_data.get_crawl_status, run_id)
-    except CrawlerAPIError as exc:
-        return jsonify({"error": str(exc)}), (exc.status_code or 500)
-    if run is None:
-        return jsonify({"error": "Không tìm thấy lượt crawl này."}), 404
-    return jsonify(run)
+def get_crawl_status(access_token, run_id) -> dict:
+    """GET /crawl/{run_id} — poll tiến độ/kết quả 1 lượt. BẮT BUỘC
+    access_token (role tối thiểu 'ss_team' ở backend — nhưng route Flask
+    ở đây vẫn luôn gọi qua @admin_required, chặt hơn mức backend yêu
+    cầu, đúng yêu cầu gốc "chỉ admin thấy và dùng" của trang này)."""
+    raw = _request("GET", f"/crawl/{run_id}", access_token=access_token)
+    return _normalize_crawl_run(raw) if raw else None
 
 
-@crawl_bp.route("/crawl/<string:run_id>/logs.json")
-@admin_required
-def logs_json(run_id):
-    """JSON polling khu "Xem log live" — JS ở crawl.html gọi định kỳ
-    (song song với status.json) kèm ?after_id=N để chỉ lấy dòng log MỚI
-    (xem docstring crawler_client/crawl.py::get_crawl_logs). Cùng cách
-    xử lý lỗi như status_json() ở trên (@admin_required tự trả JSON,
-    không redirect HTML)."""
-    after_id = request.args.get("after_id", "0")
-    after_id = int(after_id) if after_id.isdigit() else 0
-    try:
-        result = _call_authed(db_data.get_crawl_logs, run_id, after_id=after_id)
-    except CrawlerAPIError as exc:
-        return jsonify({"error": str(exc)}), (exc.status_code or 500)
-    return jsonify(result)
+def list_crawl_runs(access_token, *, source="", status="", triggered_by="",
+                     limit=50, offset=0) -> dict:
+    """GET /crawl — danh sách lịch sử, phân trang. Trả {"items": [...], "total": int}."""
+    params = {"limit": limit, "offset": offset}
+    if source:
+        params["source"] = source
+    if status:
+        params["status"] = status
+    if triggered_by:
+        params["triggered_by"] = triggered_by
+    data = _request("GET", "/crawl", access_token=access_token, params=params) or {}
+    items = [_normalize_crawl_run(r) for r in data.get("items", [])]
+    return {"items": items, "total": data.get("total", 0)}
 
 
-@crawl_bp.route("/crawl/latest-log-run")
-@admin_required
-def latest_log_run():
-    """JSON — khung "Log live" (LUÔN HIỆN cố định trên trang, 08/2026,
-    xem lịch sử trao đổi) gọi lúc tải trang để biết run_id GẦN NHẤT
-    (bất kể status) mà nó nên hiện log. Trả {"run_id": null, ...} (không
-    phải 404) nếu chưa từng crawl lần nào — đây là trạng thái hợp lệ,
-    JS tự hiện "Chưa có lượt crawl nào." thay vì coi là lỗi."""
-    try:
-        run = _call_authed(db_data.get_crawl_latest_log_run)
-    except CrawlerAPIError as exc:
-        return jsonify({"error": str(exc)}), (exc.status_code or 500)
-    return jsonify(run or {"run_id": None})
+def get_crawl_logs(access_token, run_id, after_id=0, limit=500) -> dict:
+    """GET /crawl/{run_id}/logs?after_id=N — khu "Xem log live" ở
+    trang /crawl (08/2026, xem docstring backend api/routers/crawl.py::
+    get_crawl_logs). Trả {"last_id": int, "items": [{"id","level",
+    "message","created_at"}, ...]} y hệt response backend, KHÔNG cần
+    normalize thêm (không có mapping nhãn/badge nào áp dụng cho dòng
+    log thô, khác _normalize_crawl_run ở trên).
+
+    after_id: truyền đúng "last_id" của lần gọi TRƯỚC để chỉ nhận dòng
+    MỚI — route Flask (blueprints/crawl.py::logs_json) truyền thẳng
+    query string từ JS xuống đây, không tự ý đổi giá trị."""
+    return _request(
+        "GET", f"/crawl/{run_id}/logs", access_token=access_token,
+        params={"after_id": after_id, "limit": limit},
+    ) or {"last_id": after_id, "items": []}
+
+
+def get_crawl_latest_log_run(access_token) -> dict:
+    """GET /crawl/latest-log-run — khung "Log live" (LUÔN HIỆN cố định
+    trên trang /crawl, 08/2026, xem lịch sử trao đổi) gọi lúc mở trang
+    để biết run_id GẦN NHẤT (bất kể status) mà nó nên hiện log, và tiếp
+    tục poll định kỳ (mỗi 6s, xem crawl.html) để tự chuyển sang run mới
+    ngay khi phát hiện có lượt crawl khác bắt đầu.
+
+    Trả None (KHÔNG raise lỗi) nếu bảng crawl_runs rỗng hoàn toàn (chưa
+    từng crawl lần nào) — route Flask (blueprints/crawl.py::
+    latest_log_run) tự bọc lại thành {"run_id": None} cho JS, đây là
+    trạng thái hợp lệ chứ không phải lỗi — cùng quy ước response_model
+    Optional[CrawlStatusOut] ở backend."""
+    raw = _request("GET", "/crawl/latest-log-run", access_token=access_token)
+    return _normalize_crawl_run(raw) if raw else None

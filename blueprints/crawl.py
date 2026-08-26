@@ -179,3 +179,18 @@ def logs_json(run_id):
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
     return jsonify(result)
+
+
+@crawl_bp.route("/crawl/latest-log-run")
+@admin_required
+def latest_log_run():
+    """JSON — khung "Log live" (LUÔN HIỆN cố định trên trang, 08/2026,
+    xem lịch sử trao đổi) gọi lúc tải trang để biết run_id GẦN NHẤT
+    (bất kể status) mà nó nên hiện log. Trả {"run_id": null, ...} (không
+    phải 404) nếu chưa từng crawl lần nào — đây là trạng thái hợp lệ,
+    JS tự hiện "Chưa có lượt crawl nào." thay vì coi là lỗi."""
+    try:
+        run = _call_authed(db_data.get_crawl_latest_log_run)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    return jsonify(run or {"run_id": None})
