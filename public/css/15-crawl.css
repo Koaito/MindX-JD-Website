@@ -112,13 +112,18 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #F7F8FA;  /* không có token --surface-soft riêng, xám nhạt cố định */
+  /* Khớp đúng nền input/select/textarea của .form-card (07-forms.css)
+     thay vì 1 tông xám riêng — tránh cảm giác "hộp xám trong card
+     trắng" lạc quẻ so với phần còn lại của form. */
+  background: #FBFCFB;
 }
 
+/* .checkbox-label (07-forms.css) đã lo layout hàng ngang (flex-direction:
+   row, align-items:center, gap:8px) — class này CHỈ thêm phần riêng của
+   crawl: cỡ chữ nhỏ hơn label thường (13px, khớp text ngành trong ô) +
+   accent-color cam để tick khớp màu CTA "Bắt đầu crawl" của trang, thay
+   vì checkbox đen mặc định trình duyệt trông lạc tông. */
 .crawl-category-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 13px;
   font-weight: 400;
   cursor: pointer;
@@ -127,6 +132,7 @@
 .crawl-category-item input[type="checkbox"] {
   width: auto;
   margin: 0;
+  accent-color: var(--accent);
 }
 
 .crawl-category-item input[type="checkbox"]:disabled {

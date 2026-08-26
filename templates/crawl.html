@@ -36,13 +36,13 @@
         <div class="crawl-category-head">
           <span>Ngành (tick 1 hoặc nhiều — crawl tuần tự hết)</span>
           <span class="crawl-category-actions">
-            <button type="button" class="btn-text" data-role="check-all" {{ 'disabled' if active }}>Chọn tất cả</button>
-            <button type="button" class="btn-text" data-role="check-none" {{ 'disabled' if active }}>Bỏ chọn</button>
+            <button type="button" class="btn btn-text" data-role="check-all" {{ 'disabled' if active }}>Chọn tất cả</button>
+            <button type="button" class="btn btn-text" data-role="check-none" {{ 'disabled' if active }}>Bỏ chọn</button>
           </span>
         </div>
         <div class="crawl-category-list">
           {% for cat_key, cat_label in categories.items() %}
-          <label class="crawl-category-item">
+          <label class="crawl-category-item checkbox-label">
             <input type="checkbox" name="categories" value="{{ cat_key }}" {{ 'disabled' if active }}>
             {{ cat_label }}
           </label>
