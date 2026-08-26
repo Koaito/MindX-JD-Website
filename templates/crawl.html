@@ -24,16 +24,32 @@
         Chọn ngành, bấm để bắt đầu 1 lượt crawl mới.
       {% endif %}
     </p>
-    <form method="post" action="{{ url_for('crawl.trigger') }}" class="form-grid form-card">
+    {# 08/2026 — đổi dropdown 1 category thành checkbox NHIỀU category
+       (crawl tuần tự, xem blueprints/crawl.py::trigger_batch()). Form
+       này LUÔN post về crawl.trigger_batch (kể cả tick đúng 1 ô) —
+       route crawl.trigger (đơn lẻ, dropdown cũ) vẫn còn nguyên trong
+       code, chỉ không còn form nào ở trang này gọi tới nữa. #}
+    <form method="post" action="{{ url_for('crawl.trigger_batch') }}"
+          class="form-grid form-card crawl-batch-form" data-source="{{ source }}">
       <input type="hidden" name="source" value="{{ source }}">
-      <label class="span-2">
-        Ngành
-        <select name="category" required {{ 'disabled' if active }}>
+      <div class="crawl-category-field">
+        <div class="crawl-category-head">
+          <span>Ngành (tick 1 hoặc nhiều — crawl tuần tự hết)</span>
+          <span class="crawl-category-actions">
+            <button type="button" class="btn-text" data-role="check-all" {{ 'disabled' if active }}>Chọn tất cả</button>
+            <button type="button" class="btn-text" data-role="check-none" {{ 'disabled' if active }}>Bỏ chọn</button>
+          </span>
+        </div>
+        <div class="crawl-category-list">
           {% for cat_key, cat_label in categories.items() %}
-            <option value="{{ cat_key }}">{{ cat_label }}</option>
+          <label class="crawl-category-item">
+            <input type="checkbox" name="categories" value="{{ cat_key }}" {{ 'disabled' if active }}>
+            {{ cat_label }}
+          </label>
           {% endfor %}
-        </select>
-      </label>
+        </div>
+        <p class="crawl-category-error" data-role="category-error"></p>
+      </div>
       <label class="span-1">
         Số trang
         <input type="number" name="pages" min="1" max="20" placeholder="Mặc định 3" {{ 'disabled' if active }}>
@@ -59,25 +75,47 @@
     {% if active_runs %}
       <h2 class="crawl-zone-title">Đang chạy</h2>
       {% for source, run in active_runs.items() %}
+      {% set batch = active_batches.get(source) %}
       <div class="dm-export-card crawl-running-card-wrap"
            id="crawl-running-{{ source }}"
            data-run-id="{{ run.run_id }}"
-           data-source="{{ source }}">
+           data-source="{{ source }}"
+           {% if batch %}data-batch-id="{{ batch.batch_id }}"{% endif %}>
         <div class="crawl-running-card">
           <div>
             <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
             <p class="crawl-running-meta" style="margin-top: 8px;">
-              {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
+              {% if batch %}
+                {{ source_labels.get(source, source) }} ·
+                <span data-role="batch-count">{{ batch.completed }}/{{ batch.total }}</span> ngành xong
+              {% else %}
+                {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}
+              {% endif %}<br>
               Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
             </p>
           </div>
         </div>
+        {% if batch %}
+        {# 08/2026 — checklist đủ N category theo đúng thứ tự đã tick,
+           kể cả category CHƯA có run con nào (hiện 'Đang chờ' placeholder,
+           xem docstring crawler_client/crawl.py::_normalize_crawl_batch()).
+           JS (renderBatchChecklist) cập nhật badge từng dòng khi poll. #}
+        <ul class="crawl-batch-checklist" data-role="batch-checklist">
+          {% for item in batch.checklist %}
+          <li class="crawl-batch-item" data-category="{{ item.category }}">
+            <span class="badge {{ item.status_badge }}" data-role="item-badge">{{ item.status_label }}</span>
+            <span class="crawl-batch-item-label">{{ category_labels.get(source ~ ':' ~ item.category, item.category) }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
         <div class="crawl-progress" data-role="progress">
           <p class="crawl-progress-line">
             <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
           </p>
           <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
         </div>
+        {% endif %}
       </div>
       {% endfor %}
     {% else %}
@@ -307,10 +345,16 @@
   }
 
   function reenableSourceForm(source) {
-    var card = document.querySelector('.crawl-source-card form input[value="' + source + '"]');
-    if (!card) return;
-    var form = card.closest("form");
+    // 08/2026: input[value=source] giờ luôn khớp đúng 1 input — chính
+    // input hidden name="source" (checkbox category không còn value
+    // trùng source nữa, khác select cũ), nên selector này vẫn đúng.
+    var hiddenSourceInput = document.querySelector('.crawl-batch-form input[type=hidden][value="' + source + '"]');
+    if (!hiddenSourceInput) return;
+    var form = hiddenSourceInput.closest("form");
     if (!form) return;
+    // "select" giữ lại phòng route trigger() (dropdown đơn lẻ) cũ còn
+    // được dùng ở nơi khác sau này — form batch hiện tại chỉ có
+    // checkbox/input/button, "select" đơn giản không khớp gì, vô hại.
     form.querySelectorAll("select, input, button").forEach(function (el) {
       el.disabled = false;
     });
@@ -439,6 +483,78 @@
     }, 6000);
   }
 
+  // 08/2026 — checklist card cho batch (nhiều category liên tục, xem
+  // blueprints/crawl.py::trigger_batch()). Cập nhật badge từng dòng +
+  // số "x/y ngành xong" theo response GET /crawl/batch/{id}/status.json
+  // — KHÔNG tự dựng lại <li> (đủ N dòng đã render sẵn từ Jinja lúc tải
+  // trang, xem batch.checklist trong crawl.html), chỉ tìm đúng <li>
+  // theo data-category rồi đổi class/text badge của nó.
+  function renderBatchChecklist(card, batch) {
+    var list = card.querySelector('[data-role="batch-checklist"]');
+    if (!list || !batch.checklist) return;
+    batch.checklist.forEach(function (item) {
+      var li = list.querySelector('li[data-category="' + item.category + '"]');
+      if (!li) return;
+      var badge = li.querySelector('[data-role="item-badge"]');
+      if (badge) {
+        badge.className = "badge " + (STATUS_BADGE[item.status] || "badge-warning");
+        badge.textContent = STATUS_LABELS[item.status] || item.status;
+      }
+    });
+  }
+
+  function pollBatch(card, onDone) {
+    var batchId = card.getAttribute("data-batch-id");
+    var source = card.getAttribute("data-source");
+    var stopped = false;
+    var inFlight = false;  // cùng lý do inFlight ở pollRun() bên dưới — chặn race 2 response chồng nhau.
+    // Chặn thêm TRÙNG dòng lịch sử cho 1 run con khi nó vẫn còn 'done'/
+    // 'error' ở NHIỀU lần poll liên tiếp (backend không tự xoá items
+    // đã xong khỏi response — mỗi lần poll đều trả LẠI toàn bộ items).
+    var addedRunIds = {};
+
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/batch/" + batchId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (batch) {
+          inFlight = false;
+          if (stopped) return;
+          if (batch.error) {
+            stopped = true;
+            clearInterval(timer);
+            return;
+          }
+
+          var countEl = card.querySelector('[data-role="batch-count"]');
+          if (countEl) countEl.textContent = batch.completed + "/" + batch.total;
+          renderBatchChecklist(card, batch);
+
+          // Category nào vừa xong (done/error) mà chưa có dòng lịch sử
+          // -> thêm NGAY, không đợi CẢ batch xong mới thêm 1 lần — thấy
+          // kết quả từng ngành ngay khi nó xong, giống crawl đơn lẻ.
+          (batch.items || []).forEach(function (item) {
+            if ((item.status === "done" || item.status === "error") && item.run_id && !addedRunIds[item.run_id]) {
+              addedRunIds[item.run_id] = true;
+              prependHistoryRow(item);
+            }
+          });
+
+          if (batch.status === "done" || batch.status === "error") {
+            stopped = true;
+            clearInterval(timer);
+            reenableSourceForm(source);
+            if (onDone) onDone(batch);
+          }
+        })
+        .catch(function () {
+          inFlight = false;
+          // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp.
+        });
+    }, 4000);
+  }
+
   function pollRun(card, onDone) {
     var runId = card.getAttribute("data-run-id");
     var source = card.getAttribute("data-source");
@@ -483,15 +599,52 @@
     }, 4000);
   }
 
+  function onRunOrBatchDone(card) {
+    card.remove();
+    var zone = document.getElementById("crawl-running-zone");
+    if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+      var empty = document.createElement("p");
+      empty.className = "muted crawl-running-empty";
+      empty.textContent = "Hiện không có lượt crawl nào đang chạy.";
+      zone.appendChild(empty);
+    }
+  }
+
   document.querySelectorAll(".crawl-running-card-wrap[data-run-id]").forEach(function (card) {
-    pollRun(card, function () {
-      card.remove();
-      var zone = document.getElementById("crawl-running-zone");
-      if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
-        var empty = document.createElement("p");
-        empty.className = "muted crawl-running-empty";
-        empty.textContent = "Hiện không có lượt crawl nào đang chạy.";
-        zone.appendChild(empty);
+    // 08/2026 — card có data-batch-id (nguồn đang chạy 1 batch nhiều
+    // category) thì poll theo batch (checklist), ngược lại poll theo
+    // run đơn lẻ như trước giờ (progress-fetched/progress-updated).
+    if (card.getAttribute("data-batch-id")) {
+      pollBatch(card, function () { onRunOrBatchDone(card); });
+    } else {
+      pollRun(card, function () { onRunOrBatchDone(card); });
+    }
+  });
+
+  // 08/2026 — nút "Chọn tất cả"/"Bỏ chọn" + chặn submit khi chưa tick
+  // ngành nào (checkbox "categories" không hỗ trợ required native cho
+  // "ít nhất 1 trong nhóm" như radio, phải tự validate bằng JS).
+  document.querySelectorAll(".crawl-batch-form").forEach(function (form) {
+    var checkAllBtn = form.querySelector('[data-role="check-all"]');
+    var checkNoneBtn = form.querySelector('[data-role="check-none"]');
+    var errorEl = form.querySelector('[data-role="category-error"]');
+
+    if (checkAllBtn) {
+      checkAllBtn.addEventListener("click", function () {
+        form.querySelectorAll('input[name="categories"]').forEach(function (cb) { cb.checked = true; });
+        if (errorEl) errorEl.textContent = "";
+      });
+    }
+    if (checkNoneBtn) {
+      checkNoneBtn.addEventListener("click", function () {
+        form.querySelectorAll('input[name="categories"]').forEach(function (cb) { cb.checked = false; });
+      });
+    }
+    form.addEventListener("submit", function (e) {
+      var checked = form.querySelectorAll('input[name="categories"]:checked');
+      if (!checked.length) {
+        e.preventDefault();
+        if (errorEl) errorEl.textContent = "Tick ít nhất 1 ngành trước khi bấm.";
       }
     });
   });

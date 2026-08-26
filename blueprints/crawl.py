@@ -54,6 +54,7 @@ def index():
         sources = {}
 
     active_runs = {}
+    active_batches = {}
     for source in sources:
         try:
             run = _active_run_for_source(source)
@@ -62,6 +63,21 @@ def index():
             run = None
         if run:
             active_runs[source] = run
+            # 08/2026 — nếu run đang chạy của nguồn này thuộc 1 batch
+            # (batch_id khác None, xem docstring
+            # crawler_client/crawl.py::_normalize_crawl_run), lấy thêm
+            # tiến độ TỔNG của batch (checklist đủ N category) để Khu B
+            # hiện card "2/6 category xong" thay vì card 1-category cũ.
+            # Lỗi ở đây KHÔNG chặn render trang (card vẫn hiện, chỉ
+            # thiếu checklist) — giống cách active_runs xử lý lỗi ở trên.
+            if run.get("batch_id"):
+                try:
+                    batch = _call_authed(db_data.get_crawl_batch_status, run["batch_id"])
+                except CrawlerAPIError as exc:
+                    flash(str(exc), "error")
+                    batch = None
+                if batch:
+                    active_batches[source] = batch
 
     # Filter lịch sử
     f_source = request.args.get("source", "")
@@ -106,7 +122,7 @@ def index():
     return render_template(
         "crawl.html",
         sources=sources, source_labels=_SOURCE_LABELS,
-        active_runs=active_runs, category_labels=category_labels,
+        active_runs=active_runs, active_batches=active_batches, category_labels=category_labels,
         runs=runs, total_runs=total_runs, page=page, total_pages=total_pages, per_page=per_page,
         status_labels=db_data.CRAWL_STATUS_LABELS, stat_labels=db_data.CRAWL_STAT_LABELS,
         admin_members=admin_members,
@@ -149,6 +165,52 @@ def trigger():
     return redirect(url_for("crawl.index"))
 
 
+@crawl_bp.route("/crawl/batch/trigger", methods=["POST"])
+@admin_required
+def trigger_batch():
+    """08/2026 — "crawl nhiều category liên tục". Khu A (crawl.html) đã
+    đổi dropdown 1 category thành checkbox nhiều category cho MỌI lượt
+    bấm (kể cả tick đúng 1 ô) — form của Khu A LUÔN post về đây, KHÔNG
+    còn post về trigger() ở trên nữa (trigger() vẫn giữ nguyên, không
+    xoá — có thể cần lại sau, xem docstring
+    crawler_client/crawl.py::trigger_crawl_batch())."""
+    source = request.form.get("source", "").strip()
+    categories = [c.strip() for c in request.form.getlist("categories") if c.strip()]
+    pages_raw = request.form.get("pages", "").strip()
+    max_jobs_raw = request.form.get("max_jobs", "").strip()
+
+    pages = int(pages_raw) if pages_raw.isdigit() else None
+    max_jobs = int(max_jobs_raw) if max_jobs_raw.isdigit() else None
+
+    if not categories:
+        # Phòng hờ trường hợp JS validate bị tắt/lỗi (form.html đã chặn
+        # submit khi chưa tick gì ở phía JS, xem crawl.html) — backend
+        # Flask vẫn phải tự chặn lại vì request có thể tới đây trực
+        # tiếp (curl, JS bị chặn...), CrawlBatchRequest phía FastAPI
+        # backend cũng sẽ 422 nếu categories rỗng nhưng flash message
+        # tiếng Việt rõ ràng hơn để redirect thẳng ở đây.
+        flash("Chưa tick ngành nào — chọn ít nhất 1 ngành trước khi bấm.", "error")
+        return redirect(url_for("crawl.index"))
+
+    try:
+        result = _call_authed(
+            db_data.trigger_crawl_batch, source=source, categories=categories,
+            pages=pages, max_jobs=max_jobs,
+        )
+        flash(
+            f"Đã bắt đầu crawl {len(categories)} ngành liên tục cho "
+            f"{_SOURCE_LABELS.get(source, source)} (batch_id={result['batch_id'][:8]}...). "
+            f"Theo dõi tiến độ ở khu 'Đang chạy' bên dưới.",
+            "success",
+        )
+    except CrawlerAPIError as exc:
+        # Cùng cách xử lý lỗi (409 nguồn đang bận, hay lỗi khác) như
+        # trigger() ở trên — message backend đã tiếng Việt sẵn.
+        flash(str(exc), "error")
+
+    return redirect(url_for("crawl.index"))
+
+
 @crawl_bp.route("/crawl/<string:run_id>/status.json")
 @admin_required
 def status_json(run_id):
@@ -179,6 +241,23 @@ def logs_json(run_id):
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
     return jsonify(result)
+
+
+@crawl_bp.route("/crawl/batch/<string:batch_id>/status.json")
+@admin_required
+def batch_status_json(batch_id):
+    """JSON polling cho card batch ở Khu B — JS ở crawl.html gọi định
+    kỳ (khác hẳn status.json ở trên vốn poll 1 run đơn lẻ) tới khi
+    batch.status 'done'/'error'. Trả kèm "checklist" đủ N category để
+    JS cập nhật badge từng dòng, xem docstring
+    crawler_client/crawl.py::_normalize_crawl_batch()."""
+    try:
+        batch = _call_authed(db_data.get_crawl_batch_status, batch_id)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    if batch is None:
+        return jsonify({"error": "Không tìm thấy batch này."}), 404
+    return jsonify(batch)
 
 
 @crawl_bp.route("/crawl/latest-log-run")

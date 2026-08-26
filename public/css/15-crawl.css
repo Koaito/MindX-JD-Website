@@ -73,6 +73,99 @@
 .crawl-source-card .form-grid > label.span-1 { grid-column: span 1; }
 .crawl-source-card .form-actions.span-4 { grid-column: 1 / -1; }
 
+/* Khu A (08/2026) — khối checkbox nhiều category thay cho <select> đơn.
+   CỐ TÌNH không dùng class .span-* có sẵn (span-2 ở override 2-cột
+   ngay trên đã bị gán nghĩa "full-width", span-4 gốc của 07-forms.css
+   thì chưa được .crawl-source-card .form-grid nhận diện lại — thêm
+   1 class riêng ở đây đỡ phải đụng vào 2 hệ thống span đang lệch nghĩa
+   nhau đó, tự set grid-column: 1 / -1 thẳng cho div này). */
+.crawl-category-field {
+  grid-column: 1 / -1;
+}
+
+.crawl-category-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.crawl-category-actions .btn-text {
+  padding: 2px 6px;
+  font-size: 12.5px;
+}
+
+.crawl-category-actions .btn-text:disabled {
+  color: var(--ink-soft);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.crawl-category-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #F7F8FA;  /* không có token --surface-soft riêng, xám nhạt cố định */
+}
+
+.crawl-category-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.crawl-category-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.crawl-category-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.crawl-category-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #C62828;  /* khớp .crawl-error-text ở dưới, không có token --danger riêng */
+  min-height: 15px;
+}
+
+/* Khu B (08/2026) — checklist trạng thái từng category trong 1 batch,
+   thay cho .crawl-progress (1 dòng "fetched/inserted") khi card này
+   đang chạy 1 batch nhiều category thay vì 1 run đơn lẻ. */
+.crawl-batch-checklist {
+  list-style: none;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.crawl-batch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.crawl-batch-item-label {
+  color: var(--ink);
+}
+
 /* Badge trạng thái 'queued'/'running' — action log cũ (12-activity-logs.css)
    chỉ có success/warning/danger, không có màu trung tính cho "đang diễn
    ra" (khác hẳn ý nghĩa "Sửa" của warning). */

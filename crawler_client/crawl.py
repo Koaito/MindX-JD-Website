@@ -69,6 +69,79 @@ def _normalize_crawl_run(raw: dict) -> dict:
         # heartbeat nào (status vẫn 'queued', hoặc lượt crawl chạy
         # TRƯỚC KHI tính năng này tồn tại).
         "progress": raw.get("progress"),
+        # 08/2026 (xem docstring sql/migration_add_crawl_batches.sql
+        # phía backend) — None nếu run này KHÔNG thuộc batch nào (crawl
+        # đơn lẻ, đa số run). batch_position: thứ tự category này trong
+        # batch (0-based) — frontend hiện chưa dùng field này trực tiếp
+        # (khớp checklist bằng "category" ở _normalize_crawl_batch()
+        # bên dưới thay vì batch_position, vì category không lặp trong
+        # 1 batch nên khớp theo tên đủ chắc), giữ lại cho đủ khớp
+        # backend + phòng khi cần sau.
+        "batch_id": raw.get("batch_id"),
+        "batch_position": raw.get("batch_position"),
+    }
+
+
+def _normalize_crawl_batch(raw: dict) -> dict:
+    """08/2026 — chuẩn hóa CrawlBatchStatusOut (GET /crawl/batch/{id}).
+
+    Thêm "checklist": đủ N category theo ĐÚNG thứ tự đã chọn lúc bấm
+    (kể cả category CHƯA có row crawl_runs nào — vì backend chỉ tạo run
+    của category kế tiếp SAU KHI category trước xong, xem docstring
+    api/crawl_runner.py::execute() phía Scrap JD, nên "items" trả về
+    lúc đầu có thể ít hơn "categories") — khớp theo TÊN category (không
+    trùng lặp trong 1 batch, xem router backend tự loại category trùng)
+    thay vì batch_position, để không phải quan tâm thứ tự items trả về.
+    Category chưa có run nào -> hiện placeholder trạng thái 'queued',
+    run_id=None (JS không poll riêng cho category này, chỉ đợi lần poll
+    batch kế tiếp thấy nó xuất hiện trong "items")."""
+    status = raw.get("status") or ""
+    items = [_normalize_crawl_run(r) for r in (raw.get("items") or [])]
+    items_by_category = {item["category"]: item for item in items}
+    categories = raw.get("categories") or []
+
+    checklist = []
+    for cat_key in categories:
+        item = items_by_category.get(cat_key)
+        if item:
+            checklist.append({
+                "category": cat_key,
+                "run_id": item["run_id"],
+                "status": item["status"],
+                "status_label": item["status_label"],
+                "status_badge": item["status_badge"],
+            })
+        else:
+            checklist.append({
+                "category": cat_key,
+                "run_id": None,
+                "status": "queued",
+                "status_label": CRAWL_STATUS_LABELS["queued"],
+                "status_badge": CRAWL_STATUS_BADGE["queued"],
+            })
+
+    return {
+        "batch_id": raw.get("batch_id"),
+        "source": raw.get("source") or "",
+        "categories": categories,
+        "pages": raw.get("pages"),
+        "max_jobs": raw.get("max_jobs"),
+        "status": status,
+        "status_label": CRAWL_STATUS_LABELS.get(status, status),
+        "status_badge": CRAWL_STATUS_BADGE.get(status, "badge-warning"),
+        "error": raw.get("error") or "",
+        "triggered_by": raw.get("triggered_by"),
+        "triggered_by_name": raw.get("triggered_by_name") or "Hệ thống (tự động)",
+        "created_at": raw.get("created_at"),
+        "finished_at": raw.get("finished_at"),
+        # "2/6 category xong" — đúng 2 số backend đã đếm sẵn, JS không
+        # tự đếm lại từ items/checklist (xem docstring CrawlBatchStatusOut).
+        "total": raw.get("total", len(categories)),
+        "completed": raw.get("completed", 0),
+        # Run con ĐÃ tạo (đúng response backend, có thể ít hơn categories).
+        "items": items,
+        # Đủ N category kể cả placeholder — dùng để render checklist UI.
+        "checklist": checklist,
     }
 
 
@@ -103,6 +176,56 @@ def trigger_crawl(access_token, *, source, category, pages=None, max_jobs=None) 
     if max_jobs is not None:
         payload["max_jobs"] = max_jobs
     return _request("POST", "/crawl", access_token=access_token, json=payload)
+
+
+def trigger_crawl_batch(access_token, *, source, categories, pages=None, max_jobs=None) -> dict:
+    """POST /crawl/batch (08/2026, xem docstring
+    sql/migration_add_crawl_batches.sql phía backend) — "crawl nhiều
+    category liên tục": tick nhiều category cùng lúc cho 1 nguồn, bấm 1
+    lần, backend tự crawl TUẦN TỰ hết — thay cho bấm "Bắt đầu crawl"
+    nhiều lần cho từng category.
+
+    Trả {"batch_id": ..., "first_run_id": ..., "status": "running"}
+    NGAY — CHỈ category đầu tiên được tạo+chạy trong request này, các
+    category còn lại tự nối tiếp ở CHÍNH background task đó phía
+    backend (KHÔNG có request/poll nào khác cần gọi để "kích" category
+    kế tiếp — trang /crawl chỉ cần poll GET /crawl/batch/{batch_id} để
+    theo dõi, xem get_crawl_batch_status() bên dưới).
+
+    Dùng ĐƯỢC cho cả 1 category (categories=[cat]) — backend không phân
+    biệt batch 1 phần tử với nhiều phần tử, vẫn tạo 1 row crawl_batches
+    bình thường — trang /crawl (08/2026) LUÔN gọi qua hàm này thay vì
+    trigger_crawl() ở trên cho UI checkbox multi-category mới, để chỉ
+    có 1 luồng xử lý/1 kiểu card tiến độ duy nhất ở Khu B, đỡ phải phân
+    2 nhánh khác nhau tùy số category tick (trigger_crawl() ở trên vẫn
+    giữ nguyên, KHÔNG xoá — chưa có nơi nào khác gọi tới nhưng có thể
+    cần lại sau).
+
+    Cùng ràng buộc quyền/lỗi như trigger_crawl(): BẮT BUỘC access_token
+    role='admin' thật (route Flask gọi hàm này PHẢI tự chặn bằng
+    @admin_required), raise CrawlerAPIError(status_code=409) nếu nguồn
+    này đang có 1 lượt 'queued'/'running' chưa xong (category đầu tiên
+    của batch cũng phải qua đúng UNIQUE INDEX như crawl đơn lẻ)."""
+    payload = {"source": source, "categories": categories}
+    if pages is not None:
+        payload["pages"] = pages
+    if max_jobs is not None:
+        payload["max_jobs"] = max_jobs
+    return _request("POST", "/crawl/batch", access_token=access_token, json=payload)
+
+
+def get_crawl_batch_status(access_token, batch_id) -> dict:
+    """GET /crawl/batch/{batch_id} — poll tiến độ TỔNG 1 batch, trả kèm
+    "items" (run con ĐÃ tạo) + "checklist" (đủ N category theo đúng thứ
+    tự đã chọn, có placeholder 'queued' cho category CHƯA có run con —
+    xem docstring _normalize_crawl_batch() ở trên) + "total"/"completed"
+    để hiện kiểu "2/6 category xong" mà không cần tự đếm lại.
+
+    Trả None nếu batch_id không tồn tại (404) — nơi gọi (route Flask)
+    tự quyết định coi đây là lỗi hay không, cùng quy ước get_crawl_status()
+    ở trên."""
+    raw = _request("GET", f"/crawl/batch/{batch_id}", access_token=access_token)
+    return _normalize_crawl_batch(raw) if raw else None
 
 
 def get_crawl_status(access_token, run_id) -> dict:
