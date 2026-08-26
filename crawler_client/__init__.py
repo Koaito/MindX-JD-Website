@@ -104,6 +104,7 @@ from .crawl import (
     trigger_crawl,
     get_crawl_status,
     list_crawl_runs,
+    get_crawl_logs,
 )
 from .import_export import (
     IMPORT_EXPORT_ENTITY_TYPES,
@@ -179,6 +180,7 @@ __all__ = [
     "trigger_crawl",
     "get_crawl_status",
     "list_crawl_runs",
+    "get_crawl_logs",
     "IMPORT_EXPORT_ENTITY_TYPES",
     "IMPORT_EXPORT_ENTITY_LABELS",
     "CONFLICT_STATUS_LABELS",

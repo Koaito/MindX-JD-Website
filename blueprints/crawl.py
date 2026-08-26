@@ -162,3 +162,20 @@ def status_json(run_id):
     if run is None:
         return jsonify({"error": "Không tìm thấy lượt crawl này."}), 404
     return jsonify(run)
+
+
+@crawl_bp.route("/crawl/<string:run_id>/logs.json")
+@admin_required
+def logs_json(run_id):
+    """JSON polling khu "Xem log live" — JS ở crawl.html gọi định kỳ
+    (song song với status.json) kèm ?after_id=N để chỉ lấy dòng log MỚI
+    (xem docstring crawler_client/crawl.py::get_crawl_logs). Cùng cách
+    xử lý lỗi như status_json() ở trên (@admin_required tự trả JSON,
+    không redirect HTML)."""
+    after_id = request.args.get("after_id", "0")
+    after_id = int(after_id) if after_id.isdigit() else 0
+    try:
+        result = _call_authed(db_data.get_crawl_logs, run_id, after_id=after_id)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    return jsonify(result)

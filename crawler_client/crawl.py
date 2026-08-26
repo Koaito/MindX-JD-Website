@@ -61,6 +61,12 @@ def _normalize_crawl_run(raw: dict) -> dict:
         # có khi status='done' (stats rỗng thì thôi, template tự ẩn).
         "stat_items": [(label, stats.get(key, 0)) for key, label in CRAWL_STAT_LABELS] if stats else [],
         "error": raw.get("error") or "",
+        # 08/2026 (heartbeat/tiến độ real-time, xem docstring backend
+        # api/schemas/crawl.py::CrawlStatusOut) — snapshot mới nhất
+        # {"fetched", "inserted", "last_update"}, None nếu chưa có
+        # heartbeat nào (status vẫn 'queued', hoặc lượt crawl chạy
+        # TRƯỚC KHI tính năng này tồn tại).
+        "progress": raw.get("progress"),
     }
 
 
@@ -119,3 +125,20 @@ def list_crawl_runs(access_token, *, source="", status="", triggered_by="",
     data = _request("GET", "/crawl", access_token=access_token, params=params) or {}
     items = [_normalize_crawl_run(r) for r in data.get("items", [])]
     return {"items": items, "total": data.get("total", 0)}
+
+
+def get_crawl_logs(access_token, run_id, after_id=0, limit=500) -> dict:
+    """GET /crawl/{run_id}/logs?after_id=N — khu "Xem log live" ở
+    trang /crawl (08/2026, xem docstring backend api/routers/crawl.py::
+    get_crawl_logs). Trả {"last_id": int, "items": [{"id","level",
+    "message","created_at"}, ...]} y hệt response backend, KHÔNG cần
+    normalize thêm (không có mapping nhãn/badge nào áp dụng cho dòng
+    log thô, khác _normalize_crawl_run ở trên).
+
+    after_id: truyền đúng "last_id" của lần gọi TRƯỚC để chỉ nhận dòng
+    MỚI — route Flask (blueprints/crawl.py::logs_json) truyền thẳng
+    query string từ JS xuống đây, không tự ý đổi giá trị."""
+    return _request(
+        "GET", f"/crawl/{run_id}/logs", access_token=access_token,
+        params={"after_id": after_id, "limit": limit},
+    ) or {"last_id": after_id, "items": []}

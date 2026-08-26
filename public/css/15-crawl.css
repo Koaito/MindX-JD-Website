@@ -48,6 +48,31 @@
   padding: 0;
 }
 
+/* LỖI 08/2026 (ảnh chụp báo lỗi): 2 ô "Số trang"/"Tối đa job" bị bóp
+   nhỏ dị dạng, lệch hàng so với "Ngành" ngay khi trang tải xong (không
+   cần bấm gì). Nguyên nhân: .form-grid (07-forms.css) đổi số cột theo
+   BỀ RỘNG MÀN HÌNH (@media max-width: 1200px/900px/768px), không theo
+   bề rộng THẬT của card chứa nó. Ở trang /crawl, 2 card TopCV/
+   VietnamWorks đứng CẠNH NHAU trong .crawl-sources (mỗi card chỉ ~45-
+   48% màn hình) — nếu màn hình rộng hơn 1200px, .form-grid vẫn dùng
+   layout "desktop 4 cột" (thiết kế cho card full-width như add_job.html)
+   dù bề ngang thật của card lúc này chỉ đủ chỗ cho ~2 cột thoải mái ->
+   2 field span-1 cuối hàng bị ép rất hẹp.
+
+   Sửa: ép RIÊNG layout của .form-grid bên trong .crawl-source-card về
+   2 cột cố định (không đổi theo breakpoint viewport nữa) — khớp đúng
+   bề rộng thật của card (~340-600px, xem .crawl-sources ở trên): hàng 1
+   "Ngành" full-width, hàng 2 "Số trang" + "Tối đa job" chia đôi bằng
+   nhau. Đặt SAU khối @media của 07-forms.css trong thứ tự nạp CSS
+   (15-crawl.css nạp sau) nên tự nhiên thắng độ ưu tiên, không cần
+   !important. */
+.crawl-source-card .form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.crawl-source-card .form-grid > label.span-2 { grid-column: 1 / -1; }
+.crawl-source-card .form-grid > label.span-1 { grid-column: span 1; }
+.crawl-source-card .form-actions.span-4 { grid-column: 1 / -1; }
+
 /* Badge trạng thái 'queued'/'running' — action log cũ (12-activity-logs.css)
    chỉ có success/warning/danger, không có màu trung tính cho "đang diễn
    ra" (khác hẳn ý nghĩa "Sửa" của warning). */
@@ -88,6 +113,107 @@
 }
 
 .crawl-running-meta strong { color: var(--ink); }
+
+/* Danh sách các lượt "đang chạy" — mỗi lượt là 1 khối .crawl-running-split
+   (trạng thái | log live), XẾP DỌC nếu có 2 nguồn cùng chạy (khác
+   .crawl-sources ở Khu A vốn xếp NGANG cạnh nhau) — 2 lượt crawl khác
+   nguồn không liên quan tới nhau, xếp dọc dễ đọc hơn là nhồi cả 4 khối
+   (2 trạng thái + 2 log) vào 1 hàng ngang chật. */
+.crawl-running-zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+/* 1 lượt "đang chạy" = 2 cột: bên trái trạng thái/tiến độ (hẹp hơn, đủ
+   chỗ cho vài dòng text), bên phải log live (rộng hơn, cần nhiều chỗ
+   ngang để đọc log dài không bị ngắt dòng liên tục). */
+.crawl-running-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .crawl-running-split { grid-template-columns: 1fr; }
+}
+
+.crawl-running-card-wrap { display: flex; flex-direction: column; }
+
+/* Tiến độ real-time (heartbeat, 08/2026) — hiện trong CHÍNH card trạng
+   thái bên trái, ngay dưới badge/meta đã có, không tách card riêng để
+   không chiếm thêm chỗ dọc. */
+.crawl-progress {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.crawl-progress-line {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.crawl-progress-updated {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+/* Khung "Log live" — cố tình style GIỐNG terminal thật (nền tối, font
+   monospace) để dễ phân biệt trực quan với phần còn lại của trang (nền
+   sáng) — đúng yêu cầu "xem log như log trong cmd khi crawl ở backend". */
+.crawl-log-card {
+  display: flex;
+  flex-direction: column;
+  background: #14171A;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-height: 220px;
+}
+
+.crawl-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #C8CDD2;
+  background: #1D2125;
+  border-bottom: 1px solid #2A2F34;
+}
+
+.crawl-log-autoscroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  color: #9BA3AB;
+  cursor: pointer;
+}
+
+.crawl-log-body {
+  margin: 0;
+  padding: 12px 14px;
+  flex: 1;
+  min-height: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #D7DBDE;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crawl-log-line { display: block; }
+.crawl-log-line.is-warning { color: #E0B94C; }
+.crawl-log-line.is-error { color: #E5726A; }
 
 /* Khu C — cột "Kết quả" trong bảng lịch sử: gộp 8 chỉ số vào 1 ô nhỏ
    gọn (không dùng .dm-stat to như card summary, chật bảng) — hiện số

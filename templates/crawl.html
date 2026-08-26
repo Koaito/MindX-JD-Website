@@ -55,20 +55,41 @@
 {# ================= Khu B — Đang chạy (tối đa 2, 1/nguồn) ================= #}
 {% if active_runs %}
 <h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Đang chạy</h2>
-<div class="crawl-sources" id="crawl-running-zone" style="margin-bottom: 32px;">
+<div class="crawl-running-zone-list" id="crawl-running-zone">
   {% for source, run in active_runs.items() %}
-  <div class="dm-export-card crawl-running-card-wrap"
+  <div class="crawl-running-split"
        id="crawl-running-{{ source }}"
        data-run-id="{{ run.run_id }}"
-       data-source="{{ source }}">
-    <div class="crawl-running-card">
-      <div>
-        <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
-        <p class="crawl-running-meta" style="margin-top: 8px;">
-          {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
-          Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
-        </p>
+       data-source="{{ source }}"
+       data-log-after-id="0">
+    {# ---- Bên trái: trạng thái hiện tại + tiến độ ---- #}
+    <div class="dm-export-card crawl-running-card-wrap">
+      <div class="crawl-running-card">
+        <div>
+          <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+          <p class="crawl-running-meta" style="margin-top: 8px;">
+            {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
+            Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+          </p>
+        </div>
       </div>
+      <div class="crawl-progress" data-role="progress">
+        <p class="crawl-progress-line">
+          <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
+        </p>
+        <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
+      </div>
+    </div>
+    {# ---- Bên phải: log live kiểu terminal ---- #}
+    <div class="crawl-log-card">
+      <div class="crawl-log-head">
+        <span>Log live</span>
+        <label class="crawl-log-autoscroll">
+          <input type="checkbox" data-role="autoscroll" checked>
+          Tự cuộn
+        </label>
+      </div>
+      <pre class="crawl-log-body" data-role="log-body"><code data-role="log-lines">Đang chờ log đầu tiên…</code></pre>
     </div>
   </div>
   {% endfor %}
@@ -284,20 +305,63 @@
     if (btn) btn.textContent = "Bắt đầu crawl";
   }
 
+  function renderProgress(card, progress) {
+    var fetchedEl = card.querySelector('[data-role="progress-fetched"]');
+    var updatedEl = card.querySelector('[data-role="progress-updated"]');
+    if (!progress) {
+      if (fetchedEl) fetchedEl.textContent = "Đang chờ dữ liệu tiến độ đầu tiên…";
+      if (updatedEl) updatedEl.textContent = "";
+      return;
+    }
+    if (fetchedEl) {
+      fetchedEl.textContent = "Đã lấy " + (progress.fetched || 0) + " job · lưu mới " + (progress.inserted || 0);
+    }
+    if (updatedEl) {
+      updatedEl.textContent = "Cập nhật lúc " + formatTime(progress.last_update);
+    }
+  }
+
+  var LOG_LEVEL_CLASS = {"WARNING": "is-warning", "ERROR": "is-error", "CRITICAL": "is-error"};
+
+  function appendLogLines(card, items) {
+    if (!items || !items.length) return;
+    var linesEl = card.querySelector('[data-role="log-lines"]');
+    var bodyEl = card.querySelector('[data-role="log-body"]');
+    var autoscrollEl = card.querySelector('[data-role="autoscroll"]');
+    if (!linesEl) return;
+    if (linesEl.textContent === "Đang chờ log đầu tiên…") linesEl.textContent = "";
+    items.forEach(function (item) {
+      var span = document.createElement("span");
+      span.className = "crawl-log-line " + (LOG_LEVEL_CLASS[item.level] || "");
+      span.textContent = "[" + formatTime(item.created_at) + "] " + item.message;
+      linesEl.appendChild(span);
+      linesEl.appendChild(document.createTextNode("\n"));
+    });
+    if (bodyEl && autoscrollEl && autoscrollEl.checked) {
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
+  }
+
   function pollRun(card) {
     var runId = card.getAttribute("data-run-id");
     var source = card.getAttribute("data-source");
+    var stopped = false;
 
-    var timer = setInterval(function () {
+    var statusTimer = setInterval(function () {
       fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
         .then(function (run) {
           if (run.error) {
-            clearInterval(timer);
+            stopped = true;
+            clearInterval(statusTimer);
+            clearInterval(logsTimer);
             return;
           }
+          renderProgress(card, run.progress);
           if (run.status === "done" || run.status === "error") {
-            clearInterval(timer);
+            stopped = true;
+            clearInterval(statusTimer);
+            clearInterval(logsTimer);
             card.remove();  // Khu B chỉ hiện lượt ĐANG chạy — xong thì gỡ khỏi đây
             prependHistoryRow(run);
             reenableSourceForm(source);
@@ -309,9 +373,32 @@
           // lỗi nghiệp vụ rõ ràng như 404/403).
         });
     }, 4000);
+
+    // Timer RIÊNG cho log — chu kỳ ngắn hơn (2s so với 4s của status)
+    // vì log là thứ người xem muốn thấy gần-thời-gian-thực nhất (giống
+    // "xem log trong cmd"), trong khi status/progress chỉ cần đủ mịn để
+    // biết còn đang chạy hay đã xong. after_id lấy từ data-log-after-id
+    // trên chính card, cập nhật lại sau mỗi lần poll để lần sau chỉ xin
+    // dòng MỚI (xem docstring backend GET /crawl/{run_id}/logs).
+    var logsTimer = setInterval(function () {
+      if (stopped) { clearInterval(logsTimer); return; }
+      var afterId = card.getAttribute("data-log-after-id") || "0";
+      fetch("/crawl/" + runId + "/logs.json?after_id=" + afterId, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) return;
+          appendLogLines(card, data.items);
+          if (typeof data.last_id === "number") {
+            card.setAttribute("data-log-after-id", String(data.last_id));
+          }
+        })
+        .catch(function () {
+          // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp.
+        });
+    }, 2000);
   }
 
-  document.querySelectorAll(".crawl-running-card-wrap").forEach(pollRun);
+  document.querySelectorAll(".crawl-running-split").forEach(pollRun);
 })();
 </script>
 
