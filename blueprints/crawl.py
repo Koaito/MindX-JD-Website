@@ -21,10 +21,17 @@ from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
 crawl_bp = Blueprint("crawl", __name__)
 
 # Nhãn hiển thị cho từng nguồn — KHÔNG lấy từ get_sources() (dict đó chỉ
-# có category, không có nhãn nguồn) — giữ khớp tay với 2 nguồn đã đăng ký
-# ở crawl_runner.py phía backend (careerviet CHƯA có adapter, xem lịch sử
-# trao đổi — cố tình không liệt kê ở đây).
-_SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks"}
+# có category, không có nhãn nguồn) — giữ khớp tay với các nguồn đã đăng
+# ký ở crawl_runner.py phía backend.
+#
+# 08/2026 — THÊM "careerviet": adapters/careerviet.py phía backend đã
+# crawl được từ trước (chạy qua CLI) và giờ đã đăng ký đủ ở cả
+# api/crawl_runner.py, api/routers/crawl.py, api/routers/meta.py (GET
+# /sources) — xem lịch sử trao đổi. Trang /crawl (index() bên dưới) tự
+# lặp qua get_sources() để render card (xem crawl.html, KHÔNG hardcode
+# tên nguồn nào ở template) nên chỉ cần thêm đúng 1 dòng nhãn ở đây là
+# đủ để card CareerViet xuất hiện.
+_SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks", "careerviet": "CareerViet"}
 
 
 def _active_run_for_source(source):

@@ -150,9 +150,12 @@ def get_sources() -> dict:
     X-API-Key, tự thêm sẵn trong mọi _request() — không có JWT nào ở
     đây), khác hẳn các hàm bên dưới đều bắt buộc access_token thật.
 
-    Trả {"topcv": {"data-analyst": "Data Analyst", ...}, "vietnamworks": {...}}
-    — CHỈ 2 nguồn (careerviet chưa có adapter đăng ký ở crawl_runner.py
-    phía backend, xem lịch sử trao đổi — KHÔNG phải thiếu sót ở đây)."""
+    Trả {"topcv": {"data-analyst": "Data Analyst", ...}, "vietnamworks": {...},
+    "careerviet": {...}} — 08/2026: careerviet ĐÃ có adapter + đã đăng
+    ký đủ ở backend (api/crawl_runner.py, api/routers/crawl.py,
+    api/routers/meta.py), nên giờ trả về CẢ 3 nguồn (trước đây chỉ 2,
+    xem lịch sử trao đổi — không phải thiếu sót ở file này, chỉ là
+    phản ánh đúng những gì backend GET /sources trả về)."""
     return _request("GET", "/sources") or {}
 
 
