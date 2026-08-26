@@ -105,6 +105,7 @@ from .crawl import (
     get_crawl_status,
     list_crawl_runs,
     get_crawl_logs,
+    get_crawl_latest_log_run,
 )
 from .import_export import (
     IMPORT_EXPORT_ENTITY_TYPES,
@@ -181,6 +182,7 @@ __all__ = [
     "get_crawl_status",
     "list_crawl_runs",
     "get_crawl_logs",
+    "get_crawl_latest_log_run",
     "IMPORT_EXPORT_ENTITY_TYPES",
     "IMPORT_EXPORT_ENTITY_LABELS",
     "CONFLICT_STATUS_LABELS",

@@ -114,37 +114,63 @@
 
 .crawl-running-meta strong { color: var(--ink); }
 
-/* Danh sách các lượt "đang chạy" — mỗi lượt là 1 khối .crawl-running-split
-   (trạng thái | log live), XẾP DỌC nếu có 2 nguồn cùng chạy (khác
-   .crawl-sources ở Khu A vốn xếp NGANG cạnh nhau) — 2 lượt crawl khác
-   nguồn không liên quan tới nhau, xếp dọc dễ đọc hơn là nhồi cả 4 khối
-   (2 trạng thái + 2 log) vào 1 hàng ngang chật. */
-.crawl-running-zone-list {
-  display: flex;
-  flex-direction: column;
+/* Khu B (trạng thái đang chạy, tối đa 2 — 1/nguồn) + Log live — 08/2026
+   ĐỔI layout: trước đây log live nằm CHUNG 1 khối với từng card "đang
+   chạy" (.crawl-running-split lặp lại theo từng nguồn) — giờ tách hẳn
+   thành 2 CỘT CỐ ĐỊNH cho toàn trang: trái là danh sách card trạng thái
+   (có thể rỗng/nhiều card tuỳ số nguồn đang chạy), phải là ĐÚNG 1 khung
+   Log live LUÔN HIỆN (không phụ thuộc có đang crawl hay không, xem
+   lịch sử trao đổi "khung Log live luôn hiện cố định trên trang").
+
+   CHIỀU RỘNG CỐ ĐỊNH cho khung log (thay vì 1fr co giãn theo card bên
+   trái đổi nội dung) — lý do người dùng báo "khung bị nhảy chiều rộng
+   liên tục": card trạng thái bên trái đổi nội dung (progress xuất hiện/
+   mất, badge đổi text) làm nó co giãn, mà trước đây cột log dùng `1fr`
+   nên ăn theo độ co giãn đó -> nhảy theo. Cột log giờ có width CỐ ĐỊNH
+   riêng (không phải 1fr), card trạng thái bên trái mới là phần co giãn
+   (minmax), khớp đúng tỉ lệ trong ảnh chụp báo lỗi. */
+.crawl-running-log-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 720px;
   gap: 18px;
+  align-items: start;
   margin-bottom: 32px;
 }
 
-/* 1 lượt "đang chạy" = 2 cột: bên trái trạng thái/tiến độ (hẹp hơn, đủ
-   chỗ cho vài dòng text), bên phải log live (rộng hơn, cần nhiều chỗ
-   ngang để đọc log dài không bị ngắt dòng liên tục). */
-.crawl-running-split {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) 1fr;
-  gap: 18px;
-  align-items: stretch;
+@media (max-width: 1200px) {
+  /* Không đủ chỗ cho cột log cố định 720px + card 260-340px cạnh nhau
+     -> xếp dọc, cột log tự co theo bề ngang màn hình thay vì giữ cứng
+     720px (tràn ngang trên tablet/mobile). */
+  .crawl-running-log-row {
+    grid-template-columns: 1fr;
+  }
 }
 
-@media (max-width: 900px) {
-  .crawl-running-split { grid-template-columns: 1fr; }
+.crawl-zone-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.crawl-running-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.crawl-running-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  font-size: 13.5px;
 }
 
 .crawl-running-card-wrap { display: flex; flex-direction: column; }
 
 /* Tiến độ real-time (heartbeat, 08/2026) — hiện trong CHÍNH card trạng
-   thái bên trái, ngay dưới badge/meta đã có, không tách card riêng để
-   không chiếm thêm chỗ dọc. */
+   thái, ngay dưới badge/meta đã có, không tách card riêng để không
+   chiếm thêm chỗ dọc. */
 .crawl-progress {
   margin-top: 14px;
   padding-top: 14px;
@@ -164,7 +190,10 @@
 
 /* Khung "Log live" — cố tình style GIỐNG terminal thật (nền tối, font
    monospace) để dễ phân biệt trực quan với phần còn lại của trang (nền
-   sáng) — đúng yêu cầu "xem log như log trong cmd khi crawl ở backend". */
+   sáng) — đúng yêu cầu "xem log như log trong cmd khi crawl ở backend".
+   LUÔN HIỆN, chiều rộng CỐ ĐỊNH (xem .crawl-running-log-row ở trên) —
+   không co giãn theo nội dung 2 bên, tránh "nhảy" khi card trạng thái
+   bên trái đổi kích thước. */
 .crawl-log-card {
   display: flex;
   flex-direction: column;
@@ -172,7 +201,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  min-height: 220px;
+  height: 340px;
 }
 
 .crawl-log-head {
@@ -185,6 +214,7 @@
   color: #C8CDD2;
   background: #1D2125;
   border-bottom: 1px solid #2A2F34;
+  flex: none;
 }
 
 .crawl-log-autoscroll {
@@ -200,8 +230,7 @@
   margin: 0;
   padding: 12px 14px;
   flex: 1;
-  min-height: 180px;
-  max-height: 320px;
+  min-height: 0;
   overflow-y: auto;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 12.5px;

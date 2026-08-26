@@ -52,49 +52,57 @@
   {% endfor %}
 </div>
 
-{# ================= Khu B — Đang chạy (tối đa 2, 1/nguồn) ================= #}
-{% if active_runs %}
-<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Đang chạy</h2>
-<div class="crawl-running-zone-list" id="crawl-running-zone">
-  {% for source, run in active_runs.items() %}
-  <div class="crawl-running-split"
-       id="crawl-running-{{ source }}"
-       data-run-id="{{ run.run_id }}"
-       data-source="{{ source }}"
-       data-log-after-id="0">
-    {# ---- Bên trái: trạng thái hiện tại + tiến độ ---- #}
-    <div class="dm-export-card crawl-running-card-wrap">
-      <div class="crawl-running-card">
-        <div>
-          <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
-          <p class="crawl-running-meta" style="margin-top: 8px;">
-            {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
-            Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+{# ================= Khu B — Đang chạy (tối đa 2, 1/nguồn) + Log live (luôn hiện) ================= #}
+<div class="crawl-running-log-row">
+  {# ---- Bên trái: card trạng thái/tiến độ cho từng nguồn đang chạy (rỗng nếu không có) ---- #}
+  <div class="crawl-running-list" id="crawl-running-zone">
+    {% if active_runs %}
+      <h2 class="crawl-zone-title">Đang chạy</h2>
+      {% for source, run in active_runs.items() %}
+      <div class="dm-export-card crawl-running-card-wrap"
+           id="crawl-running-{{ source }}"
+           data-run-id="{{ run.run_id }}"
+           data-source="{{ source }}">
+        <div class="crawl-running-card">
+          <div>
+            <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+            <p class="crawl-running-meta" style="margin-top: 8px;">
+              {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}<br>
+              Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+            </p>
+          </div>
+        </div>
+        <div class="crawl-progress" data-role="progress">
+          <p class="crawl-progress-line">
+            <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
           </p>
+          <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
         </div>
       </div>
-      <div class="crawl-progress" data-role="progress">
-        <p class="crawl-progress-line">
-          <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
-        </p>
-        <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
-      </div>
-    </div>
-    {# ---- Bên phải: log live kiểu terminal ---- #}
-    <div class="crawl-log-card">
-      <div class="crawl-log-head">
-        <span>Log live</span>
-        <label class="crawl-log-autoscroll">
-          <input type="checkbox" data-role="autoscroll" checked>
-          Tự cuộn
-        </label>
-      </div>
-      <pre class="crawl-log-body" data-role="log-body"><code data-role="log-lines">Đang chờ log đầu tiên…</code></pre>
-    </div>
+      {% endfor %}
+    {% else %}
+      <h2 class="crawl-zone-title">Đang chạy</h2>
+      <p class="muted crawl-running-empty">Hiện không có lượt crawl nào đang chạy.</p>
+    {% endif %}
   </div>
-  {% endfor %}
+
+  {# ---- Bên phải: Log live — LUÔN HIỆN, không phụ thuộc có đang crawl hay
+       không (08/2026, xem lịch sử trao đổi "khung Log live luôn hiện cố
+       định trên trang"). Lúc tải trang JS tự gọi GET /crawl/latest-log-run
+       để lấy run_id GẦN NHẤT (dù đã done/error) rồi load toàn bộ log của
+       run đó — không xoá log cũ mỗi khi có lượt crawl mới, chỉ NỐI TIẾP
+       thêm dòng (xem loadAndPollLatestLog ở JS bên dưới). ---- #}
+  <div class="crawl-log-card" id="crawl-log-card" data-run-id="" data-log-after-id="0">
+    <div class="crawl-log-head">
+      <span>Log live</span>
+      <label class="crawl-log-autoscroll">
+        <input type="checkbox" data-role="autoscroll" checked>
+        Tự cuộn
+      </label>
+    </div>
+    <pre class="crawl-log-body" data-role="log-body"><code data-role="log-lines">Đang tải log…</code></pre>
+  </div>
 </div>
-{% endif %}
 
 {# ================= Khu C — Lịch sử ================= #}
 <h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử crawl</h2>
@@ -143,7 +151,7 @@
     </thead>
     <tbody id="crawl-history-tbody">
       {% for run in runs %}
-      <tr>
+      <tr data-run-id="{{ run.run_id }}">
         <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
         <td>
           {{ source_labels.get(run.source, run.source) }}<br>
@@ -281,7 +289,16 @@
       return;
     }
     if (!tbody) return;
-    tbody.insertBefore(buildHistoryRow(run), tbody.firstChild);
+    // Chặn TRÙNG theo run_id — lớp bảo vệ thứ 2 (lớp 1 là cờ inFlight ở
+    // pollRun() chặn race ngay từ đầu) phòng trường hợp hàm này vẫn bị
+    // gọi 2 lần vì lý do khác (vd 2 tab cùng mở, cùng tự thêm dòng cho
+    // cùng 1 run_id) — không thêm dòng nếu run_id đó đã có sẵn trong bảng.
+    if (run.run_id && tbody.querySelector('tr[data-run-id="' + run.run_id + '"]')) {
+      return;
+    }
+    var row = buildHistoryRow(run);
+    if (run.run_id) row.setAttribute("data-run-id", run.run_id);
+    tbody.insertBefore(row, tbody.firstChild);
     var countEl = document.getElementById("crawl-history-count");
     if (countEl) {
       var n = parseInt(countEl.textContent, 10);
@@ -323,13 +340,15 @@
 
   var LOG_LEVEL_CLASS = {"WARNING": "is-warning", "ERROR": "is-error", "CRITICAL": "is-error"};
 
-  function appendLogLines(card, items) {
+  function appendLogLines(items) {
     if (!items || !items.length) return;
-    var linesEl = card.querySelector('[data-role="log-lines"]');
-    var bodyEl = card.querySelector('[data-role="log-body"]');
-    var autoscrollEl = card.querySelector('[data-role="autoscroll"]');
+    var logCard = document.getElementById("crawl-log-card");
+    if (!logCard) return;
+    var linesEl = logCard.querySelector('[data-role="log-lines"]');
+    var bodyEl = logCard.querySelector('[data-role="log-body"]');
+    var autoscrollEl = logCard.querySelector('[data-role="autoscroll"]');
     if (!linesEl) return;
-    if (linesEl.textContent === "Đang chờ log đầu tiên…") linesEl.textContent = "";
+    if (linesEl.textContent === "Đang tải log…" || linesEl.textContent === "Chưa có log nào.") linesEl.textContent = "";
     items.forEach(function (item) {
       var span = document.createElement("span");
       span.className = "crawl-log-line " + (LOG_LEVEL_CLASS[item.level] || "");
@@ -342,63 +361,142 @@
     }
   }
 
-  function pollRun(card) {
+  // Khung "Log live" LUÔN HIỆN cố định trên trang (08/2026, xem lịch sử
+  // trao đổi) — KHÔNG gắn theo 1 card "đang chạy" cụ thể như trước, mà
+  // tự quản lý run_id RIÊNG (lưu ở data-run-id trên #crawl-log-card):
+  //   1. Lúc tải trang: gọi GET /crawl/latest-log-run để biết run_id
+  //      GẦN NHẤT (dù đã done/error hay đang chạy), rồi tải log của
+  //      đúng run đó — log không bị "mất" khi mở lại trang.
+  //   2. Poll logs.json định kỳ theo run_id hiện tại để nối thêm dòng
+  //      MỚI (không xoá log cũ mỗi lần crawl mới — đúng yêu cầu "không
+  //      cần dọn log cũ mỗi lần crawl").
+  //   3. Poll latest-log-run định kỳ (chu kỳ dài hơn) để tự PHÁT HIỆN
+  //      khi có 1 lượt crawl MỚI bắt đầu (run_id gần nhất đổi khác) —
+  //      lúc đó đổi sang theo dõi run mới, vẫn giữ nguyên log cũ ở trên,
+  //      chỉ nối tiếp thêm log của run mới xuống dưới (không dựng lại
+  //      từ đầu, không xoá gì cả).
+  function loadAndPollLatestLog() {
+    var logCard = document.getElementById("crawl-log-card");
+    if (!logCard) return;
+
+    function fetchLogsFor(runId) {
+      var afterId = logCard.getAttribute("data-log-after-id") || "0";
+      fetch("/crawl/" + runId + "/logs.json?after_id=" + afterId, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) return;
+          appendLogLines(data.items);
+          if (typeof data.last_id === "number") {
+            logCard.setAttribute("data-log-after-id", String(data.last_id));
+          }
+        })
+        .catch(function () {
+          // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp.
+        });
+    }
+
+    function switchToRun(runId) {
+      if (!runId || runId === logCard.getAttribute("data-run-id")) return;
+      logCard.setAttribute("data-run-id", runId);
+      logCard.setAttribute("data-log-after-id", "0");
+      var linesEl = logCard.querySelector('[data-role="log-lines"]');
+      if (linesEl && linesEl.textContent === "Đang tải log…") linesEl.textContent = "Chưa có log nào.";
+      fetchLogsFor(runId);
+    }
+
+    // Nạp lần đầu ngay khi trang tải xong.
+    fetch("/crawl/latest-log-run", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+      .then(function (res) { return res.json(); })
+      .then(function (run) {
+        if (run && run.run_id) {
+          switchToRun(run.run_id);
+        } else {
+          var linesEl = logCard.querySelector('[data-role="log-lines"]');
+          if (linesEl) linesEl.textContent = "Chưa có lượt crawl nào.";
+        }
+      })
+      .catch(function () {
+        var linesEl = logCard.querySelector('[data-role="log-lines"]');
+        if (linesEl) linesEl.textContent = "Không tải được log — thử tải lại trang.";
+      });
+
+    // Poll log của run hiện tại — 2s/lần, đủ nhanh để cảm giác "live".
+    setInterval(function () {
+      var runId = logCard.getAttribute("data-run-id");
+      if (runId) fetchLogsFor(runId);
+    }, 2000);
+
+    // Poll phát hiện run MỚI — 6s/lần (không cần nhanh bằng, chỉ để bắt
+    // kịp lúc có người bấm "Bắt đầu crawl" ở nguồn khác trong lúc đang
+    // xem log của run cũ).
+    setInterval(function () {
+      fetch("/crawl/latest-log-run", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          if (run && run.run_id) switchToRun(run.run_id);
+        })
+        .catch(function () {});
+    }, 6000);
+  }
+
+  function pollRun(card, onDone) {
     var runId = card.getAttribute("data-run-id");
     var source = card.getAttribute("data-source");
     var stopped = false;
+    // Chặn RACE CONDITION: nếu 1 lần fetch status.json chưa kịp trả lời
+    // xong (mạng chậm) mà interval kế tiếp đã bắn tiếp request MỚI, có
+    // thể có 2 response "status done" cùng lúc -> callback chạy 2 lần
+    // -> prependHistoryRow() bị gọi 2 lần -> 1 dòng lịch sử bị nhân đôi
+    // (lỗi thật đã gặp: "dòng lịch sử lặp" trông giống có 1 lượt đang
+    // chạy dư ra). inFlight đảm bảo tại 1 thời điểm chỉ có ĐÚNG 1 request
+    // status.json đang chờ, bỏ qua tick interval nào rơi vào lúc đang chờ.
+    var inFlight = false;
 
     var statusTimer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
       fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
         .then(function (run) {
+          inFlight = false;
+          if (stopped) return;  // Đã dừng ở 1 tick trước đó (vd do response khác trễ về) - bỏ qua nốt response trễ này.
           if (run.error) {
             stopped = true;
             clearInterval(statusTimer);
-            clearInterval(logsTimer);
             return;
           }
           renderProgress(card, run.progress);
           if (run.status === "done" || run.status === "error") {
             stopped = true;
             clearInterval(statusTimer);
-            clearInterval(logsTimer);
-            card.remove();  // Khu B chỉ hiện lượt ĐANG chạy — xong thì gỡ khỏi đây
             prependHistoryRow(run);
             reenableSourceForm(source);
+            if (onDone) onDone(run);
           }
         })
         .catch(function () {
+          inFlight = false;
           // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp
           // (KHÔNG dừng timer, khác trường hợp run.error ở trên vốn là
           // lỗi nghiệp vụ rõ ràng như 404/403).
         });
     }, 4000);
-
-    // Timer RIÊNG cho log — chu kỳ ngắn hơn (2s so với 4s của status)
-    // vì log là thứ người xem muốn thấy gần-thời-gian-thực nhất (giống
-    // "xem log trong cmd"), trong khi status/progress chỉ cần đủ mịn để
-    // biết còn đang chạy hay đã xong. after_id lấy từ data-log-after-id
-    // trên chính card, cập nhật lại sau mỗi lần poll để lần sau chỉ xin
-    // dòng MỚI (xem docstring backend GET /crawl/{run_id}/logs).
-    var logsTimer = setInterval(function () {
-      if (stopped) { clearInterval(logsTimer); return; }
-      var afterId = card.getAttribute("data-log-after-id") || "0";
-      fetch("/crawl/" + runId + "/logs.json?after_id=" + afterId, {headers: {"X-Requested-With": "XMLHttpRequest"}})
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (data.error) return;
-          appendLogLines(card, data.items);
-          if (typeof data.last_id === "number") {
-            card.setAttribute("data-log-after-id", String(data.last_id));
-          }
-        })
-        .catch(function () {
-          // Lỗi mạng tạm thời — bỏ qua, thử lại ở lần poll kế tiếp.
-        });
-    }, 2000);
   }
 
-  document.querySelectorAll(".crawl-running-split").forEach(pollRun);
+  document.querySelectorAll(".crawl-running-card-wrap[data-run-id]").forEach(function (card) {
+    pollRun(card, function () {
+      card.remove();
+      var zone = document.getElementById("crawl-running-zone");
+      if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+        var empty = document.createElement("p");
+        empty.className = "muted crawl-running-empty";
+        empty.textContent = "Hiện không có lượt crawl nào đang chạy.";
+        zone.appendChild(empty);
+      }
+    });
+  });
+
+  loadAndPollLatestLog();
 })();
 </script>
 
