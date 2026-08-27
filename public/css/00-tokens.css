@@ -33,6 +33,22 @@ html.sidebar-collapsed {
 
 * { box-sizing: border-box; }
 
+/* 08/2026 (theo yêu cầu thảo luận: "100% giống hệt 90% hiện tại")
+   -- CSS `zoom` là cách TRUNG THỰC nhất để mô phỏng đúng ý browser
+   zoom thật: nó scale MỌI THỨ đồng nhất (px, border, khoảng cách,
+   input/select, scrollbar...) và cập nhật lại media query giống hệt
+   như người dùng tự bấm Ctrl+- 90% trong trình duyệt -- khác với
+   cách đổi `html { font-size: ... }` (chỉ ảnh hưởng đơn vị rem/em,
+   mà toàn bộ codebase này dùng px thuần cho hầu hết padding/width/
+   font-size nên sẽ KHÔNG khớp đúng tỉ lệ) hay `transform: scale()`
+   (không reflow layout, gây tràn/scroll sai). Hỗ trợ: Chrome/Edge/
+   Safari 15.4+ từ lâu, Firefox 126+ (2024) -- đã đủ an toàn cho
+   nội bộ Career Hub tháng 08/2026. Muốn tắt/đổi tỉ lệ khác chỉ cần
+   sửa 1 dòng này, không đụng tới component nào khác. */
+html {
+  zoom: 90%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
