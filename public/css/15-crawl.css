@@ -17,8 +17,12 @@
    .crawl-live-widget bên dưới, không liên quan tới đoạn này.) */
 .crawl-sources {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-  gap: 18px;
+  /* 08/2026 (refactor #2): 440px/18px giờ tham chiếu --card-min-w/
+     --card-gap ở 00-tokens.css thay vì viết tay — GIÁ TRỊ giữ nguyên,
+     không đổi giao diện; đổi bề rộng card lần sau chỉ cần sửa 1 dòng
+     ở 00-tokens.css, không phải dò lại file này. */
+  grid-template-columns: repeat(auto-fit, minmax(var(--card-min-w), 1fr));
+  gap: var(--card-gap);
   margin-bottom: 28px;
 }
 
@@ -74,7 +78,16 @@
    "Ngành" full-width, hàng 2 "Số trang" + "Tối đa job" chia đôi bằng
    nhau. Đặt SAU khối @media của 07-forms.css trong thứ tự nạp CSS
    (15-crawl.css nạp sau) nên tự nhiên thắng độ ưu tiên, không cần
-   !important. */
+   !important.
+
+   CẬP NHẬT 08/2026 (refactor #1): 07-forms.css giờ đã có Container
+   Queries cho .form-grid (đo theo bề rộng CARD thật, không phải màn
+   hình) — với bề rộng .crawl-source-card hiện tại (~440-600px) thì
+   Container Query đó tự ra đúng 2 cột, nên về lý thuyết rule ép cứng
+   dưới đây không còn thật sự cần nữa. VẪN GIỮ NGUYÊN rule này (không
+   xoá) để không đổi hành vi trang /crawl đang chạy ổn định — coi đây
+   là "chốt an toàn" tường minh, phòng trường hợp sau này ai đó đổi lại
+   --card-min-w nhỏ hơn khiến card hẹp đi ngoài ý muốn. */
 .crawl-source-card .form-grid {
   grid-template-columns: 1fr 1fr;
 }

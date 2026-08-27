@@ -28,6 +28,48 @@
      ngay tại `html { zoom }`. Đổi tỉ lệ zoom chỉ cần sửa DUY NHẤT số
      này, không phải sửa từng nơi dùng vh riêng lẻ. */
   --zoom-scale: 0.9;
+
+  /* ---- Thang đo khoảng cách/bề rộng (thêm 08/2026, refactor #2) ----
+     Trước đây KHÔNG có "sổ tay" kích thước dùng chung — mọi padding/
+     gap/bề rộng card là số px viết tay rải rác 17 file, cùng 1 con số
+     (vd 440px) xuất hiện ở nhiều chỗ với Ý NGHĨA KHÁC NHAU nên không
+     ai dám sửa 1 chỗ vì sợ ảnh hưởng chỗ khác, mà sửa đúng chỗ cần thì
+     lại phải lục từng file tìm.
+     Quy ước: số nào LẶP LẠI nhiều nơi với CÙNG một ý nghĩa mới đưa vào
+     đây; số chỉ dùng đúng 1 chỗ thì cứ để viết tay, không ép vào token
+     cho có. Khai báo dưới đây giữ NGUYÊN giá trị hiện đang dùng (không
+     đổi bất kỳ hành vi/giao diện nào) — mục đích chỉ là gom 1 chỗ để
+     lần sau đổi kích thước không phải lục nhiều file. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 18px;
+  --space-7: 24px;
+  --space-8: 28px;
+
+  /* Padding mặc định (desktop) của các "card" chứa form/nội dung chính
+     — .form-card (07-forms.css), .dm-export-card (13-data-management),
+     .crawl-source-card dùng riêng số khác (29/31px) nên KHÔNG gộp vào
+     đây, xem ghi chú tại chỗ khai báo. */
+  --card-pad-y: 26px;
+  --card-pad-x: 28px;
+
+  /* Khoảng cách card-với-card khi nhiều card xếp cạnh nhau dạng grid
+     (.crawl-sources, .maint-job-grid...). */
+  --card-gap: 18px;
+
+  /* Bề rộng tối thiểu 1 "card nguồn" trước khi auto-fit tự xuống hàng
+     mới — hiện chỉ .crawl-sources dùng, nhưng khai báo tường minh ở
+     đây để lần sau cần đổi (vd "mở rộng card ~30%" đã từng làm) chỉ
+     sửa 1 dòng, không cần dò trong 15-crawl.css. */
+  --card-min-w: 440px;
+
+  /* Gap của .form-grid (07-forms.css): hàng/cột không đều nhau nên
+     tách riêng 2 biến thay vì gộp vào --space-*. */
+  --form-grid-gap-row: 14px;
+  --form-grid-gap-col: 18px;
 }
 
 /* Set by the anti-FOUC script in base.html (before first paint) when the

@@ -9,8 +9,17 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 26px 28px;
+  padding: var(--card-pad-y) var(--card-pad-x);
   /* BỎ max-width - để form fill hết chiều rộng .content (đã có max 1600px) */
+
+  /* 08/2026 (refactor #1, xem chi tiết tại khối "@container" bên dưới
+     phần .form-grid): biến .form-card thành 1 "query container" theo
+     bề rộng thật của chính nó — để .form-grid con có thể đổi số cột
+     dựa vào bề rộng CARD đang chứa nó, thay vì dựa vào bề rộng cả màn
+     hình (@media). Chỉ set containment kiểu inline-size (theo chiều
+     ngang) nên không ảnh hưởng chiều cao/nội dung bên trong — an toàn,
+     không đổi giao diện hiện tại của bất kỳ trang nào. */
+  container-type: inline-size;
 }
 
 .form-section {
@@ -159,7 +168,7 @@
      - Dùng .span-1, .span-2, .span-3, .span-4 classes để control
      - Responsive: 4→3→2→1 cột theo breakpoints */
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px 18px;
+  gap: var(--form-grid-gap-row) var(--form-grid-gap-col);
 }
 
 /* Span classes - control số cột mỗi field chiếm */
@@ -357,6 +366,53 @@
   .form-card select,
   .form-card textarea {
     font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+}
+
+/* ============================================================
+   08/2026 (refactor #1 — xem tóm tắt "4 nguyên nhân gốc" đã thảo
+   luận): 3 khối @media phía trên đổi số cột .form-grid theo BỀ RỘNG
+   MÀN HÌNH, không theo bề rộng THẬT của .form-card đang chứa nó — đây
+   chính là gốc rễ khiến .crawl-source-card .form-grid (15-crawl.css)
+   phải viết tay 1 rule đè riêng (ép cứng 2 cột) thay vì tự đúng.
+
+   CỐ TÌNH KHÔNG XOÁ 3 khối @media ở trên — giữ nguyên làm lưới an
+   toàn (fallback) cho trình duyệt cũ chưa hỗ trợ Container Queries,
+   và vì chúng đặt TRƯỚC khối này trong file nên khi cả 2 loại điều
+   kiện (@media lẫn @container) cùng đúng, khối @container dưới đây
+   (đứng SAU, cùng độ ưu tiên) sẽ thắng theo cascade — tức về đúng bề
+   rộng thật của card, không cần sửa gì thêm ở 3 khối cũ.
+
+   Cách dùng cho code mới: đặt `container-type: inline-size` lên phần
+   tử CHA của .form-grid (như .form-card ở trên đã làm) — không cần
+   động vào khối này. Ngưỡng chọn dưới đây tương đương đúng 3 mốc
+   1200/900/768px cũ nhưng đo trên bề rộng CARD ở layout mặc định
+   (sidebar mở, .content max 1800px, padding 40px) — không phải bề
+   rộng màn hình, nên card đặt trong container hẹp hơn (sidebar,
+   crawl...) giờ tự đổi cột đúng mà không cần rule đè riêng nào nữa. */
+@container (max-width: 860px) {
+  .form-grid { grid-template-columns: repeat(3, 1fr); }
+  .form-grid > label.span-1 { grid-column: span 1; } /* 33% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 66% */
+  .form-grid > label.span-3 { grid-column: span 3; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 3; } /* 100% */
+}
+
+@container (max-width: 620px) {
+  .form-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-grid > label.span-1 { grid-column: span 1; } /* 50% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-3 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 2; } /* 100% */
+}
+
+@container (max-width: 440px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid > label.span-1,
+  .form-grid > label.span-2,
+  .form-grid > label.span-3,
+  .form-grid > label.span-4 {
+    grid-column: span 1;
   }
 }
 
