@@ -1,16 +1,56 @@
-name: Deploy to Vercel
+name: Test & Deploy to Vercel
 
 # Chạy mỗi khi có push lên nhánh main — bất kể ai push (owner hay
-# collaborator), vì workflow này KHÔNG dùng danh tính commit author để
+# collaborator), vì job deploy KHÔNG dùng danh tính commit author để
 # gọi Vercel, mà gọi thẳng Deploy Hook URL (secret) — Vercel coi đây là
 # request hợp lệ không phụ thuộc ai trigger workflow.
+#
+# Thêm 08/2026: trước đây workflow này CHỈ gọi Deploy Hook ngay khi có
+# push lên main — 144 test có sẵn trong tests/ (chạy sạch local qua
+# `pytest`) KHÔNG hề được dùng để chặn deploy lỗi, nghĩa là code sai
+# vẫn lên production được miễn là push thành công. Thêm job `test`
+# chạy TRƯỚC, job `deploy` chỉ chạy nếu `test` xanh (needs: test) —
+# vẫn dùng Deploy Hook (không đổi cách deploy) nhưng giờ có 1 lớp chặn
+# thật sự trước khi gọi hook đó.
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cài dependency (app + test)
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Chạy test
+        # Biến môi trường chỉ để pytest chạy được (import app.py cần có
+        # giá trị, KHÔNG phải secret thật) — xem env_loader.py/
+        # .env.example. crawler_client trong test đều bị mock (xem
+        # tests/conftest.py), không có request mạng thật nào ra
+        # CRAWLER_API_URL lúc chạy CI.
+        env:
+          CRAWLER_API_URL: http://localhost:9999
+          CRAWLER_API_KEY: ci_placeholder_key
+          FLASK_SECRET_KEY: ci_placeholder_secret
+        run: pytest
+
   deploy:
+    needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Gọi Vercel Deploy Hook

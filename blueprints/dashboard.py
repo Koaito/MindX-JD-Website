@@ -193,17 +193,29 @@ def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jo
         d = _parse_any_date(j.get("date_collected"))
         if d is None or not j.get("company_id"):
             continue
-        jobs_by_company.setdefault(j["company_id"], []).append(d)
+        jobs_by_company.setdefault(j["company_id"], []).append((d, j.get("position") or ""))
 
     companies_idx = {c["id"]: c for c in companies}
     expanding, quiet = [], []
-    for company_id, dates in jobs_by_company.items():
+    for company_id, entries in jobs_by_company.items():
         company = companies_idx.get(company_id)
         if not company:
             continue
+        dates = [d for d, _ in entries]
         recent_count = sum(1 for d in dates if (today - d).days <= expanding_days)
         if recent_count >= expanding_min_jobs:
-            expanding.append({**company, "recent_job_count": recent_count})
+            # Thêm 08/2026: kèm tối đa 10 job mới nhất (title) để FE hiện
+            # tooltip khi hover vào badge "N job" — chỉ lấy trong đúng
+            # expanding_days ngày, sắp mới nhất trước.
+            recent_jobs = sorted(
+                (e for e in entries if (today - e[0]).days <= expanding_days),
+                key=lambda e: e[0], reverse=True,
+            )[:10]
+            expanding.append({
+                **company,
+                "recent_job_count": recent_count,
+                "recent_jobs": [title for _, title in recent_jobs if title],
+            })
         latest = max(dates)
         quiet_for = (today - latest).days
         if quiet_for >= quiet_days:
