@@ -342,10 +342,21 @@
             <tr>
               <td><a href="{{ url_for('companies.detail', company_id=c.id) }}" style="color: var(--accent);">{{ c.company }}</a></td>
               <td>
-                <span class="reason-tag job-count-hover" style="background: var(--teal-soft); color: var(--teal); cursor: default;"
-                      {% if c.recent_jobs %}data-jobs="{{ c.recent_jobs | tojson | forceescape }}"{% endif %}>
-                  {{ c.recent_job_count }} job
+                {% if c.recent_jobs %}
+                <span class="fit-chip-wrap" tabindex="0">
+                  <span class="reason-tag" style="background: var(--teal-soft); color: var(--teal);">{{ c.recent_job_count }} job</span>
+                  <span class="potential-suggestion-tooltip" role="tooltip">
+                    <strong>Job mới nhất</strong>
+                    <ul>
+                      {% for title in c.recent_jobs %}
+                      <li>{{ title }}</li>
+                      {% endfor %}
+                    </ul>
+                  </span>
                 </span>
+                {% else %}
+                <span class="reason-tag" style="background: var(--teal-soft); color: var(--teal);">{{ c.recent_job_count }} job</span>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -587,85 +598,6 @@
 
   var params = new URLSearchParams(window.location.search);
   activate(params.get("tab") || "tong-quan");
-})();
-</script>
-
-<style>
-  .job-count-hover-tooltip {
-    position: fixed;
-    z-index: 9999;
-    max-width: 280px;
-    background: #1f2937;
-    color: #f3f4f6;
-    font-size: 11.5px;
-    line-height: 1.5;
-    padding: 8px 10px;
-    border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
-    pointer-events: none;
-    display: none;
-  }
-  .job-count-hover-tooltip ul {
-    margin: 0;
-    padding-left: 16px;
-  }
-  .job-count-hover-tooltip li {
-    margin: 1px 0;
-  }
-</style>
-<script>
-(function () {
-  "use strict";
-  // Hover vào badge "N job" trong bảng "Đang mở rộng tuyển dụng" ->
-  // hiện tooltip nhỏ liệt kê tối đa 10 job mới nhất của công ty đó
-  // (thêm 08/2026, dữ liệu recent_jobs tính ở _companies_job_activity).
-  var tooltip = document.createElement("div");
-  tooltip.className = "job-count-hover-tooltip";
-  document.body.appendChild(tooltip);
-
-  function showTooltip(el, evt) {
-    var raw = el.getAttribute("data-jobs");
-    if (!raw) return;
-    var jobs;
-    try { jobs = JSON.parse(raw); } catch (e) { return; }
-    if (!jobs || !jobs.length) return;
-
-    var items = jobs.slice(0, 10).map(function (title) {
-      var safe = String(title).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      return "<li>" + safe + "</li>";
-    }).join("");
-    tooltip.innerHTML = "<ul>" + items + "</ul>";
-    tooltip.style.display = "block";
-    positionTooltip(evt);
-  }
-
-  function positionTooltip(evt) {
-    var offset = 14;
-    var x = evt.clientX + offset;
-    var y = evt.clientY + offset;
-    var rect = tooltip.getBoundingClientRect();
-    if (x + rect.width > window.innerWidth) x = evt.clientX - rect.width - offset;
-    if (y + rect.height > window.innerHeight) y = evt.clientY - rect.height - offset;
-    tooltip.style.left = x + "px";
-    tooltip.style.top = y + "px";
-  }
-
-  function hideTooltip() {
-    tooltip.style.display = "none";
-  }
-
-  document.addEventListener("mouseover", function (e) {
-    var el = e.target.closest(".job-count-hover");
-    if (el) showTooltip(el, e);
-  });
-  document.addEventListener("mousemove", function (e) {
-    var el = e.target.closest(".job-count-hover");
-    if (el && tooltip.style.display === "block") positionTooltip(e);
-  });
-  document.addEventListener("mouseout", function (e) {
-    var el = e.target.closest(".job-count-hover");
-    if (el) hideTooltip();
-  });
 })();
 </script>
 

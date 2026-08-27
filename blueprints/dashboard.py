@@ -186,7 +186,7 @@ def _contacts_needing_followup(contacts, quiet_days=14):
     return result
 
 
-def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jobs=2, quiet_days=75):
+def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jobs=2, quiet_days=75, recent_jobs_shown=5):
     today = datetime.now().date()
     jobs_by_company = {}
     for j in jobs:
@@ -204,13 +204,13 @@ def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jo
         dates = [d for d, _ in entries]
         recent_count = sum(1 for d in dates if (today - d).days <= expanding_days)
         if recent_count >= expanding_min_jobs:
-            # Thêm 08/2026: kèm tối đa 10 job mới nhất (title) để FE hiện
-            # tooltip khi hover vào badge "N job" — chỉ lấy trong đúng
-            # expanding_days ngày, sắp mới nhất trước.
+            # Thêm 08/2026: kèm tối đa recent_jobs_shown job mới nhất (title)
+            # để FE hiện tooltip khi hover vào badge "N job" — chỉ lấy trong
+            # đúng expanding_days ngày, sắp mới nhất trước.
             recent_jobs = sorted(
                 (e for e in entries if (today - e[0]).days <= expanding_days),
                 key=lambda e: e[0], reverse=True,
-            )[:10]
+            )[:recent_jobs_shown]
             expanding.append({
                 **company,
                 "recent_job_count": recent_count,
