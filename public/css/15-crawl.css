@@ -6,31 +6,27 @@
    badge-info (còn thiếu, badge cũ chỉ có success/warning/danger dành
    cho action log Thêm/Sửa/Xoá), spinner cho trạng thái đang chạy. */
 
-/* GỐC RỄ thật của "card không to lên" (08/2026): `auto-fit +
-   minmax(440px, 1fr)` chỉ quyết định KHI NÀO xuống còn 1 card/hàng
-   (khi màn hình không đủ chỗ cho 2×440px+gap). Một khi đã xuống còn 1
-   card/hàng, cột đó ăn `1fr` = 100% bề rộng container SẴN RỒI — nên
-   tăng số minmax (340→440→"70%" nữa cũng vậy) không đổi được bề rộng
-   card thật, nó chỉ đổi cái NGƯỠNG co xuống 1 cột, không đổi bề rộng
-   sau khi đã co. Cái thật sự giới hạn bề rộng card là `.content`
-   (40px padding mỗi bên, 03-layout.css) — trang này đã bật
-   `content-full` (bỏ trần 1800px) nên phần còn lại có thể "kéo dài"
-   thật là: (1) luôn cố định 1 cột (bỏ hẳn auto-fit/minmax mù mờ),
-   (2) cho .crawl-sources tràn ra NGOÀI 40px padding trái/phải của
-   .content bằng margin âm — đây là khoảng không gian thật duy nhất
-   còn lại để card rộng thêm, không phải con số trong minmax(). */
+/* 08/2026 (yêu cầu "mở rộng card ~30%"): 340px -> 440px (~+30%),
+   padding 22/24 -> 29/31, tiêu đề 18px -> 23px. Card rộng hơn nên trên
+   màn hình thường sẽ tự co từ 3 xuống 2 card/hàng (đúng ý "to ra" thay
+   vì nhồi nhiều card nhỏ/hàng) — vẫn auto-fit nên màn hình hẹp hơn tự
+   xuống 1 card/hàng, không vỡ layout.
+   (08/2026, revert theo yêu cầu: bản "1 cột cố định + tràn padding"
+   thử trước đó không cho hiệu quả như mong đợi trên thực tế, quay lại
+   đúng bản auto-fit/minmax này — chỉ giữ lại phần bù zoom 90% ở
+   .crawl-live-widget bên dưới, không liên quan tới đoạn này.) */
 .crawl-sources {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
   gap: 18px;
-  margin: 0 -40px 28px;
+  margin-bottom: 28px;
 }
 
 .crawl-source-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 29px 40px;
+  padding: 29px 31px;
 }
 
 .crawl-source-card h2 {
