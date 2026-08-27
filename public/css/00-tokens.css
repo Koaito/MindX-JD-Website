@@ -98,7 +98,7 @@
      mới — hiện chỉ .crawl-sources dùng, nhưng khai báo tường minh ở
      đây để lần sau cần đổi (vd "mở rộng card ~30%" đã từng làm) chỉ
      sửa 1 dòng, không cần dò trong 15-crawl.css. */
-  --card-min-w: 440px;
+  --card-min-w: 748px; /* 440px + 70% (08/2026, yêu cầu "rộng thêm 70%") */
 
   /* Gap của .form-grid (07-forms.css): hàng/cột không đều nhau nên
      tách riêng 2 biến thay vì gộp vào --space-*. */
