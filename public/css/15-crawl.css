@@ -395,8 +395,29 @@
    trong từng card (khác khung Log live to, DUY NHẤT ở tab Crawl).
    ============================================================ */
 
+/* 08/2026 (báo lỗi ảnh chụp): auto-fit/minmax(320px,1fr) co card lại
+   theo bề rộng NỘI DUNG tối thiểu, không ép lấp đầy .content-full ->
+   trên màn hình rộng chỉ dựng đủ 2 card/hàng rồi để trống 2 bên rất
+   nhiều, kéo theo khung "Log live" (con của card, xem .maint-log-card
+   dưới) bị hẹp theo. Sửa: cố định LUÔN 2 cột chia đều 100% bề rộng
+   (không phụ thuộc minmax nữa) để 2 card/hàng lấp hết ngang trang. */
 .maint-job-grid {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Card LẺ cuối cùng (ví dụ 5 job -> card #5 đứng 1 mình ở hàng 3) bị
+   ép chỉ rộng bằng 1 cột, để trống hẳn nửa hàng bên phải -> cho nó
+   chiếm luôn cả 2 cột (grid-column: 1 / -1) khi vừa là con cuối cùng
+   (:nth-last-child(1)) vừa đứng ở vị trí lẻ (:nth-child(odd), tức
+   không có "bạn cùng hàng"). Số chẵn card thì :nth-last-child(1) luôn
+   rơi vào vị trí chẵn -> selector không khớp, giữ nguyên 2 cột như
+   thường, tự đúng bất kể sau này thêm/bớt job (không hardcode số 5). */
+.maint-job-grid .crawl-source-card:nth-last-child(1):nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .maint-job-grid { grid-template-columns: 1fr; }
 }
 
 .maint-cost-badge {

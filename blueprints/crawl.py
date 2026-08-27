@@ -163,6 +163,7 @@ def index():
 
     return render_template(
         "crawl.html",
+        tab=tab,
         sources=sources, source_labels=_SOURCE_LABELS,
         active_runs=active_runs, active_batches=active_batches, category_labels=category_labels,
         runs=runs, total_runs=total_runs, page=page, total_pages=total_pages, per_page=per_page,
