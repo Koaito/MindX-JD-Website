@@ -15,7 +15,7 @@
 #}
 
 {# ================= Khu A — Kích hoạt job bảo trì ================= #}
-<div class="crawl-sources maint-job-grid">
+<div class="crawl-sources crawl-sources--fixed-2col">
   {% for job in maintenance_jobs %}
   {% set jt = job.job_type %}
   {% set active = active_runs.get(jt) %}

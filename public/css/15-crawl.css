@@ -6,7 +6,27 @@
    badge-info (còn thiếu, badge cũ chỉ có success/warning/danger dành
    cho action log Thêm/Sửa/Xoá), spinner cho trạng thái đang chạy. */
 
-/* 08/2026 (yêu cầu "mở rộng card ~30%"): 340px -> 440px (~+30%),
+/* 08/2026 (refactor #3 — xem "4 nguyên nhân gốc" đã thảo luận, điểm 3):
+   TRƯỚC ĐÂY .crawl-sources (base, dùng ở tab Crawl) và .maint-job-grid
+   (modifier đứng RIÊNG, không compound, dùng ở tab Bảo trì) có CÙNG độ
+   ưu tiên CSS trên property grid-template-columns — ai đứng SAU trong
+   file thắng, nhìn HTML (class="crawl-sources maint-job-grid") không
+   ai đoán được. Refactor: .crawl-sources giờ CHỈ giữ phần DÙNG CHUNG
+   cho cả 2 tab (display/gap/margin) — số cột tách hẳn ra 2 class biến
+   thể compound bên dưới (.crawl-sources--auto-fit /
+   .crawl-sources--fixed-2col), thắng bằng ĐỘ ƯU TIÊN CSS thật (2 class
+   > 1 class) chứ không phụ thuộc thứ tự khai báo nữa — đổi thứ tự 2
+   khối bên dưới cho nhau cũng KHÔNG đổi kết quả render. */
+.crawl-sources {
+  display: grid;
+  gap: var(--card-gap);
+  margin-bottom: 28px;
+}
+
+/* Biến thể "auto-fit" — tab Crawl (_crawl_tab.html, <div class=
+   "crawl-sources crawl-sources--auto-fit">): số card/hàng TỰ co giãn
+   theo bề rộng màn hình, mỗi card tối thiểu --card-min-w.
+   (08/2026, yêu cầu "mở rộng card ~30%": 340px -> 440px (~+30%),
    padding 22/24 -> 29/31, tiêu đề 18px -> 23px. Card rộng hơn nên trên
    màn hình thường sẽ tự co từ 3 xuống 2 card/hàng (đúng ý "to ra" thay
    vì nhồi nhiều card nhỏ/hàng) — vẫn auto-fit nên màn hình hẹp hơn tự
@@ -14,16 +34,13 @@
    (08/2026, revert theo yêu cầu: bản "1 cột cố định + tràn padding"
    thử trước đó không cho hiệu quả như mong đợi trên thực tế, quay lại
    đúng bản auto-fit/minmax này — chỉ giữ lại phần bù zoom 90% ở
-   .crawl-live-widget bên dưới, không liên quan tới đoạn này.) */
-.crawl-sources {
-  display: grid;
-  /* 08/2026 (refactor #2): 440px/18px giờ tham chiếu --card-min-w/
-     --card-gap ở 00-tokens.css thay vì viết tay — GIÁ TRỊ giữ nguyên,
-     không đổi giao diện; đổi bề rộng card lần sau chỉ cần sửa 1 dòng
-     ở 00-tokens.css, không phải dò lại file này. */
+   .crawl-live-widget bên dưới, không liên quan tới đoạn này.)
+   08/2026 (refactor #2): 440px giờ tham chiếu --card-min-w ở
+   00-tokens.css thay vì viết tay — GIÁ TRỊ giữ nguyên, không đổi giao
+   diện; đổi bề rộng card lần sau chỉ cần sửa 1 dòng ở 00-tokens.css,
+   không phải dò lại file này. */
+.crawl-sources.crawl-sources--auto-fit {
   grid-template-columns: repeat(auto-fit, minmax(var(--card-min-w), 1fr));
-  gap: var(--card-gap);
-  margin-bottom: 28px;
 }
 
 .crawl-source-card {
@@ -385,8 +402,16 @@
   word-break: break-word;
 }
 
+/* 08/2026 (refactor #3): gộp chung 2 khối @media 720px (trước đây tách
+   riêng cho .crawl-sources và .maint-job-grid, nội dung y hệt nhau) —
+   giờ target thẳng 2 class biến thể compound, cùng độ ưu tiên với 2
+   khối định nghĩa cột ở trên nên vẫn thắng đúng theo breakpoint, không
+   phụ thuộc thứ tự khai báo. */
 @media (max-width: 720px) {
-  .crawl-sources { grid-template-columns: 1fr; }
+  .crawl-sources.crawl-sources--auto-fit,
+  .crawl-sources.crawl-sources--fixed-2col {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ============================================================
@@ -399,13 +424,22 @@
    trong từng card (khác khung Log live to, DUY NHẤT ở tab Crawl).
    ============================================================ */
 
-/* 08/2026 (báo lỗi ảnh chụp): auto-fit/minmax(320px,1fr) co card lại
+/* Biến thể "cố định 2 cột" — tab Bảo trì (_maintenance_tab.html, <div
+   class="crawl-sources crawl-sources--fixed-2col">). Trước đây tên là
+   .maint-job-grid, đứng RIÊNG (không compound với .crawl-sources) nên
+   cùng độ ưu tiên với .crawl-sources gốc trên property
+   grid-template-columns — ai đứng SAU trong file thắng, nhìn HTML
+   không đoán được. Đổi tên + viết compound selector
+   (.crawl-sources.crawl-sources--fixed-2col) để thắng bằng ĐỘ ƯU TIÊN
+   thật (2 class > 1 class), không còn phụ thuộc thứ tự dòng nữa — xem
+   khối "refactor #3" ở đầu file.
+   08/2026 (báo lỗi ảnh chụp): auto-fit/minmax(320px,1fr) co card lại
    theo bề rộng NỘI DUNG tối thiểu, không ép lấp đầy .content-full ->
    trên màn hình rộng chỉ dựng đủ 2 card/hàng rồi để trống 2 bên rất
    nhiều, kéo theo khung "Log live" (con của card, xem .maint-log-card
    dưới) bị hẹp theo. Sửa: cố định LUÔN 2 cột chia đều 100% bề rộng
    (không phụ thuộc minmax nữa) để 2 card/hàng lấp hết ngang trang. */
-.maint-job-grid {
+.crawl-sources.crawl-sources--fixed-2col {
   grid-template-columns: repeat(2, 1fr);
 }
 
@@ -416,12 +450,8 @@
    không có "bạn cùng hàng"). Số chẵn card thì :nth-last-child(1) luôn
    rơi vào vị trí chẵn -> selector không khớp, giữ nguyên 2 cột như
    thường, tự đúng bất kể sau này thêm/bớt job (không hardcode số 5). */
-.maint-job-grid .crawl-source-card:nth-last-child(1):nth-child(odd) {
+.crawl-sources--fixed-2col .crawl-source-card:nth-last-child(1):nth-child(odd) {
   grid-column: 1 / -1;
-}
-
-@media (max-width: 720px) {
-  .maint-job-grid { grid-template-columns: 1fr; }
 }
 
 .maint-cost-badge {

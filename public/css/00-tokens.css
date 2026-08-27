@@ -2,6 +2,40 @@
    reset, <body>, <a>, and the top-level .shell grid live here — nothing
    page-specific. Change a --variable and it affects the whole site by
    design; don't add component-specific rules to this file. */
+
+/* ============================================================
+   CHECKLIST NGẮN (08/2026, refactor #4) — đọc trước khi thêm CSS mới
+   liên quan tới kích thước/khoảng cách, tránh lặp lại các lỗi đã gặp:
+
+   1. Thêm đơn vị vh/vw mới? PHẢI chia cho var(--zoom-scale) — vd
+      `calc(100vh / var(--zoom-scale))`, KHÔNG dùng `100vh` trần. Lý
+      do: xem khối `html { zoom }` ở dưới, đây là lỗi đã gặp 2 lần.
+
+   2. Thêm 1 grid (form, card list...) nằm BÊN TRONG 1 card/container
+      có thể đổi bề rộng (không phải full viewport — vd trong sidebar,
+      trong 2 card cạnh nhau)? Dùng `container-type: inline-size` trên
+      phần tử CHA + `@container` cho số cột — xem ví dụ .form-card/
+      .form-grid ở 07-forms.css. KHÔNG dùng `@media (max-width)` để
+      đổi số cột của grid loại này — @media đo theo màn hình, không
+      đo theo bề rộng thật của card chứa nó (đây chính là gốc rễ bug
+      .form-grid ở .crawl-source-card từng gặp).
+
+   3. Padding/gap/bề rộng bạn sắp viết tay đã có ở thang đo bên dưới
+      chưa (--space-*, --card-pad-*, --card-gap, --card-min-w...)? Nếu
+      con số đó sẽ dùng LẶP LẠI ở nhiều chỗ với CÙNG ý nghĩa, thêm vào
+      thang đo và tham chiếu var() thay vì viết số mới. Số chỉ dùng
+      đúng 1 chỗ thì cứ viết tay, không ép vào token cho có.
+
+   4. 1 class cần dùng cho nhiều biến thể layout khác nhau (vd cùng
+      ".crawl-sources" nhưng tab Crawl xếp auto-fit, tab Bảo trì xếp cố
+      định 2 cột)? Đặt tên tường minh theo biến thể — class gốc +
+      modifier dạng `--ten-bien-the` (vd `.crawl-sources--fixed-2col`)
+      — viết compound selector `.crawl-sources.crawl-sources--...` để
+      thắng bằng ĐỘ ƯU TIÊN CSS thật sự, không phải chồng 2 class rời
+      rồi để cascade tự phân xử theo thứ tự dòng trong file (nhìn HTML
+      không đoán được cái nào thắng nếu làm vậy — xem 15-crawl.css để
+      thấy ví dụ thật).
+   ============================================================ */
 :root {
   --bg: #EEF2F0;
   --surface: #FFFFFF;
@@ -57,7 +91,7 @@
   --card-pad-x: 28px;
 
   /* Khoảng cách card-với-card khi nhiều card xếp cạnh nhau dạng grid
-     (.crawl-sources, .maint-job-grid...). */
+     (.crawl-sources--auto-fit, .crawl-sources--fixed-2col...). */
   --card-gap: 18px;
 
   /* Bề rộng tối thiểu 1 "card nguồn" trước khi auto-fit tự xuống hàng

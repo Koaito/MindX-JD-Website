@@ -6,7 +6,7 @@
 #}
 
 {# ================= Khu A — Kích hoạt crawl ================= #}
-<div class="crawl-sources">
+<div class="crawl-sources crawl-sources--auto-fit">
   {% for source, categories in sources.items() %}
   {% set active = active_runs.get(source) %}
   <div class="crawl-source-card {{ 'is-busy' if active else '' }}">
