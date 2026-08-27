@@ -73,6 +73,13 @@
 .crawl-source-card .form-grid > label.span-1 { grid-column: span 1; }
 .crawl-source-card .form-actions.span-4 { grid-column: 1 / -1; }
 
+/* 08/2026: khối checkbox dry-run/check-deadline (tab Bảo trì) là
+   <div class="span-2 maint-checkbox-col">, KHÔNG phải <label> nên 3
+   rule .span-* ngay trên (chỉ khớp tag label) bỏ sót nó -> div này rơi
+   về auto-placement, chỉ chiếm 1/2 cột thay vì full-width như ý đồ
+   "span-2" ban đầu, để trống hẳn nửa hàng bên cạnh. */
+.crawl-source-card .form-grid > .maint-checkbox-col.span-2 { grid-column: 1 / -1; }
+
 /* Khu A (08/2026) — khối checkbox nhiều category thay cho <select> đơn.
    CỐ TÌNH không dùng class .span-* có sẵn (span-2 ở override 2-cột
    ngay trên đã bị gán nghĩa "full-width", span-4 gốc của 07-forms.css
@@ -213,42 +220,17 @@
 
 .crawl-running-meta strong { color: var(--ink); }
 
-/* Khu B (trạng thái đang chạy, tối đa 2 — 1/nguồn) + Log live — 08/2026
-   ĐỔI layout: trước đây log live nằm CHUNG 1 khối với từng card "đang
-   chạy" (.crawl-running-split lặp lại theo từng nguồn) — giờ tách hẳn
-   thành 2 CỘT CỐ ĐỊNH cho toàn trang: trái là danh sách card trạng thái
-   (có thể rỗng/nhiều card tuỳ số nguồn đang chạy), phải là ĐÚNG 1 khung
-   Log live LUÔN HIỆN (không phụ thuộc có đang crawl hay không, xem
-   lịch sử trao đổi "khung Log live luôn hiện cố định trên trang").
-
-   CHIỀU RỘNG CỐ ĐỊNH cho khung log (thay vì 1fr co giãn theo card bên
-   trái đổi nội dung) — lý do người dùng báo "khung bị nhảy chiều rộng
-   liên tục": card trạng thái bên trái đổi nội dung (progress xuất hiện/
-   mất, badge đổi text) làm nó co giãn, mà trước đây cột log dùng `1fr`
-   nên ăn theo độ co giãn đó -> nhảy theo. Cột log giờ có width CỐ ĐỊNH
-   riêng (không phải 1fr), card trạng thái bên trái mới là phần co giãn
-   (minmax), khớp đúng tỉ lệ trong ảnh chụp báo lỗi. */
-.crawl-running-log-row {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) 720px;
-  gap: 18px;
-  align-items: start;
+/* Khu B — 08/2026 x2: đợt trước tách "đang chạy" + "Log live" thành 2
+   cột cố định (260-340px + 720px) nằm CHUNG 1 hàng trong luồng trang.
+   Đợt này (theo yêu cầu thảo luận "khó theo dõi khi nằm ở đáy trang")
+   bỏ hẳn layout 2 cột đó: "Đang chạy" dời sang widget NỔI góc dưới-phải
+   (.crawl-live-widget, cuối file này), không còn chiếm chỗ trong luồng
+   trang -> Log live đứng ĐỘC LẬP, full-width (xem .crawl-log-card-standalone
+   ngay dưới) thay vì bị ép cố định 720px cạnh cột kia nữa. Rule
+   .crawl-running-log-row cũ đã XOÁ (không còn template nào dùng). */
+.crawl-log-card-standalone {
+  width: 100%;
   margin-bottom: 32px;
-}
-
-@media (max-width: 1200px) {
-  /* Không đủ chỗ cho cột log cố định 720px + card 260-340px cạnh nhau
-     -> xếp dọc, cột log tự co theo bề ngang màn hình thay vì giữ cứng
-     720px (tràn ngang trên tablet/mobile). */
-  .crawl-running-log-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.crawl-zone-title {
-  font-family: var(--font-display);
-  font-size: 18px;
-  margin: 0 0 12px;
 }
 
 .crawl-running-list {
@@ -441,4 +423,113 @@
 
 .maint-log-body {
   max-height: 140px;
+}
+
+/* ============================================================
+   Widget nổi "Đang chạy" (08/2026, theo yêu cầu thảo luận) — DÙNG
+   CHUNG cho cả 2 tab (#crawl-live-widget bên _crawl_tab.html,
+   #maint-live-widget bên _maintenance_tab.html): nổi cố định góc
+   dưới-phải, đi theo khi cuộn trang (position: fixed, không phải
+   sticky — sticky vẫn cuộn mất khi hết vùng cha, fixed mới "đi theo
+   người dùng" đúng nghĩa xuyên suốt cả trang dài). Mỗi tab CHỈ hiện
+   job của chính tab đó (đã chốt lúc thảo luận, đơn giản hơn gộp cả
+   2 nguồn dữ liệu) — không đụng vào layout 2 cột card hiện có (Khu A),
+   chỉ thêm 1 lớp nổi TRÊN CÙNG của trang. Card list bên trong tái
+   dùng NGUYÊN .crawl-running-list/.crawl-running-card-wrap cũ nên
+   toàn bộ JS polling/xoá-card-khi-xong không cần sửa gì. */
+.crawl-live-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Bóng đậm hơn card thường trong trang — cần TÁCH RÕ khỏi nội dung
+     bên dưới nó (nổi đè lên, không phải 1 phần bố cục bình thường). */
+  box-shadow: 0 12px 32px rgba(15, 23, 30, 0.18);
+  z-index: 40;
+  overflow: hidden;
+}
+
+.crawl-live-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+  user-select: none;
+}
+
+.crawl-live-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.crawl-live-widget-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.crawl-live-widget-count[hidden] { display: none; }
+
+.crawl-live-widget-toggle {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: transform 0.2s;
+}
+
+/* Thu gọn: chỉ ẩn phần thân, GIỮ NGUYÊN phần đầu (tiêu đề + số đếm)
+   để vẫn biết đang có mấy job chạy mà không chiếm chỗ màn hình — mũi
+   tên xoay ngược lại làm dấu hiệu trực quan cho biết đang thu gọn. */
+.crawl-live-widget-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.crawl-live-widget.is-collapsed .crawl-live-widget-body { display: none; }
+.crawl-live-widget.is-collapsed .crawl-live-widget-toggle { transform: rotate(180deg); }
+
+/* Bên trong widget, .crawl-running-list vẫn dùng flex-column gốc —
+   chỉ bỏ margin/gap thừa vì giờ nó nằm gọn trong widget nhỏ, không
+   phải 1 khu to giữa trang như trước. */
+.crawl-live-widget .crawl-running-empty {
+  padding: 14px 16px;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .crawl-live-widget {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: auto;
+    max-width: none;
+  }
 }

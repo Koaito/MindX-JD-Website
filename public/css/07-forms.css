@@ -144,6 +144,22 @@
 .form-card label.full { grid-column: 1 / -1; margin-top: 14px; }
 .form-card label.checkbox-label { flex-direction: row; align-items: center; gap: 8px; }
 
+/* 08/2026 (báo lỗi ảnh chụp): ".form-card input { width: 100% }" bên
+   dưới áp lên MỌI input, kể cả checkbox/radio nằm trong
+   .checkbox-label -> ô tick bị kéo giãn thành khối vô hình rộng bằng
+   cả hàng (chỉ vẽ tick nhỏ ở góc trái), đẩy chữ nhãn dạt hẳn sang phải
+   trông như "nút bị trôi/center lung tung". Trước đây chỉ tab Crawl
+   (ngành nghề) có riêng 1 dòng reset cho .crawl-category-item, còn mọi
+   .checkbox-label khác (vd 2 checkbox dry-run/check-deadline ở tab Bảo
+   trì) đều dính lỗi này -> sửa CHUNG tại nguồn ở đây để không phải vá
+   riêng từng chỗ dùng .checkbox-label mới sau này. */
+.form-card label.checkbox-label input[type="checkbox"],
+.form-card label.checkbox-label input[type="radio"] {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+
 .form-card input, .form-card select, .form-card textarea {
   font-family: var(--font-body);
   font-size: 14px;

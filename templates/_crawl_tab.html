@@ -62,77 +62,93 @@
   {% endfor %}
 </div>
 
-{# ================= Khu B — Đang chạy (tối đa 2, 1/nguồn) + Log live (luôn hiện) ================= #}
-<div class="crawl-running-log-row">
-  {# ---- Bên trái: card trạng thái/tiến độ cho từng nguồn đang chạy (rỗng nếu không có) ---- #}
-  <div class="crawl-running-list" id="crawl-running-zone">
-    {% if active_runs %}
-      <h2 class="crawl-zone-title">Đang chạy</h2>
-      {% for source, run in active_runs.items() %}
-      {% set batch = active_batches.get(source) %}
-      <div class="dm-export-card crawl-running-card-wrap"
-           id="crawl-running-{{ source }}"
-           data-run-id="{{ run.run_id }}"
-           data-source="{{ source }}"
-           {% if batch %}data-batch-id="{{ batch.batch_id }}"{% endif %}>
-        <div class="crawl-running-card">
-          <div>
-            <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
-            <p class="crawl-running-meta" style="margin-top: 8px;">
-              {% if batch %}
-                {{ source_labels.get(source, source) }} ·
-                <span data-role="batch-count">{{ batch.completed }}/{{ batch.total }}</span> ngành xong
-              {% else %}
-                {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}
-              {% endif %}<br>
-              Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
-            </p>
-          </div>
-        </div>
-        {% if batch %}
-        {# 08/2026 — checklist đủ N category theo đúng thứ tự đã tick,
-           kể cả category CHƯA có run con nào (hiện 'Đang chờ' placeholder,
-           xem docstring crawler_client/crawl.py::_normalize_crawl_batch()).
-           JS (renderBatchChecklist) cập nhật badge từng dòng khi poll. #}
-        <ul class="crawl-batch-checklist" data-role="batch-checklist">
-          {% for item in batch.checklist %}
-          <li class="crawl-batch-item" data-category="{{ item.category }}">
-            <span class="badge {{ item.status_badge }}" data-role="item-badge">{{ item.status_label }}</span>
-            <span class="crawl-batch-item-label">{{ category_labels.get(source ~ ':' ~ item.category, item.category) }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <div class="crawl-progress" data-role="progress">
-          <p class="crawl-progress-line">
-            <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
-          </p>
-          <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    {% else %}
-      <h2 class="crawl-zone-title">Đang chạy</h2>
-      <p class="muted crawl-running-empty">Hiện không có lượt crawl nào đang chạy.</p>
-    {% endif %}
+{# ================= Khu B — Log live (luôn hiện, full-width) ================= #}
+{# 08/2026 (theo yêu cầu thảo luận) — bỏ layout 2 cột cũ (card trạng
+   thái bên trái + log cố định 720px bên phải, xem lịch sử trao đổi
+   trước). Danh sách "đang chạy" giờ dời sang widget NỔI góc dưới-phải
+   (xem cuối file), không còn nằm trong luồng trang -> Log live đứng
+   riêng, full-width luôn cho dễ đọc thay vì bị ép 720px cố định như
+   trước. Vẫn LUÔN HIỆN, không phụ thuộc có đang crawl hay không (JS
+   loadAndPollLatestLog bên dưới không đổi gì, vẫn hoạt động y hệt). #}
+<div class="crawl-log-card crawl-log-card-standalone" id="crawl-log-card" data-run-id="" data-log-after-id="0">
+  <div class="crawl-log-head">
+    <span>Log live</span>
+    <label class="crawl-log-autoscroll">
+      <input type="checkbox" data-role="autoscroll" checked>
+      Tự cuộn
+    </label>
   </div>
+  <pre class="crawl-log-body" data-role="log-body"><code data-role="log-lines">Đang tải log…</code></pre>
+</div>
 
-  {# ---- Bên phải: Log live — LUÔN HIỆN, không phụ thuộc có đang crawl hay
-       không (08/2026, xem lịch sử trao đổi "khung Log live luôn hiện cố
-       định trên trang"). Lúc tải trang JS tự gọi GET /crawl/latest-log-run
-       để lấy run_id GẦN NHẤT (dù đã done/error) rồi load toàn bộ log của
-       run đó — không xoá log cũ mỗi khi có lượt crawl mới, chỉ NỐI TIẾP
-       thêm dòng (xem loadAndPollLatestLog ở JS bên dưới). ---- #}
-  <div class="crawl-log-card" id="crawl-log-card" data-run-id="" data-log-after-id="0">
-    <div class="crawl-log-head">
-      <span>Log live</span>
-      <label class="crawl-log-autoscroll">
-        <input type="checkbox" data-role="autoscroll" checked>
-        Tự cuộn
-      </label>
+{# ================= Widget nổi "Đang chạy" (tối đa 2, 1/nguồn) =================
+   08/2026 (theo yêu cầu thảo luận "khó theo dõi cái nào đang chạy khi
+   nó nằm ở đáy trang") — nổi cố định góc dưới-phải, đi theo khi cuộn,
+   thu gọn được. CHỈ hiện job của TAB đang xem (đã chốt trong lúc thảo
+   luận — đơn giản hơn gộp cả 2 tab). Bên trong TÁI DÙNG NGUYÊN
+   #crawl-running-zone + .crawl-running-card-wrap + toàn bộ data-*
+   attribute như cũ -> JS polling/xoá card khi xong (pollRun/pollBatch/
+   onRunOrBatchDone ở cuối file) KHÔNG cần sửa gì, chỉ đổi chỗ hiển thị
+   bằng CSS (.crawl-live-widget, 15-crawl.css) + thêm phần thu gọn. #}
+<div class="crawl-live-widget{{ '' if active_runs else ' is-collapsed' }}" id="crawl-live-widget">
+  <div class="crawl-live-widget-head" data-role="widget-toggle">
+    <span class="crawl-live-widget-title">
+      Đang chạy
+      <span class="crawl-live-widget-count" id="crawl-live-widget-count" {{ 'hidden' if not active_runs }}>{{ active_runs|length }}</span>
+    </span>
+    <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
+  </div>
+  <div class="crawl-live-widget-body">
+    <div class="crawl-running-list" id="crawl-running-zone">
+      {% if active_runs %}
+        {% for source, run in active_runs.items() %}
+        {% set batch = active_batches.get(source) %}
+        <div class="dm-export-card crawl-running-card-wrap"
+             id="crawl-running-{{ source }}"
+             data-run-id="{{ run.run_id }}"
+             data-source="{{ source }}"
+             {% if batch %}data-batch-id="{{ batch.batch_id }}"{% endif %}>
+          <div class="crawl-running-card">
+            <div>
+              <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+              <p class="crawl-running-meta" style="margin-top: 8px;">
+                {% if batch %}
+                  {{ source_labels.get(source, source) }} ·
+                  <span data-role="batch-count">{{ batch.completed }}/{{ batch.total }}</span> ngành xong
+                {% else %}
+                  {{ source_labels.get(source, source) }} · {{ category_labels.get(source ~ ':' ~ run.category, run.category) }}
+                {% endif %}<br>
+                Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+              </p>
+            </div>
+          </div>
+          {% if batch %}
+          {# 08/2026 — checklist đủ N category theo đúng thứ tự đã tick,
+             kể cả category CHƯA có run con nào (hiện 'Đang chờ' placeholder,
+             xem docstring crawler_client/crawl.py::_normalize_crawl_batch()).
+             JS (renderBatchChecklist) cập nhật badge từng dòng khi poll. #}
+          <ul class="crawl-batch-checklist" data-role="batch-checklist">
+            {% for item in batch.checklist %}
+            <li class="crawl-batch-item" data-category="{{ item.category }}">
+              <span class="badge {{ item.status_badge }}" data-role="item-badge">{{ item.status_label }}</span>
+              <span class="crawl-batch-item-label">{{ category_labels.get(source ~ ':' ~ item.category, item.category) }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="crawl-progress" data-role="progress">
+            <p class="crawl-progress-line">
+              <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
+            </p>
+            <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="muted crawl-running-empty">Hiện không có lượt crawl nào đang chạy.</p>
+      {% endif %}
     </div>
-    <pre class="crawl-log-body" data-role="log-body"><code data-role="log-lines">Đang tải log…</code></pre>
   </div>
 </div>
 
@@ -593,6 +609,24 @@
     }, 4000);
   }
 
+  // Cập nhật số đếm trên widget nổi (badge cạnh chữ "Đang chạy") theo
+  // đúng số card CÒN LẠI trong zone — gọi lại mỗi khi 1 card bị xoá
+  // (onRunOrBatchDone bên dưới), không cần khi thêm mới vì trigger
+  // crawl là POST form thường (reload cả trang), số ban đầu Jinja
+  // render đã đúng sẵn rồi.
+  function updateWidgetCount() {
+    var zone = document.getElementById("crawl-running-zone");
+    var countEl = document.getElementById("crawl-live-widget-count");
+    if (!zone || !countEl) return;
+    var n = zone.querySelectorAll(".crawl-running-card-wrap").length;
+    if (n > 0) {
+      countEl.hidden = false;
+      countEl.textContent = String(n);
+    } else {
+      countEl.hidden = true;
+    }
+  }
+
   function onRunOrBatchDone(card) {
     card.remove();
     var zone = document.getElementById("crawl-running-zone");
@@ -602,6 +636,7 @@
       empty.textContent = "Hiện không có lượt crawl nào đang chạy.";
       zone.appendChild(empty);
     }
+    updateWidgetCount();
   }
 
   document.querySelectorAll(".crawl-running-card-wrap[data-run-id]").forEach(function (card) {
@@ -642,6 +677,19 @@
       }
     });
   });
+
+  // Widget nổi "Đang chạy" — bấm vào phần đầu (tiêu đề) để thu gọn/mở
+  // rộng, chỉ đổi 1 class nên không đụng gì tới nội dung/JS polling
+  // bên trong (xem CSS .crawl-live-widget.is-collapsed, 15-crawl.css).
+  var liveWidget = document.getElementById("crawl-live-widget");
+  if (liveWidget) {
+    var widgetHead = liveWidget.querySelector('[data-role="widget-toggle"]');
+    if (widgetHead) {
+      widgetHead.addEventListener("click", function () {
+        liveWidget.classList.toggle("is-collapsed");
+      });
+    }
+  }
 
   loadAndPollLatestLog();
 })();
