@@ -30,26 +30,44 @@ MAINTENANCE_JOBS = [
     {
         "job_type": "backfill_company_profiles",
         "label": "Vá hồ sơ công ty",
-        "description": "Điền lại các trường hồ sơ công ty còn thiếu/sai từ dữ liệu job đã crawl.",
+        # 08/2026 — viết lại theo đúng bảng đối chiếu script (README):
+        # vá industry/company_size/address/website (+ products_services
+        # nhặt kèm), đọc từ source_profile_url đã lưu (đúng trang
+        # TopCV/VietnamWorks/CareerViet gốc) — miễn phí, chỉ tốn thời
+        # gian chờ, không gọi API trả phí nào.
+        "description": "Vá industry, company_size, address, website (kèm products_services) — đọc lại đúng trang nguồn đã lưu (source_profile_url). Miễn phí, chỉ tốn thời gian chờ.",
         "costs_money": False,
     },
     {
         "job_type": "enrich_profile_from_website",
         "label": "Tra cứu từ website công ty",
-        "description": "Đọc trực tiếp website công ty đã có sẵn để bổ sung ngành nghề, sản phẩm/dịch vụ.",
+        # 08/2026 — theo bảng: vá industry/products_services, đọc từ
+        # companies.website + 1 lần gọi Gemini/công ty để phân loại
+        # (không dùng Tavily) — chi phí rẻ, không phải miễn phí tuyệt
+        # đối nhưng cũng không thuộc diện "TỐN PHÍ THẬT" như 2 job dưới.
+        "description": "Vá industry, products_services — đọc companies.website + 1 lần gọi Gemini/công ty để phân loại. Chi phí rẻ (không dùng Tavily).",
         "costs_money": False,
     },
     {
         "job_type": "enrich_web_info",
         "label": "Tra cứu web (Tavily + Gemini)",
-        "description": "Tìm + đọc thông tin công ty trên web khi CHƯA có website — gọi Tavily/Gemini, TỐN PHÍ THẬT.",
+        # 08/2026 — theo bảng: vá website/tax_id, đọc từ Tavily search (2
+        # query/công ty) + Gemini trích xuất — tốn phí nhất trong 5 job,
+        # chỉ nên chạy cho công ty chưa có source_profile_url.
+        "description": "Vá website, tax_id — Tavily search (2 query/công ty) + Gemini trích xuất. TỐN PHÍ THẬT, tốn nhất trong 5 job — chỉ nên chạy cho công ty chưa có source_profile_url.",
         "costs_money": True,
     },
     {
         "job_type": "get_fb_linkedin",
         "label": "Tìm Facebook/LinkedIn công ty",
-        "description": "Tìm link Fanpage/LinkedIn công ty qua tra cứu web — gọi Tavily/Gemini, TỐN PHÍ THẬT.",
-        "costs_money": True,
+        # 08/2026 (sửa mô tả sai): job này KHÔNG gọi Tavily/Gemini — xem
+        # get_company_fb_linkedin_link.py, chỉ crawl HTML thô
+        # (curl_cffi + BeautifulSoup) từ companies.website đã có sẵn để
+        # tìm link social ngay trên site công ty, hoàn toàn miễn phí.
+        # Giới hạn thật: site dạng SPA/React/Next.js render bằng JS thì
+        # HTML thô rỗng, script không đọc được — không phải chi phí tiền.
+        "description": "Vá fanpage_url, linkedin_url — đọc companies.website (crawl HTML thô). Miễn phí, nhưng giới hạn với site dạng SPA/React (render bằng JS).",
+        "costs_money": False,
     },
     {
         "job_type": "check_expired_jobs",
