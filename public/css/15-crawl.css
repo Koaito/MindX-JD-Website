@@ -425,8 +425,15 @@
 }
 
 /* Log live thu nhỏ, gắn trong card (khác .crawl-log-card to ở Khu B
-   tab Crawl) — thấp hơn hẳn để 5 card vẫn gọn trên 1 màn hình. */
+   tab Crawl) — thấp hơn hẳn để 5 card vẫn gọn trên 1 màn hình.
+   FIX 08/2026 (báo lỗi ảnh chụp): .crawl-log-card có height:340px CỐ
+   ĐỊNH — trước đây chỉ giới hạn .maint-log-body xuống 140px mà QUÊN
+   override luôn height của card cha, nên card vẫn cao 340px trong khi
+   nội dung/scrollbar bên trong chỉ chiếm 140px -> để trống hẳn khoảng
+   dưới, thanh cuộn nhìn như "cụt" giữa chừng. Đặt lại height: auto để
+   card co theo đúng header + body 140px, không dư khoảng trống. */
 .maint-log-card {
+  height: auto;
   margin-top: 14px;
 }
 

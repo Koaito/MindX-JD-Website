@@ -102,6 +102,35 @@
 .potential-suggestion-tooltip li.is-unmet { color: var(--muted); }
 .potential-suggestion-tooltip li.is-unmet .tick { color: var(--muted); }
 
+/* Danh sách job title trong tooltip "Job mới nhất" (dashboard, khu
+   "Đang mở rộng tuyển dụng") — KHÁC checklist tiêu chí gợi ý ở trên
+   (dùng icon .tick riêng nên tắt list-style: none). Danh sách job chỉ
+   là text thuần, không có icon -> phải tự bật lại dấu gạch đầu dòng,
+   tách class riêng (.tooltip-plain-list) để không ảnh hưởng checklist
+   ở add_company.html/companies.html đang dùng chung .potential-
+   suggestion-tooltip ul/li. 08/2026 (báo lỗi ảnh chụp: nhìn phẳng lì,
+   không phân biệt được từng dòng job). */
+.potential-suggestion-tooltip ul.tooltip-plain-list {
+  list-style: disc;
+  padding-left: 18px;
+}
+.potential-suggestion-tooltip ul.tooltip-plain-list li {
+  display: list-item;
+  padding: 2px 0;
+}
+
+/* Ghi chú nhỏ cuối tooltip — giải thích tooltip chỉ show tối đa N job
+   mới nhất (không phải TẤT CẢ job công ty đó đang tuyển), để người
+   dùng không hiểu lầm đây là danh sách đầy đủ. */
+.tooltip-footnote {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .potential-suggestion-note {
   display: block;
   margin-top: 4px;
