@@ -107,6 +107,23 @@ from .crawl import (
     get_crawl_logs,
     get_crawl_latest_log_run,
 )
+# 08/2026 (xem lịch sử trao đổi "phương án B — generic runner dùng
+# chung") — tab "Bảo trì dữ liệu", đối xứng .crawl ở trên.
+from .maintenance import (
+    MAINTENANCE_JOBS,
+    MAINTENANCE_JOB_LABELS,
+    MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT,
+    MAINTENANCE_CHECK_EXPIRED_JOB_TYPE,
+    MAINTENANCE_STAT_LABELS,
+    MAINTENANCE_STATUS_LABELS,
+    MAINTENANCE_STATUS_BADGE,
+    _normalize_maintenance_run,
+    trigger_maintenance_run,
+    get_maintenance_status,
+    list_maintenance_runs,
+    get_maintenance_logs,
+    get_maintenance_latest_log_runs,
+)
 from .import_export import (
     IMPORT_EXPORT_ENTITY_TYPES,
     IMPORT_EXPORT_ENTITY_LABELS,
@@ -183,6 +200,18 @@ __all__ = [
     "list_crawl_runs",
     "get_crawl_logs",
     "get_crawl_latest_log_run",
+    "MAINTENANCE_JOBS",
+    "MAINTENANCE_JOB_LABELS",
+    "MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT",
+    "MAINTENANCE_CHECK_EXPIRED_JOB_TYPE",
+    "MAINTENANCE_STAT_LABELS",
+    "MAINTENANCE_STATUS_LABELS",
+    "MAINTENANCE_STATUS_BADGE",
+    "trigger_maintenance_run",
+    "get_maintenance_status",
+    "list_maintenance_runs",
+    "get_maintenance_logs",
+    "get_maintenance_latest_log_runs",
     "IMPORT_EXPORT_ENTITY_TYPES",
     "IMPORT_EXPORT_ENTITY_LABELS",
     "CONFLICT_STATUS_LABELS",

@@ -1,0 +1,440 @@
+{#
+  Tab "Bảo trì dữ liệu" (08/2026, xem lịch sử trao đổi "phương án B —
+  generic runner dùng chung"). Include từ crawl.html (shell) khi
+  tab='maintenance'. Mirror cấu trúc _crawl_tab.html (Khu A/B/C) nhưng:
+    - Khu A: lặp qua `maintenance_jobs` (5 job cố định, KHÔNG động như
+      `sources` bên crawl) thay vì dropdown nguồn/ngành.
+    - Khu B: MỖI job_type có 1 khung "Log live" RIÊNG gắn ngay trong
+      card của nó (khác crawl chỉ có 1 khung Log live DUY NHẤT dùng
+      chung, tự chuyển run — ở đây 5 job_type có thể chạy SONG SONG nên
+      cần log tách biệt để không lẫn dòng của nhau, xem docstring
+      db.get_latest_maintenance_run_per_job_type() phía backend).
+    - 5 job KHÔNG có heartbeat/progress real-time (chỉ log + trạng thái
+      cuối) — xem docstring api/maintenance_runner.py phía backend, nên
+      card "Đang chạy" ở đây đơn giản hơn (không có thanh progress-fetched).
+#}
+
+{# ================= Khu A — Kích hoạt job bảo trì ================= #}
+<div class="crawl-sources maint-job-grid">
+  {% for job in maintenance_jobs %}
+  {% set jt = job.job_type %}
+  {% set active = active_runs.get(jt) %}
+  <div class="crawl-source-card {{ 'is-busy' if active else '' }}">
+    <h2>
+      {{ job.label }}
+      {% if job.costs_money %}
+        <span class="badge badge-warning maint-cost-badge">Tốn phí thật</span>
+      {% endif %}
+    </h2>
+    <p class="crawl-source-sub">{{ job.description }}</p>
+    {% if active %}
+    <p class="crawl-source-sub">
+      Đang có 1 lượt {{ status_labels.get(active.status, active.status)|lower }} — đợi xong hoặc xem log bên dưới.
+    </p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('crawl.maintenance_trigger', job_type=jt) }}"
+          class="form-grid form-card maint-trigger-form" data-job-type="{{ jt }}">
+      <label class="span-2">
+        Giới hạn (limit)
+        {% if jt in require_limit_job_types %}
+          <input type="number" name="limit" min="1" max="5000" placeholder="Bắt buộc — vd 50" required {{ 'disabled' if active }}>
+        {% else %}
+          <input type="number" name="limit" min="1" max="5000" placeholder="Bỏ trống = chạy hết" {{ 'disabled' if active }}>
+        {% endif %}
+      </label>
+
+      {% if jt == check_expired_job_type %}
+      <div class="span-2 maint-checkbox-col">
+        <label class="checkbox-label">
+          <input type="checkbox" name="dry_run" {{ 'disabled' if active }}>
+          Chỉ xem trước (dry-run) — không ghi gì vào DB
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="check_deadline_only" {{ 'disabled' if active }}>
+          Chỉ check deadline — không fetch mạng
+        </label>
+      </div>
+      {% endif %}
+
+      <div class="form-actions span-4">
+        <button type="submit" class="btn btn-primary" {{ 'disabled' if active }}>
+          {{ 'Đang chạy…' if active else 'Bắt đầu chạy' }}
+        </button>
+      </div>
+    </form>
+
+    {# ---- Log live RIÊNG cho job_type này — xem đầu docstring file ---- #}
+    {% set latest = latest_log_runs.get(jt) %}
+    <div class="crawl-log-card maint-log-card" data-job-type="{{ jt }}"
+         data-run-id="" data-log-after-id="0">
+      <div class="crawl-log-head">
+        <span>Log live</span>
+        <label class="crawl-log-autoscroll">
+          <input type="checkbox" data-role="autoscroll" checked>
+          Tự cuộn
+        </label>
+      </div>
+      <pre class="crawl-log-body maint-log-body" data-role="log-body"><code data-role="log-lines">Đang tải log…</code></pre>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ================= Khu B — Đang chạy (tối đa 5, 1/job_type) ================= #}
+<div class="crawl-running-list" id="maint-running-zone" style="margin: 24px 0;">
+  {% if active_runs %}
+    <h2 class="crawl-zone-title">Đang chạy</h2>
+    {% for jt, run in active_runs.items() %}
+    <div class="dm-export-card crawl-running-card-wrap" id="maint-running-{{ jt }}"
+         data-run-id="{{ run.run_id }}" data-job-type="{{ jt }}">
+      <div class="crawl-running-card">
+        <div>
+          <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+          <p class="crawl-running-meta" style="margin-top: 8px;">
+            {{ job_labels.get(jt, jt) }}<br>
+            Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+          </p>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <h2 class="crawl-zone-title">Đang chạy</h2>
+    <p class="muted crawl-running-empty">Hiện không có job bảo trì nào đang chạy.</p>
+  {% endif %}
+</div>
+
+{# ================= Khu C — Lịch sử ================= #}
+<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử bảo trì</h2>
+
+<form class="filter-bar" method="get">
+  <input type="hidden" name="tab" value="maintenance">
+  <select name="m_job_type">
+    <option value="">Mọi job</option>
+    {% for job in maintenance_jobs %}
+      <option value="{{ job.job_type }}" {{ 'selected' if filters.job_type == job.job_type }}>{{ job.label }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="m_status">
+    <option value="">Mọi trạng thái</option>
+    {% for st, label in status_labels.items() %}
+      <option value="{{ st }}" {{ 'selected' if filters.status == st }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="m_triggered_by">
+    <option value="">Mọi admin</option>
+    {% for u in admin_members %}
+      <option value="{{ u.ss_user_id }}" {{ 'selected' if filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.job_type or filters.status or filters.triggered_by %}
+    <a class="btn btn-text" href="{{ url_for('crawl.index', tab='maintenance') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count" id="maint-history-count">{{ total_runs }} lượt phù hợp</p>
+
+{% if runs %}
+<div class="activity-table-wrap">
+  <table class="activity-table">
+    <thead>
+      <tr>
+        <th style="width: 130px;">Thời gian</th>
+        <th style="width: 170px;">Job</th>
+        <th style="width: 150px;">Người bấm</th>
+        <th style="width: 110px;">Trạng thái</th>
+        <th>Kết quả</th>
+      </tr>
+    </thead>
+    <tbody id="maint-history-tbody">
+      {% for run in runs %}
+      <tr data-run-id="{{ run.run_id }}">
+        <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
+        <td>
+          {{ run.job_label }}<br>
+          <span class="muted" style="font-size: 12px;">
+            {% if run.limit %}limit={{ run.limit }}{% else %}không giới hạn{% endif %}
+            {% if run.dry_run %} · dry-run{% endif %}
+            {% if run.check_deadline_only %} · chỉ check deadline{% endif %}
+          </span>
+        </td>
+        <td>{{ run.triggered_by_name }}</td>
+        <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
+        <td>
+          {% if run.status == 'done' and run.stat_items %}
+            <div class="crawl-result-main">{{ run.stat_items[0][1] }} {{ run.stat_items[0][0]|lower }}</div>
+            <details class="crawl-result-details">
+              <summary>Xem đủ chỉ số</summary>
+              <dl>
+                {% for label, value in run.stat_items %}
+                  <dt>{{ label }}</dt><dd>{{ value }}</dd>
+                {% endfor %}
+              </dl>
+            </details>
+          {% elif run.status == 'error' %}
+            <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Phân trang">
+  {% if page > 1 %}
+    <a class="page-link" href="{{ url_for('crawl.index', tab='maintenance', page=page-1, **pagination_filters) }}">‹ Trang trước</a>
+  {% endif %}
+  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="page-link" href="{{ url_for('crawl.index', tab='maintenance', page=page+1, **pagination_filters) }}">Trang sau ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state" id="maint-history-empty">
+  <p>Chưa có lượt chạy nào khớp bộ lọc.</p>
+</div>
+{% endif %}
+
+{# ================= JS ================= #}
+<script>
+(function () {
+  "use strict";
+
+  var JOB_LABEL_MAP = {{ job_labels|tojson }};
+  var STAT_LABELS_BY_JOB = {{ stat_labels_by_job|tojson }};  // {job_type: [[key, label], ...]}
+  var STATUS_LABELS = {{ status_labels|tojson }};
+  var STATUS_BADGE = {"queued": "badge-info", "running": "badge-info", "done": "badge-success", "error": "badge-danger"};
+
+  function formatTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return pad(d.getHours()) + ":" + pad(d.getMinutes()) + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
+  function buildHistoryRow(run) {
+    var tr = document.createElement("tr");
+
+    var tdTime = document.createElement("td");
+    tdTime.className = "muted";
+    tdTime.textContent = formatTime(run.started_at);
+    tr.appendChild(tdTime);
+
+    var tdJob = document.createElement("td");
+    var params = run.params || {};
+    var subLine = params.limit ? ("limit=" + params.limit) : "không giới hạn";
+    if (params.dry_run) subLine += " · dry-run";
+    if (params.check_deadline_only) subLine += " · chỉ check deadline";
+    tdJob.innerHTML = (JOB_LABEL_MAP[run.job_type] || run.job_type) +
+      "<br><span class=\"muted\" style=\"font-size:12px;\">" + subLine + "</span>";
+    tr.appendChild(tdJob);
+
+    var tdUser = document.createElement("td");
+    tdUser.textContent = run.triggered_by_name || "Hệ thống (tự động)";
+    tr.appendChild(tdUser);
+
+    var tdStatus = document.createElement("td");
+    var badge = document.createElement("span");
+    badge.className = "badge " + (STATUS_BADGE[run.status] || "badge-warning");
+    badge.textContent = STATUS_LABELS[run.status] || run.status;
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    var tdResult = document.createElement("td");
+    var statLabels = STAT_LABELS_BY_JOB[run.job_type] || [];
+    if (run.status === "done" && run.stats && statLabels.length) {
+      var mainDiv = document.createElement("div");
+      mainDiv.className = "crawl-result-main";
+      mainDiv.textContent = (run.stats[statLabels[0][0]] || 0) + " " + statLabels[0][1].toLowerCase();
+      tdResult.appendChild(mainDiv);
+
+      var details = document.createElement("details");
+      details.className = "crawl-result-details";
+      var summary = document.createElement("summary");
+      summary.textContent = "Xem đủ chỉ số";
+      details.appendChild(summary);
+      var dl = document.createElement("dl");
+      statLabels.forEach(function (pair) {
+        var dt = document.createElement("dt");
+        dt.textContent = pair[1];
+        var dd = document.createElement("dd");
+        dd.textContent = run.stats[pair[0]] || 0;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      });
+      details.appendChild(dl);
+      tdResult.appendChild(details);
+    } else if (run.status === "error") {
+      var errDiv = document.createElement("div");
+      errDiv.className = "crawl-error-text";
+      errDiv.textContent = run.error || "Không rõ lỗi.";
+      tdResult.appendChild(errDiv);
+    } else {
+      tdResult.innerHTML = "<span class=\"muted\">—</span>";
+    }
+    tr.appendChild(tdResult);
+
+    return tr;
+  }
+
+  function prependHistoryRow(run) {
+    var tbody = document.getElementById("maint-history-tbody");
+    var emptyState = document.getElementById("maint-history-empty");
+    if (!tbody && emptyState) return;  // bảng rỗng lúc tải trang — nhắc tải lại, giống crawl tab.
+    if (!tbody) return;
+    if (run.run_id && tbody.querySelector('tr[data-run-id="' + run.run_id + '"]')) return;
+    var row = buildHistoryRow(run);
+    if (run.run_id) row.setAttribute("data-run-id", run.run_id);
+    tbody.insertBefore(row, tbody.firstChild);
+    var countEl = document.getElementById("maint-history-count");
+    if (countEl) {
+      var n = parseInt(countEl.textContent, 10);
+      if (!isNaN(n)) countEl.textContent = (n + 1) + " lượt phù hợp";
+    }
+  }
+
+  function reenableJobForm(jobType) {
+    var form = document.querySelector('.maint-trigger-form[data-job-type="' + jobType + '"]');
+    if (!form) return;
+    form.querySelectorAll("input, button").forEach(function (el) { el.disabled = false; });
+    var wrap = form.closest(".crawl-source-card");
+    if (wrap) wrap.classList.remove("is-busy");
+    var btn = form.querySelector("button[type=submit]");
+    if (btn) btn.textContent = "Bắt đầu chạy";
+  }
+
+  function onRunDone(card) {
+    card.remove();
+    var zone = document.getElementById("maint-running-zone");
+    if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+      var empty = document.createElement("p");
+      empty.className = "muted crawl-running-empty";
+      empty.textContent = "Hiện không có job bảo trì nào đang chạy.";
+      zone.appendChild(empty);
+    }
+  }
+
+  function pollMaintenanceRun(card) {
+    var runId = card.getAttribute("data-run-id");
+    var jobType = card.getAttribute("data-job-type");
+    var stopped = false;
+    var inFlight = false;  // chặn race 2 response chồng nhau, cùng lý do pollRun() bên _crawl_tab.html.
+
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/maintenance/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          inFlight = false;
+          if (stopped) return;
+          if (run.error) {
+            stopped = true;
+            clearInterval(timer);
+            return;
+          }
+          if (run.status === "done" || run.status === "error") {
+            stopped = true;
+            clearInterval(timer);
+            prependHistoryRow(run);
+            reenableJobForm(jobType);
+            onRunDone(card);
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  document.querySelectorAll("#maint-running-zone .crawl-running-card-wrap[data-run-id]").forEach(function (card) {
+    pollMaintenanceRun(card);
+  });
+
+  // ---- Log live RIÊNG cho từng job_type (5 khung, xem đầu docstring
+  // file _maintenance_tab.html) — mirror loadAndPollLatestLog() bên
+  // _crawl_tab.html nhưng lặp qua TỪNG khung .maint-log-card thay vì 1
+  // khung duy nhất, dùng /crawl/maintenance/latest-log-runs.json (trả
+  // đủ 5 job_type 1 lần) thay vì /crawl/latest-log-run (1 nguồn).
+  var LOG_LEVEL_CLASS = {"WARNING": "is-warning", "ERROR": "is-error", "CRITICAL": "is-error"};
+
+  function appendLogLines(logCard, items) {
+    if (!items || !items.length) return;
+    var linesEl = logCard.querySelector('[data-role="log-lines"]');
+    var bodyEl = logCard.querySelector('[data-role="log-body"]');
+    var autoscrollEl = logCard.querySelector('[data-role="autoscroll"]');
+    if (!linesEl) return;
+    if (linesEl.textContent === "Đang tải log…" || linesEl.textContent === "Chưa có log nào." || linesEl.textContent === "Chưa có lượt chạy nào.") linesEl.textContent = "";
+    items.forEach(function (item) {
+      var span = document.createElement("span");
+      span.className = "crawl-log-line " + (LOG_LEVEL_CLASS[item.level] || "");
+      span.textContent = "[" + formatTime(item.created_at) + "] " + item.message;
+      linesEl.appendChild(span);
+      linesEl.appendChild(document.createTextNode("\n"));
+    });
+    if (bodyEl && autoscrollEl && autoscrollEl.checked) bodyEl.scrollTop = bodyEl.scrollHeight;
+  }
+
+  function fetchLogsFor(logCard, runId) {
+    var afterId = logCard.getAttribute("data-log-after-id") || "0";
+    fetch("/crawl/maintenance/" + runId + "/logs.json?after_id=" + afterId, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.error) return;
+        appendLogLines(logCard, data.items);
+        if (typeof data.last_id === "number") logCard.setAttribute("data-log-after-id", String(data.last_id));
+      })
+      .catch(function () {});
+  }
+
+  function switchLogCardToRun(logCard, runId) {
+    if (!runId || runId === logCard.getAttribute("data-run-id")) return;
+    logCard.setAttribute("data-run-id", runId);
+    logCard.setAttribute("data-log-after-id", "0");
+    var linesEl = logCard.querySelector('[data-role="log-lines"]');
+    if (linesEl) linesEl.textContent = "Chưa có log nào.";
+    fetchLogsFor(logCard, runId);
+  }
+
+  function pollAllLatestLogRuns() {
+    fetch("/crawl/maintenance/latest-log-runs.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+      .then(function (res) { return res.json(); })
+      .then(function (result) {
+        if (result.error) return;
+        document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
+          var jt = logCard.getAttribute("data-job-type");
+          var run = result[jt];
+          if (run && run.run_id) {
+            switchLogCardToRun(logCard, run.run_id);
+          } else if (logCard.getAttribute("data-run-id") === "") {
+            var linesEl = logCard.querySelector('[data-role="log-lines"]');
+            if (linesEl && linesEl.textContent === "Đang tải log…") linesEl.textContent = "Chưa có lượt chạy nào.";
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
+  pollAllLatestLogRuns();
+  // Poll log của run hiện tại (nếu có) cho từng khung — 2s/lần.
+  setInterval(function () {
+    document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
+      var runId = logCard.getAttribute("data-run-id");
+      if (runId) fetchLogsFor(logCard, runId);
+    });
+  }, 2000);
+  // Poll phát hiện run MỚI cho CẢ 5 job_type — 6s/lần, cùng chu kỳ
+  // loadAndPollLatestLog() bên _crawl_tab.html.
+  setInterval(pollAllLatestLogRuns, 6000);
+})();
+</script>

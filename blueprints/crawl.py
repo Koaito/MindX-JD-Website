@@ -1,6 +1,21 @@
-"""Crawl blueprint — trang "Crawl dữ liệu" (08/2026). CHỈ admin thấy và
-dùng được (khớp yêu cầu gốc, chặt hơn @staff_required cho ss_team đang
-dùng ở hầu hết trang quản trị khác) — xem utils/decorators.py::admin_required.
+"""Crawl blueprint — trang "Vận hành dữ liệu" (08/2026, đổi tên từ
+"Crawl dữ liệu" — xem lịch sử trao đổi "1 mục, 2 tab như
+data_management.py"). CHỈ admin thấy và dùng được (khớp yêu cầu gốc,
+chặt hơn @staff_required cho ss_team đang dùng ở hầu hết trang quản trị
+khác) — xem utils/decorators.py::admin_required.
+
+TAB "crawl" (mặc định) — nội dung y hệt trang cũ, dời sang
+_crawl_tab.html, KHÔNG đổi logic.
+TAB "maintenance" — 5 job bảo trì dữ liệu (backfill_company_profiles,
+enrich_profile_from_website, enrich_web_info, get_fb_linkedin,
+check_expired_jobs), route trigger/status/logs khai ở
+blueprints/crawl_maintenance.py (file riêng, CÙNG blueprint object
+`crawl_bp` này — import ở CUỐI file để tự đăng ký route, xem dòng
+import cuối file).
+
+URL giữ nguyên `/crawl` (không đổi thành `/van-hanh-du-lieu` hay tương
+tự) — CHỦ Ý để không phải sửa mọi `url_for('crawl.index')` đang rải rác
+(base.html, breadcrumb...) chỉ vì đổi tên hiển thị.
 
 Nguồn dữ liệu: bảng crawl_runs (Postgres, xem
 sql/migration_add_crawl_runs.sql phía backend) — thay cho _RUNS (RAM)
@@ -52,8 +67,28 @@ def _active_run_for_source(source):
 @crawl_bp.route("/crawl")
 @admin_required
 def index():
-    """Trang chính — Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
-    1/nguồn), Khu C (lịch sử, filter + phân trang)."""
+    """Trang chính — 2 tab (?tab=crawl mặc định | ?tab=maintenance).
+
+    Tab 'crawl': Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
+    1/nguồn), Khu C (lịch sử, filter + phân trang) — y hệt trước đây.
+
+    Tab 'maintenance': build context riêng ở
+    _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
+    merge vào đây — tách hàm để file này không phình to, KHÔNG tính lại
+    context tab đang KHÔNG hiển thị (đỡ gọi API thừa lúc chỉ xem 1 tab)."""
+    tab = request.args.get("tab", "crawl")
+    if tab not in ("crawl", "maintenance"):
+        tab = "crawl"
+
+    if tab == "maintenance":
+        # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
+        # `from blueprints.crawl import crawl_bp`, import ở đầu file
+        # này sẽ chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) ->
+        # ImportError. Import trễ bên trong hàm chỉ chạy lúc request
+        # thật tới, lúc đó module đã load xong hoàn toàn.
+        from blueprints.crawl_maintenance import _maintenance_tab_context
+        return render_template("crawl.html", tab=tab, **_maintenance_tab_context())
+
     try:
         sources = db_data.get_sources()
     except CrawlerAPIError as exc:
@@ -280,3 +315,14 @@ def latest_log_run():
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
     return jsonify(run or {"run_id": None})
+
+
+# CUỐI FILE (CHỦ Ý, KHÔNG di lên đầu) — import để tự đăng ký các route
+# /crawl/maintenance/* vào ĐÚNG crawl_bp object này (xem docstring đầu
+# blueprints/crawl_maintenance.py để biết vì sao tách file nhưng dùng
+# chung 1 blueprint — giữ endpoint namespace 'crawl.*' để không phải
+# sửa logic active-highlight ở base.html). PHẢI đặt ở CUỐI, sau khi
+# crawl_bp đã được gán (dòng 21) — crawl_maintenance.py làm
+# `from blueprints.crawl import crawl_bp`, đặt import này ở ĐẦU file sẽ
+# vỡ vì crawl_bp chưa tồn tại lúc đó.
+from blueprints import crawl_maintenance  # noqa: E402,F401

@@ -384,3 +384,40 @@
 @media (max-width: 720px) {
   .crawl-sources { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Tab "Bảo trì dữ liệu" (08/2026, xem lịch sử trao đổi "phương án B —
+   generic runner dùng chung"). Tái dùng gần hết class ở trên
+   (.crawl-source-card, .crawl-running-card-wrap, .crawl-log-card...)
+   — chỉ thêm phần THẬT SỰ khác biệt: 5 card cố định (không cuộn
+   ngang như 2-3 nguồn crawl), badge "Tốn phí thật", cột checkbox
+   dry-run/check_deadline_only, và khung Log live THU NHỎ gắn ngay
+   trong từng card (khác khung Log live to, DUY NHẤT ở tab Crawl).
+   ============================================================ */
+
+.maint-job-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.maint-cost-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.maint-checkbox-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Log live thu nhỏ, gắn trong card (khác .crawl-log-card to ở Khu B
+   tab Crawl) — thấp hơn hẳn để 5 card vẫn gọn trên 1 màn hình. */
+.maint-log-card {
+  margin-top: 14px;
+}
+
+.maint-log-body {
+  max-height: 140px;
+}
