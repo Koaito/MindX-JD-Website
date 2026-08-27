@@ -22,6 +22,12 @@
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --sidebar-width: 248px;
+  /* 08/2026: cùng 1 số dùng cho `html { zoom }` bên dưới VÀ để bù lại
+     mọi chỗ dùng đơn vị `vh` (xem 01-sidebar.css .sidebar, .shell bên
+     dưới) — lý do bắt buộc phải có biến này, xem giải thích chi tiết
+     ngay tại `html { zoom }`. Đổi tỉ lệ zoom chỉ cần sửa DUY NHẤT số
+     này, không phải sửa từng nơi dùng vh riêng lẻ. */
+  --zoom-scale: 0.9;
 }
 
 /* Set by the anti-FOUC script in base.html (before first paint) when the
@@ -45,8 +51,19 @@ html.sidebar-collapsed {
    Safari 15.4+ từ lâu, Firefox 126+ (2024) -- đã đủ an toàn cho
    nội bộ Career Hub tháng 08/2026. Muốn tắt/đổi tỉ lệ khác chỉ cần
    sửa 1 dòng này, không đụng tới component nào khác. */
+/* BUG 08/2026 (sidebar bị hụt, không chạm đáy màn hình): `zoom` scale
+   TOÀN BỘ box xuống 90% SAU khi trình duyệt đã tính layout xong — còn
+   đơn vị `vh` thì luôn được tính theo viewport THẬT (chưa zoom), không
+   tự bù theo `zoom`. Hệ quả: 1 element cao `100vh` (như .sidebar,
+   .shell ở dưới) chỉ LẤP ĐƯỢC 90% chiều cao màn hình thật sau khi bị
+   zoom co lại — thừa ra đúng 10% khoảng trắng ở đáy. Đây không phải
+   lỗi cũ của sidebar, mà là tác dụng phụ của chính dòng zoom:90% này.
+   Fix: mọi chỗ cần cao đúng-bằng-viewport phải dùng
+   `calc(100vh / var(--zoom-scale))` thay vì `100vh` trần — xem
+   .shell (ngay dưới) và .sidebar/.sidebar { height } trong
+   01-sidebar.css. */
 html {
-  zoom: 90%;
+  zoom: var(--zoom-scale);
 }
 
 body {
@@ -64,7 +81,8 @@ a { color: inherit; text-decoration: none; }
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  min-height: 100vh;
+  /* bù zoom — xem giải thích ở `html { zoom }` phía trên */
+  min-height: calc(100vh / var(--zoom-scale));
   transition: grid-template-columns 0.18s ease;
 }
 

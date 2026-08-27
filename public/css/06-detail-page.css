@@ -22,7 +22,11 @@
 .detail-side {
   position: sticky;
   top: 20px;
-  max-height: calc(100vh - 40px);
+  /* bù zoom — cùng bug với .sidebar (01-sidebar.css), xem giải thích ở
+     `html { zoom }` trong 00-tokens.css. Chỉ phần `vh` cần chia lại
+     cho --zoom-scale, phần `- 40px` giữ nguyên vì px đã tự ăn theo
+     zoom cùng lúc với mọi thứ khác rồi, không cần đụng vào. */
+  max-height: calc(100vh / var(--zoom-scale) - 40px);
   overflow-y: auto;
 }
 
@@ -106,4 +110,4 @@
     padding: 10px 14px;
     font-size: 13px;
   }
-}
+}

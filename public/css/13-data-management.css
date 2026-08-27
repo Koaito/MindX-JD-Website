@@ -522,7 +522,9 @@
   border: 1px solid var(--border);
   width: 100%;
   max-width: 460px;
-  max-height: min(560px, 85vh);
+  /* bù zoom cho phần vh — 560px giữ nguyên vì đã là px cố định, không
+     bị bug vh; xem giải thích ở `html { zoom }` trong 00-tokens.css */
+  max-height: min(560px, calc(85vh / var(--zoom-scale)));
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 48px rgba(16, 30, 26, 0.22);

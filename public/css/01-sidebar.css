@@ -10,7 +10,14 @@
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 100vh;
+  /* GỐC RỄ (08/2026): `html { zoom: var(--zoom-scale) }` (00-tokens.css)
+     scale toàn trang xuống 90% SAU khi layout đã tính `100vh` theo
+     viewport thật — nên sidebar cao "100vh" chỉ phủ được 90% chiều cao
+     màn hình thật, hụt 10% ở đáy. Không liên quan gì tới khoảng cách/
+     scrollbar đã chỉnh trước đó. Bù lại bằng cách chia ngược cho chính
+     tỉ lệ zoom đang dùng: 100vh / 0.9 ≈ 111.1vh, sau khi bị zoom 90%
+     scale xuống thì đúng bằng 100% viewport thật. */
+  height: calc(100vh / var(--zoom-scale));
   overflow: hidden;
   transition: padding 0.18s ease;
 }
