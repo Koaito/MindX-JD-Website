@@ -73,6 +73,19 @@
 .potential-suggestion-wrap:focus-within .potential-suggestion-tooltip {
   display: block;
 }
+
+/* Lật lên trên khi gần đáy viewport (thêm 08/2026, báo lỗi ảnh chụp:
+   tooltip mở xuống dưới đè lên dòng kế tiếp / khuất sau thanh phân
+   trang). Class này do JS (initTooltipAutoFlip, app.js) gắn/gỡ động
+   lúc hover/focus — không thể xử lý thuần CSS vì bảng phân trang phía
+   client (ẩn/hiện bằng display), "dòng cuối" hiển thị thay đổi theo
+   trang trong khi DOM order cố định, :last-child không phản ánh đúng. */
+.potential-suggestion-tooltip.tooltip-flip-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 6px;
+}
 .potential-suggestion-tooltip strong {
   display: block;
   margin-bottom: 6px;

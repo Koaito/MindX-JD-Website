@@ -425,6 +425,70 @@
     initClientListPagination();
   }
 
+  // ---- Tự lật tooltip "Job mới nhất"/checklist tiêu chí lên trên khi
+  // gần đáy màn hình (thêm 08/2026, báo lỗi ảnh chụp) -----------------
+  //
+  // .potential-suggestion-tooltip mặc định mở XUỐNG DƯỚI (top: 100%,
+  // xem 07-forms.css). Với các dòng ở cuối bảng/danh sách (gần cuối
+  // viewport), mở xuống dưới sẽ đè lên dòng kế tiếp hoặc bị khuất sau
+  // thanh phân trang. Bảng lại phân trang phía CLIENT (ẩn/hiện bằng
+  // display, xem initClientListPagination) nên KHÔNG THỂ chỉ dùng CSS
+  // :last-child — dòng "cuối" thực tế thay đổi theo trang đang xem, còn
+  // DOM order thì cố định. Phải đo bằng JS lúc hover/focus mỗi lần: nếu
+  // khoảng trống phía dưới trigger không đủ chứa tooltip thì thêm class
+  // .tooltip-flip-up để CSS chuyển sang mở LÊN TRÊN (bottom: 100%).
+  function initTooltipAutoFlip() {
+    var SELECTOR = ".fit-chip-wrap, .potential-suggestion-wrap";
+
+    function positionTooltip(wrap) {
+      var tooltip = wrap.querySelector(".potential-suggestion-tooltip");
+      if (!tooltip) return;
+
+      // offsetHeight = 0 khi tooltip đang display:none (chưa từng hiện
+      // lần nào) -> bật tạm display:block + visibility:hidden để đo
+      // chiều cao thật, không gây nháy vì tắt lại ngay trước khi trả
+      // quyền điều khiển display cho CSS :hover/:focus-within như cũ.
+      var measuredHeight = tooltip.offsetHeight;
+      if (!measuredHeight) {
+        var prevDisplay = tooltip.style.display;
+        tooltip.style.visibility = "hidden";
+        tooltip.style.display = "block";
+        measuredHeight = tooltip.offsetHeight;
+        tooltip.style.display = prevDisplay;
+        tooltip.style.visibility = "";
+      }
+
+      var rect = wrap.getBoundingClientRect();
+      var spaceBelow = window.innerHeight - rect.bottom;
+      // +16 chừa khoảng cách an toàn (margin-top: 6px của tooltip + đệm)
+      if (spaceBelow < measuredHeight + 16) {
+        tooltip.classList.add("tooltip-flip-up");
+      } else {
+        tooltip.classList.remove("tooltip-flip-up");
+      }
+    }
+
+    // mouseover/focusin (bubble được) thay vì mouseenter/focus (không
+    // bubble) để dùng ĐƯỢC 1 listener chung trên document, không phải
+    // gắn riêng từng .fit-chip-wrap — khớp pattern event delegation đã
+    // dùng cho save-job-form/email-template ở trên, không cần re-bind
+    // khi initClientListPagination ẩn/hiện lại hàng.
+    document.addEventListener("mouseover", function (e) {
+      var wrap = e.target.closest(SELECTOR);
+      if (wrap) positionTooltip(wrap);
+    });
+    document.addEventListener("focusin", function (e) {
+      var wrap = e.target.closest(SELECTOR);
+      if (wrap) positionTooltip(wrap);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTooltipAutoFlip);
+  } else {
+    initTooltipAutoFlip();
+  }
+
   // ---- Popup chọn/soạn mẫu email liên hệ doanh nghiệp (thêm 08/2026) ----
   //
   // Nút ".btn-email-template" được render lặp lại ở nhiều dòng contact

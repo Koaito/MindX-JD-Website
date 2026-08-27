@@ -60,6 +60,16 @@
 <p class="result-count">{{ total_jobs }} job phù hợp</p>
 {% endif %}
 
+{# Thêm 08/2026 (theo yêu cầu): trước đây trang này không có bất kỳ chỉ
+   dẫn nào nói bấm vào TÊN vị trí (h3 > a, xem .ticket-top bên dưới) là
+   vào được trang chi tiết để ứng tuyển (nộp CV, xem lại/huỷ ứng tuyển —
+   toàn bộ ở job_detail.html) — 2 nút duy nhất lộ diện trên card
+   ("Xem JD gốc ↗" và "Lưu job") không ai trong 2 cái đó dẫn tới bước
+   ứng tuyển, nên học viên dễ không biết tính năng này tồn tại. #}
+{% if jobs %}
+<p class="list-hint">💡 Bấm vào <strong>tên vị trí</strong> của mỗi job để xem chi tiết đầy đủ và nộp CV ứng tuyển ngay trong hệ thống.</p>
+{% endif %}
+
 {% if jobs %}
 <div class="job-grid job-grid-3col">
   {% for job in jobs %}
