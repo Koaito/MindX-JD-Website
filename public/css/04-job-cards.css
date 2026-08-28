@@ -70,6 +70,8 @@
   padding: 3px 8px;
   border-radius: 999px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ind-0 { background: var(--teal-soft); color: var(--teal); }
@@ -82,6 +84,8 @@
   border: 1px solid var(--border);
   padding: 3px 8px;
   border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ticket-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }

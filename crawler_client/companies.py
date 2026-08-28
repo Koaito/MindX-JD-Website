@@ -224,6 +224,24 @@ def update_company(access_token, company_id, form) -> dict:
     return _normalize_company(raw)
 
 
+def update_company_potential(access_token, company_id, potential) -> dict:
+    """PATCH /companies/{id} CHỈ với field partnership_potential — dùng cho
+    thao tác sửa nhanh "Tiềm năng" ngay trên bảng danh sách công ty (thêm
+    08/2026, xem lịch sử trao đổi), KHÔNG dùng update_company()/
+    _company_payload() ở trên vì hàm đó bắt buộc form["company"] (tên công
+    ty) nên sẽ KeyError nếu chỉ có mỗi tiềm năng.
+
+    Backend PATCH /companies/{id} vốn đã hỗ trợ partial update thật sự
+    (field không có mặt trong body thì giữ nguyên, xem patch_company_profile()
+    ở backend) — nên gửi payload tối giản 1 field này là đủ, không cần kèm
+    các field khác của company."""
+    payload = {
+        "partnership_potential": PARTNERSHIP_POTENTIAL_MAP_REV.get(potential, potential),
+    }
+    raw = _request("PATCH", f"/companies/{company_id}", access_token=access_token, json=payload)
+    return _normalize_company(raw)
+
+
 def delete_company(access_token, company_id, note):
     """DELETE /companies/{company_id} (thêm 08/2026) — xoá MỀM
     (is_active=false), KHÔNG xoá thật (JD/HR contact cũ vẫn giữ nguyên,

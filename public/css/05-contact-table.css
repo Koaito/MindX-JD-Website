@@ -70,6 +70,35 @@
   display: inline-block;
   cursor: default;
 }
+
+/* Sửa nhanh "Tiềm năng" ngay tại bảng (thêm 08/2026) — .fit-chip-wrap
+   giờ nằm trong <summary> (xem templates/companies.html) nên bấm được
+   để mở popover đổi mức, không chỉ hover xem gợi ý như trước. Bỏ tam
+   giác mặc định của <summary> vì đã có chip đóng vai trò nút bấm rồi,
+   tam giác thêm vào chỉ thừa/rối mắt. */
+.potential-edit {
+  position: relative;
+}
+.potential-edit > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.potential-edit > summary::-webkit-details-marker { display: none; }
+.potential-edit > summary .fit-chip-wrap { cursor: pointer; }
+
+.potential-edit-form {
+  position: absolute;
+  z-index: 20;
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  box-shadow: 0 10px 24px rgba(16,32,26,0.12);
+}
 .fit-chip-wrap:hover .potential-suggestion-tooltip,
 .fit-chip-wrap:focus .potential-suggestion-tooltip,
 .fit-chip-wrap:focus-within .potential-suggestion-tooltip {

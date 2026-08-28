@@ -69,6 +69,7 @@ def index():
         filters={"q": q, "city": city}, total_companies=total_companies,
         pagination_filters={k: v for k, v in {"q": q, "city": city}.items() if v},
         page=page, total_pages=total_pages, per_page=per_page,
+        partnership_potentials=PARTNERSHIP_POTENTIALS,
     )
 
 
@@ -117,6 +118,34 @@ def edit(company_id):
         flash(f"Đã cập nhật công ty {updated['company']}.", "success")
         return redirect(url_for("companies.detail", company_id=company_id))
     return render_template("add_company.html", company=company, edit_id=company_id, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN, suggestion=suggestion)
+
+
+@companies_bp.route("/companies/<string:company_id>/potential", methods=["POST"])
+@staff_required
+def update_potential(company_id):
+    """Sửa nhanh riêng field "Tiềm năng" ngay tại bảng danh sách công ty
+    (thêm 08/2026, xem lịch sử trao đổi) — KHÔNG cần vào trang /edit đầy
+    đủ. Dùng db_data.update_company_potential() (payload tối giản, chỉ 1
+    field) thay vì db_data.update_company() (bắt buộc kèm company_name).
+
+    Không yêu cầu note — khác update_status() bên contacts.py (note ở đó
+    bắt buộc vì backend chặn cứng cho contact_status)."""
+    next_url = request.form.get("next", "")
+
+    def _redirect_back():
+        if next_url and next_url.startswith("/"):
+            return redirect(next_url)
+        return redirect(url_for("companies.index"))
+
+    try:
+        _call_authed(
+            db_data.update_company_potential, company_id,
+            request.form.get("partnership_potential", ""),
+        )
+        flash("Đã cập nhật tiềm năng hợp tác.", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+    return _redirect_back()
 
 
 @companies_bp.route("/companies/<string:company_id>/delete", methods=["POST"])

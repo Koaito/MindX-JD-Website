@@ -60,24 +60,42 @@
         <td>{{ c.city or '—' }}</td>
         <td class="muted">{{ c.company_size or '—' }}</td>
         <td>
-          {% if c.suggestion %}
-          <span class="fit-chip-wrap" tabindex="0">
-            <span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span>
-            <span class="potential-suggestion-tooltip" role="tooltip">
-              <strong>🤖 Gợi ý: {{ c.suggestion.level_label }} ({{ c.suggestion.score }}/{{ c.suggestion.max_score }} tiêu chí)</strong>
-              <ul>
-                {% for crit in c.suggestion.criteria %}
-                <li class="{{ 'is-met' if crit.met else 'is-unmet' }}">
-                  <span class="tick">{{ '✓' if crit.met else '✗' }}</span> {{ crit.label }}
-                </li>
+          {# Sửa nhanh "Tiềm năng" ngay tại bảng (thêm 08/2026, xem lịch
+             sử trao đổi) — bấm vào chip mở popover đổi mức, submit thẳng
+             về companies.update_potential rồi quay lại đúng trang/lọc
+             hiện tại (next=request.full_path). Không cần note (khác
+             _contact_status_cell.html — đổi trạng thái contact bắt buộc
+             note vì backend chặn cứng, còn partnership_potential ở đây
+             thì không). Chip gợi ý (suggestion tooltip) vẫn giữ nguyên
+             hành vi hover cũ, chỉ đổi phần chip từ <span> thành
+             <summary> để bấm được. #}
+          <details class="potential-edit">
+            <summary class="fit-chip-wrap" tabindex="0">
+              <span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span>
+              {% if c.suggestion %}
+              <span class="potential-suggestion-tooltip" role="tooltip">
+                <strong>🤖 Gợi ý: {{ c.suggestion.level_label }} ({{ c.suggestion.score }}/{{ c.suggestion.max_score }} tiêu chí)</strong>
+                <ul>
+                  {% for crit in c.suggestion.criteria %}
+                  <li class="{{ 'is-met' if crit.met else 'is-unmet' }}">
+                    <span class="tick">{{ '✓' if crit.met else '✗' }}</span> {{ crit.label }}
+                  </li>
+                  {% endfor %}
+                </ul>
+                <span class="potential-suggestion-note">Chỉ là gợi ý tự động — không phải đánh giá đã chốt.</span>
+              </span>
+              {% endif %}
+            </summary>
+            <form method="post" action="{{ url_for('companies.update_potential', company_id=c.id) }}" class="potential-edit-form">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <select name="partnership_potential">
+                {% for p in partnership_potentials %}
+                <option value="{{ p }}" {{ 'selected' if c.partnership_potential == p }}>{{ p }}</option>
                 {% endfor %}
-              </ul>
-              <span class="potential-suggestion-note">Chỉ là gợi ý tự động — không phải đánh giá đã chốt.</span>
-            </span>
-          </span>
-          {% else %}
-          <span class="fit-chip potential-{{ c.partnership_potential|replace(' ', '-') }}">{{ c.partnership_potential }}</span>
-          {% endif %}
+              </select>
+              <button class="btn btn-text" type="submit">Lưu</button>
+            </form>
+          </details>
         </td>
         <td>
           {% if c.website %}
