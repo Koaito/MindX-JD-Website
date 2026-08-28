@@ -13,6 +13,26 @@
   padding: 40px 40px 64px;
   max-width: 1800px;
   margin: 0 auto;
+
+  /* FIX 08/2026 (báo lỗi ảnh chụp: card "Sửa mẫu email" bị thu nhỏ lại
+     so với lúc chỉ xem danh sách). .content là 1 ô trong .shell
+     (display:grid, xem 00-tokens.css). Ô lưới có margin:auto 2 bên +
+     KHÔNG có width tường minh (mặc định width:auto) sẽ bị trình duyệt
+     bỏ hành vi "kéo giãn lấp đầy cột" (stretch) mặc định, chuyển sang
+     "co theo đúng nội dung" (shrink-to-fit) — DÙ ĐÃ có max-width:1800px.
+     Hệ quả: bề rộng thật của .content phụ thuộc vào dòng nào bên trong
+     nó "đòi" nhiều chỗ nhất tại thời điểm đó, không cố định. Trang có
+     nhiều card/bảng rộng thì tình cờ trông full-width (đủ nội dung để
+     "đòi" hết chỗ), còn khung nào ít nội dung hơn (như form Sửa mẫu
+     email) thì bị co lại theo — dù CSS của form/card đó không sai gì
+     cả. Thêm width: 100% để LUÔN lấp đầy cột lưới trước, sau đó mới bị
+     max-width giới hạn lại như thiết kế ban đầu — không còn phụ thuộc
+     nội dung bên trong nữa, nhất quán trên mọi trang. (Đã verify bằng
+     Chromium headless: không có width:100% thì .content co xuống chỉ
+     ~400-900px dù max-width 1800px, kể cả ở trang khác không phải
+     riêng form mẫu email — chỉ là các trang đó tình cờ đủ nội dung
+     rộng để che mất triệu chứng.) */
+  width: 100%;
 }
 
 /* Opt-in per page via {% block content_class %}content-full{% endblock %}

@@ -174,3 +174,13 @@ a { color: inherit; text-decoration: none; }
   transition: grid-template-columns 0.18s ease;
 }
 
+/* CẢNH BÁO cho code sau này (08/2026, rút kinh nghiệm từ lỗi ".content
+   bị co nhỏ theo nội dung" — xem comment chi tiết tại .content ở
+   03-layout.css): .shell hiện chỉ có đúng 2 con trực tiếp: .sidebar
+   (width cố định — an toàn) và .content (margin auto để canh giữa —
+   PHẢI có width: 100% đi kèm max-width, đã fix). Nếu sau này thêm 1
+   phần tử MỚI làm con trực tiếp của .shell và dùng margin auto để
+   canh giữa nó, PHẢI kèm width: 100% (hoặc width cố định) — nếu chỉ
+   có margin auto + max-width mà thiếu width, trình duyệt sẽ co phần
+   tử đó lại theo đúng nội dung bên trong (shrink-to-fit) thay vì lấp
+   đầy cột Grid, gây lại đúng lỗi cũ dù CSS bên trong không sai gì. */
