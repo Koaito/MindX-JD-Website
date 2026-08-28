@@ -13,17 +13,21 @@ from .data_health import count_missing_fields
 # chỉ cần sửa list này, không đụng logic đếm (count_missing_fields ở
 # data_health.py).
 #
-# "salary" xử lý RIÊNG bằng predicate thay vì check field "salary" (chuỗi
-# hiển thị) vì _fmt_salary() LUÔN trả về ít nhất "Thỏa thuận" khi rỗng —
-# never falsy nên check thẳng sẽ không bao giờ bắt được job thiếu lương.
-# "Thiếu lương" đúng nghĩa = CẢ salary_min LẪN salary_max đều rỗng.
+# "salary" ĐÃ BỎ khỏi thống kê (08/2026, xem lịch sử trao đổi) — sau khi
+# fix include_content, số liệu thật cho thấy 71% job "thiếu lương" chỉ
+# vì phần lớn job crawl vốn dĩ ghi "Thỏa thuận" (không có salary_min/max
+# cụ thể) — đây là TRẠNG THÁI HỢP LỆ của tin tuyển dụng thật (nhiều công
+# ty cố tình không công khai mức lương), không phải lỗi/thiếu dữ liệu
+# cần team đi bổ sung như 5 field còn lại. Giữ nguyên predicate cũ ở
+# đây (comment) phòng khi sau này cần bật lại, tách riêng khỏi nhóm
+# "thiếu thật sự" thay vì xoá hẳn:
+#   lambda j: not j.get("salary_min") and not j.get("salary_max")
 JOB_HEALTH_FIELDS = [
     ("skills", "Kỹ năng"),
     ("requirements", "Yêu cầu công việc"),
     ("benefits", "Phúc lợi"),
     ("description", "Mô tả công việc"),
     ("deadline", "Hạn nộp"),
-    ("salary", "Lương", lambda j: not j.get("salary_min") and not j.get("salary_max")),
 ]
 
 
