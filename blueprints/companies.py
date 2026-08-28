@@ -125,11 +125,14 @@ def edit(company_id):
 def update_potential(company_id):
     """Sửa nhanh riêng field "Tiềm năng" ngay tại bảng danh sách công ty
     (thêm 08/2026, xem lịch sử trao đổi) — KHÔNG cần vào trang /edit đầy
-    đủ. Dùng db_data.update_company_potential() (payload tối giản, chỉ 1
-    field) thay vì db_data.update_company() (bắt buộc kèm company_name).
+    đủ. Dùng db_data.update_company_potential() (payload tối giản, chỉ
+    partnership_potential + note) thay vì db_data.update_company() (bắt
+    buộc kèm company_name).
 
-    Không yêu cầu note — khác update_status() bên contacts.py (note ở đó
-    bắt buộc vì backend chặn cứng cho contact_status)."""
+    note KHÔNG bắt buộc (khác update_status() bên contacts.py — note ở
+    đó bắt buộc vì backend chặn cứng cho contact_status), nhưng vẫn có ô
+    nhập trên UI và được gửi lên nếu staff có ghi, giống hệt hành vi note
+    ở trang Sửa công ty đầy đủ (add_company.html)."""
     next_url = request.form.get("next", "")
 
     def _redirect_back():
@@ -141,6 +144,7 @@ def update_potential(company_id):
         _call_authed(
             db_data.update_company_potential, company_id,
             request.form.get("partnership_potential", ""),
+            request.form.get("activity_note", ""),
         )
         flash("Đã cập nhật tiềm năng hợp tác.", "success")
     except CrawlerAPIError as exc:

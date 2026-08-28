@@ -52,11 +52,13 @@
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 /* Give the "Tiềm năng" column enough room for its widest chip
    (Chưa đánh giá) so it never has to wrap and get clipped. */
-.col-potential { min-width: 110px; }
+.col-potential { min-width: 130px; }
 
 /* Tooltip tiêu chí gợi ý ngay trên danh sách công ty (thêm 08/2026) —
    để ss_team xem được lý do gợi ý mà KHÔNG cần bấm vào Sửa. Bọc chip
@@ -91,13 +93,19 @@
   z-index: 20;
   margin-top: 6px;
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  align-items: center;
+  width: 220px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 8px;
   box-shadow: 0 10px 24px rgba(16,32,26,0.12);
+}
+.potential-edit-form textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
 }
 .fit-chip-wrap:hover .potential-suggestion-tooltip,
 .fit-chip-wrap:focus .potential-suggestion-tooltip,

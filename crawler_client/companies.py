@@ -224,19 +224,26 @@ def update_company(access_token, company_id, form) -> dict:
     return _normalize_company(raw)
 
 
-def update_company_potential(access_token, company_id, potential) -> dict:
-    """PATCH /companies/{id} CHỈ với field partnership_potential — dùng cho
-    thao tác sửa nhanh "Tiềm năng" ngay trên bảng danh sách công ty (thêm
-    08/2026, xem lịch sử trao đổi), KHÔNG dùng update_company()/
-    _company_payload() ở trên vì hàm đó bắt buộc form["company"] (tên công
-    ty) nên sẽ KeyError nếu chỉ có mỗi tiềm năng.
+def update_company_potential(access_token, company_id, potential, note=None) -> dict:
+    """PATCH /companies/{id} CHỈ với field partnership_potential (+ note
+    audit log tuỳ chọn) — dùng cho thao tác sửa nhanh "Tiềm năng" ngay
+    trên bảng danh sách công ty (thêm 08/2026, xem lịch sử trao đổi),
+    KHÔNG dùng update_company()/_company_payload() ở trên vì hàm đó bắt
+    buộc form["company"] (tên công ty) nên sẽ KeyError nếu chỉ có mỗi
+    tiềm năng.
 
     Backend PATCH /companies/{id} vốn đã hỗ trợ partial update thật sự
     (field không có mặt trong body thì giữ nguyên, xem patch_company_profile()
-    ở backend) — nên gửi payload tối giản 1 field này là đủ, không cần kèm
-    các field khác của company."""
+    ở backend) — nên gửi payload tối giản 1-2 field này là đủ, không cần
+    kèm các field khác của company.
+
+    note KHÔNG bắt buộc (khác update_contact_status() — đổi trạng thái
+    contact bị backend chặn cứng nếu thiếu note, còn partnership_potential
+    thì không) — vẫn nhận note để lưu lý do vào Lịch sử thao tác (audit
+    log) nếu staff có ghi, giống hệt cách update_company() ở trên làm."""
     payload = {
         "partnership_potential": PARTNERSHIP_POTENTIAL_MAP_REV.get(potential, potential),
+        "note": (note or "").strip() or None,
     }
     raw = _request("PATCH", f"/companies/{company_id}", access_token=access_token, json=payload)
     return _normalize_company(raw)
