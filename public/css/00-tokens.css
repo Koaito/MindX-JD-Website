@@ -113,16 +113,17 @@ html.sidebar-collapsed {
   --sidebar-width: 76px;
 }
 
-/* 08/2026 (đi kèm .et-manager-form width:150% ở 16-email-template-
-   manager.css) — nhường thêm chút không gian ngang cho trang /contacts
-   (nơi duy nhất có #et-manager-form trong DOM, kể cả khi đang ẩn),
-   giảm bớt phần card phải cuộn ngang. CHỈ áp dụng cho state sidebar
-   bình thường — bỏ qua khi đã .sidebar-collapsed (76px, không cần thu
-   nhỏ thêm nữa). Dùng :has() để scope đúng 1 trang, không đụng
-   --sidebar-width của toàn bộ site. */
-:root:has(#et-manager-form):not(.sidebar-collapsed) {
-  --sidebar-width: 223px; /* 248px * 90% */
-}
+/* 08/2026: rule --sidebar-width giảm 90% khi có #et-manager-form trong
+   DOM ĐÃ BỊ XOÁ (từng ở đây) — hồi đó dùng để nhường không gian ngang
+   cho .et-manager-form lúc nó còn set width:150% (tràn khỏi khu nội
+   dung). Sau khi đổi cách làm to card mẫu email (bỏ % ép buộc, cho
+   .et-manager-grid tự "nở" bằng minmax(560px,1fr) — xem 16-email-
+   template-manager.css) thì form không còn tràn nữa, nhưng rule thu
+   nhỏ sidebar bị bỏ quên không xoá theo -> sidebar bị ép hẹp lại
+   (248px -> 223px) không lý do mỗi khi mở tab "Quản lý mẫu email",
+   khiến chữ trong menu (vd "Hoạt động học viên") bị xuống dòng. Xoá
+   hẳn rule, sidebar giữ nguyên --sidebar-width mặc định như mọi trang
+   khác. */
 
 * { box-sizing: border-box; }
 

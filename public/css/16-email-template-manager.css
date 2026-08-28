@@ -34,9 +34,10 @@
    Thêm thì tự nhiên 1 mình chiếm trọn cả hàng, rộng hơn hẳn mỗi ô card
    trong list, dù cùng nằm trong 1 khu vực nội dung). Đây vốn dĩ ĐÃ
    ĐÚNG hành vi mặc định của .form-card (không set % override) — chỉ
-   cần bỏ width/max-width ép buộc, giữ lại phần --sidebar-width giảm
-   90% (00-tokens.css) để nhường thêm chút không gian thật, không phải
-   phóng to ảo rồi cuộn. */
+   cần bỏ width/max-width ép buộc, không cần đụng gì tới sidebar. (Rule
+   --sidebar-width giảm 90% từng thêm kèm theo đây đã bị xoá ở
+   00-tokens.css — không còn lý do tồn tại, và gây lỗi sidebar bị ép
+   hẹp/chữ xuống dòng mỗi khi mở tab này.) */
 
 .et-manager-form h3 {
   margin: 0 0 12px;
