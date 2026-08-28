@@ -1,0 +1,38 @@
+{#
+  Tab "Tình trạng dữ liệu" (08/2026, xem lịch sử trao đổi). Include từ
+  crawl.html (shell) khi tab='status'. CHỈ ĐỌC — không có form/nút bấm
+  nào (khác 2 tab còn lại), nên không cần JS polling gì cả.
+
+  Mục đích: cho admin thấy nhanh bảng company đang thiếu field gì/tỉ lệ
+  bao nhiêu MÀ KHÔNG cần vào thẳng database — context build sẵn ở
+  blueprints/crawl_status.py::_status_tab_context(), template này chỉ
+  render lại `company_health_rows` (list dict field/label/missing/
+  total/pct_missing) + `company_health_total`.
+
+  Tái dùng .bar-row/.bar-track/.bar-fill (public/css/08-dashboard.css)
+  y hệt cách dashboard.html vẽ "Job theo ngành/level" — cùng 1 thước đo
+  trực quan (thanh %) nên dùng lại luôn, không tạo class CSS mới.
+#}
+
+<section class="card">
+  <h4>Company đang thiếu dữ liệu theo từng trường</h4>
+  <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+    Tính trên toàn bộ {{ company_health_total }} company hiện có (không tính company đã xoá mềm).
+    "Thiếu" nghĩa là trường đó đang rỗng — dùng bảng này để biết nên ưu tiên chạy job bảo trì nào ở tab bên cạnh.
+  </p>
+
+  {% if company_health_total == 0 %}
+  <p class="empty-placeholder">Chưa có company nào hoặc không tải được dữ liệu.</p>
+  {% else %}
+    {% for row in company_health_rows %}
+    <div class="bar-row bar-row--wide-value">
+      <span class="bar-label">{{ row.label }}</span>
+      <div class="bar-track">
+        <div class="bar-fill {{ 'bar-fill-alt' if loop.index is even else '' }}"
+             style="width: {{ row.pct_missing }}%"></div>
+      </div>
+      <span class="bar-value">{{ row.missing }}/{{ row.total }} ({{ row.pct_missing }}%)</span>
+    </div>
+    {% endfor %}
+  {% endif %}
+</section>

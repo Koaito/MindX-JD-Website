@@ -1,10 +1,12 @@
 {#
-  Shell 2 tab cho mục sidebar "Vận hành dữ liệu" (08/2026, đổi tên từ
+  Shell 3 tab cho mục sidebar "Vận hành dữ liệu" (08/2026, đổi tên từ
   "Crawl dữ liệu" — xem lịch sử trao đổi). Chỉ chọn tab + include đúng
   partial, KHÔNG tự chứa logic UI nào — mirror pattern
   templates/data_management.html (tab-nav + include theo query param).
 
   tab='crawl' (mặc định) -> _crawl_tab.html (nội dung y hệt trang cũ).
+  tab='status' -> _status_tab.html (Tình trạng dữ liệu — company đang
+  thiếu field gì/tỉ lệ bao nhiêu, thêm 08/2026).
   tab='maintenance' -> _maintenance_tab.html (5 job bảo trì dữ liệu).
 #}
 {% extends "base.html" %}
@@ -17,7 +19,9 @@
     <span class="eyebrow">Career Hub / Quản trị</span>
     <h1>Vận hành dữ liệu</h1>
     <p class="lede">
-      {% if tab == 'maintenance' %}
+      {% if tab == 'status' %}
+        Xem nhanh company đang thiếu dữ liệu gì (mã số thuế, website, ngành...) và tỉ lệ bao nhiêu, không cần vào thẳng database.
+      {% elif tab == 'maintenance' %}
         Kích hoạt các job bảo trì dữ liệu (vá hồ sơ công ty, tra cứu web, dọn job hết hạn), theo dõi tiến độ và tra lại lịch sử các lượt đã chạy.
       {% else %}
         Kích hoạt crawl JD từ TopCV/VietnamWorks/CareerViet, theo dõi tiến độ và tra lại lịch sử các lượt đã chạy.
@@ -28,10 +32,13 @@
 
 <nav class="tab-nav">
   <a href="{{ url_for('crawl.index', tab='crawl') }}" class="{{ 'active' if tab == 'crawl' else '' }}">Crawl dữ liệu</a>
+  <a href="{{ url_for('crawl.index', tab='status') }}" class="{{ 'active' if tab == 'status' else '' }}">Tình trạng dữ liệu</a>
   <a href="{{ url_for('crawl.index', tab='maintenance') }}" class="{{ 'active' if tab == 'maintenance' else '' }}">Bảo trì dữ liệu</a>
 </nav>
 
-{% if tab == 'maintenance' %}
+{% if tab == 'status' %}
+  {% include "_status_tab.html" %}
+{% elif tab == 'maintenance' %}
   {% include "_maintenance_tab.html" %}
 {% else %}
   {% include "_crawl_tab.html" %}

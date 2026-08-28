@@ -1,11 +1,17 @@
 /* ---------------- Dashboard ---------------- */
-/* Used by: templates/dashboard.html only (Career Hub / Báo cáo page) —
-   .kpi-row (the 5 top stat cards) and .chart-grid/.bar-row (the "Job
-   theo ngành/level/địa điểm/trạng thái" panels). Safe to change the KPI
-   card column count or chart layout here without touching any other
-   page. Note: .kpi-row's own responsive column count is also set in the
-   shared @media block in 10-pagination-responsive.css — check there too
-   if changing behavior below ~900px. */
+/* Used by: templates/dashboard.html — .kpi-row (the 5 top stat cards)
+   and .chart-grid/.bar-row (the "Job theo ngành/level/địa điểm/trạng
+   thái" panels). .bar-row/.bar-track/.bar-fill (+ modifier
+   .bar-row--wide-value, xem comment riêng bên dưới) cũng được
+   templates/_status_tab.html (tab "Tình trạng dữ liệu" ở /crawl) tái
+   dùng từ 08/2026 — 2 trang này KHÔNG có gì xung đột (khác trang,
+   khác context) nên dùng chung an toàn. Safe to change the KPI card
+   column count or chart layout here — chỉ .bar-row/.bar-track/
+   .bar-fill/.bar-row--wide-value là dùng ở >1 trang, đổi 4 class đó
+   thì kiểm tra cả _status_tab.html. Note: .kpi-row's own responsive
+   column count is also set in the shared @media block in
+   10-pagination-responsive.css — check there too if changing behavior
+   below ~900px. */
 
 /* Flexbox, not CSS Grid — same reasoning as .job-grid in public/css/04-
    job-cards.css. With 6 cards, a grid's auto-fit could resolve to e.g.
@@ -75,6 +81,19 @@
 .bar-fill-alt { background: var(--teal); }
 
 .bar-value { font-family: var(--font-mono); text-align: right; color: var(--muted); }
+
+/* Biến thể cột giá trị RỘNG HƠN — dùng cho tab "Tình trạng dữ liệu"
+   (_status_tab.html), nơi bar-value hiển thị "340/1200 (28%)" dài hơn
+   hẳn số 1-3 chữ số ("42") mà .bar-row gốc (dashboard.html) đang có.
+   Cột đầu (nhãn field) cũng rộng hơn 130px vì có label dài như
+   "Mã số thuế"/"LinkedIn" cần chỗ thoáng hơn ngành/level ngắn gọn ở
+   dashboard. Compound selector .bar-row.bar-row--wide-value thắng
+   .bar-row gốc bằng độ ưu tiên CSS thật (2 class > 1 class), không
+   phụ thuộc thứ tự khai báo — cùng nguyên tắc compound modifier đã
+   dùng ở .crawl-sources--fixed-2col (15-crawl.css).  */
+.bar-row.bar-row--wide-value {
+  grid-template-columns: 150px 1fr 130px;
+}
 
 /* ---------------- Tab bar ---------------- */
 /* Thêm 08/2026 cùng lúc với việc chia dashboard thành 4 tab nội bộ
