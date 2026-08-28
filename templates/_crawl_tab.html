@@ -337,11 +337,27 @@
       return;
     }
     if (!tbody) return;
-    // Chặn TRÙNG theo run_id — lớp bảo vệ thứ 2 (lớp 1 là cờ inFlight ở
-    // pollRun() chặn race ngay từ đầu) phòng trường hợp hàm này vẫn bị
-    // gọi 2 lần vì lý do khác (vd 2 tab cùng mở, cùng tự thêm dòng cho
-    // cùng 1 run_id) — không thêm dòng nếu run_id đó đã có sẵn trong bảng.
-    if (run.run_id && tbody.querySelector('tr[data-run-id="' + run.run_id + '"]')) {
+    // FIX 08/2026 (báo lỗi ảnh chụp: dòng lịch sử của 1 lượt crawl đã
+    // xong/lỗi thật sự nhưng bảng vẫn hiện mãi badge "Đang chạy"). Lượt
+    // crawl nào ĐANG "running"/"queued" lúc trang tải lần đầu ĐÃ CÓ SẴN
+    // 1 <tr data-run-id="..."> render bởi Jinja ở Khu C (xem vòng lặp
+    // "for run in runs" phía trên — Khu C không lọc bỏ trạng thái đang
+    // chạy). Trước đây hàm này chỉ COI run_id trùng là "đã thêm rồi",
+    // return luôn cho an toàn (đúng, tránh nhân đôi dòng) — nhưng lại
+    // QUÊN cập nhật nội dung dòng CŨ đó, nên khi run xong, card nổi
+    // "Đang chạy" biến mất đúng (onRunOrBatchDone) nhưng dòng lịch sử
+    // vẫn đứng yên với badge/Kết quả CŨ mãi tới khi tải lại trang. Giờ
+    // gặp run_id trùng thì THAY NỘI DUNG dòng cũ bằng buildHistoryRow()
+    // mới (badge + Kết quả đúng theo status cuối), giữ nguyên VỊ TRÍ
+    // dòng đó trong bảng (không đẩy lên đầu) — vì "Thời gian" (thời điểm
+    // bắt đầu chạy) không đổi, giữ đúng thứ tự thời gian giảm dần sẵn
+    // có, tránh dòng nhảy lung tung khi 1 run cũ hơn xong SAU 1 run mới
+    // hơn (batch nhiều category chạy song song hoàn toàn có thể xảy ra).
+    var existingRow = run.run_id ? tbody.querySelector('tr[data-run-id="' + run.run_id + '"]') : null;
+    if (existingRow) {
+      var updatedRow = buildHistoryRow(run);
+      updatedRow.setAttribute("data-run-id", run.run_id);
+      existingRow.replaceWith(updatedRow);
       return;
     }
     var row = buildHistoryRow(run);

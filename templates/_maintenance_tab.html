@@ -309,7 +309,20 @@
     var emptyState = document.getElementById("maint-history-empty");
     if (!tbody && emptyState) return;  // bảng rỗng lúc tải trang — nhắc tải lại, giống crawl tab.
     if (!tbody) return;
-    if (run.run_id && tbody.querySelector('tr[data-run-id="' + run.run_id + '"]')) return;
+    // FIX 08/2026 — lỗi y hệt tab Crawl (xem giải thích đầy đủ tại
+    // prependHistoryRow() ở _crawl_tab.html): run_id đã có sẵn 1 <tr>
+    // (job bảo trì đang "running" lúc trang tải) trước đây bị coi là
+    // "đã thêm rồi" nên return luôn, không cập nhật -> dòng lịch sử kẹt
+    // mãi ở badge "Đang chạy" dù card nổi đã biến mất đúng lúc xong.
+    // Giờ THAY nội dung dòng cũ bằng buildHistoryRow() mới, giữ nguyên
+    // vị trí (không đẩy lên đầu) vì "Thời gian" bắt đầu không đổi.
+    var existingRow = run.run_id ? tbody.querySelector('tr[data-run-id="' + run.run_id + '"]') : null;
+    if (existingRow) {
+      var updatedRow = buildHistoryRow(run);
+      updatedRow.setAttribute("data-run-id", run.run_id);
+      existingRow.replaceWith(updatedRow);
+      return;
+    }
     var row = buildHistoryRow(run);
     if (run.run_id) row.setAttribute("data-run-id", run.run_id);
     tbody.insertBefore(row, tbody.firstChild);
