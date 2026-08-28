@@ -22,34 +22,21 @@
   margin-bottom: 24px;
 }
 
-/* 08/2026 (yêu cầu "card form Sửa mẫu email to ra 150% chiều ngang hiện
-   tại"): .form-card vốn KHÔNG có max-width riêng — nó đã lấp đầy 100%
-   .content (là 1fr trong CSS Grid .shell, cạnh sidebar), tức đã ở mức
-   rộng tối đa có sẵn. Không thể set width:150% ngay trên .et-manager-
-   form vì % width luôn tính theo PARENT của chính nó — muốn "150% so
-   với bề rộng hiện tại của chính nó" phải tách ra 1 wrapper cha
-   (.et-manager-form-scroll) giữ nguyên bề rộng như cũ (100% khu vực
-   sẵn có), rồi set width:150% NGAY TRÊN .et-manager-form bên trong
-   wrapper đó — lúc này % sẽ tính theo bề rộng wrapper = đúng bề rộng
-   "hiện tại" của card trước khi phóng to.
+/* 08/2026 (bản sửa cuối, sau lúc thử 150%/110% + cuộn ngang): BỎ hẳn
+   cách "phóng to % rồi cuộn ngang" — dùng width:>100% luôn tràn ra
+   ngoài khu vực nội dung, mà tràn bao nhiêu thì phải cuộn ngang bấy
+   nhiêu, không có cách nào né được nếu còn set width vượt 100% của
+   khu vực hiện có.
 
-   Card phóng to sẽ tràn ra ngoài khu vực nội dung bình thường — cho
-   overflow-x: auto NGAY TẠI wrapper này (không phải toàn trang) để chỉ
-   khu vực form cuộn ngang khi cần, không kéo cả trang bị thanh cuộn
-   ngang xấu. Kết hợp thêm --sidebar-width giảm 90% chỉ trên trang này
-   (xem :root:has(#et-manager-form) ở 00-tokens.css) để nhường thêm ít
-   không gian, giảm bớt phần phải cuộn. */
-.et-manager-form-scroll {
-  overflow-x: auto;
-  /* Padding-bottom nhỏ để thanh cuộn ngang (nếu xuất hiện) không dính
-     sát vào card, dễ nhìn hơn. */
-  padding-bottom: 4px;
-}
-
-.et-manager-form {
-  width: 110%;
-  max-width: 110%;
-}
+   Ý muốn thực tế: form KHÔNG tràn/không cuộn ngang — chỉ cần "nở to"
+   tự nhiên bằng cách CHIẾM HẾT khoảng trống đang có sẵn (giống list
+   card #14-16 bên dưới đang xếp 2 cột sát nhau — còn form khi bấm Sửa/
+   Thêm thì tự nhiên 1 mình chiếm trọn cả hàng, rộng hơn hẳn mỗi ô card
+   trong list, dù cùng nằm trong 1 khu vực nội dung). Đây vốn dĩ ĐÃ
+   ĐÚNG hành vi mặc định của .form-card (không set % override) — chỉ
+   cần bỏ width/max-width ép buộc, giữ lại phần --sidebar-width giảm
+   90% (00-tokens.css) để nhường thêm chút không gian thật, không phải
+   phóng to ảo rồi cuộn. */
 
 .et-manager-form h3 {
   margin: 0 0 12px;

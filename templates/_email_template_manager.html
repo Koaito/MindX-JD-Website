@@ -20,7 +20,6 @@
   {% endif %}
 </div>
 
-<div class="et-manager-form-scroll">
 <div class="form-card et-manager-form" id="et-manager-form" {{ 'style=display:none;' if not editing }}>
   <h3>{{ 'Sửa mẫu email' if editing else 'Thêm mẫu email mới' }}</h3>
 
@@ -72,7 +71,6 @@
       <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly') }}">Hủy</a>
     </div>
   </form>
-</div>
 </div>
 
 {% if templates %}
