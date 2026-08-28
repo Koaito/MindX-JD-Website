@@ -11,6 +11,9 @@ from auth import BackendUser
 import backend_auth
 from backend_auth import BackendAuthError
 
+import crawler_client as db_data
+from crawler_client import CrawlerAPIError
+
 from constants import ROLE_LABELS
 from helpers import (
     _auth_tokens_from_session,
@@ -98,6 +101,33 @@ def inject_saved_job_ids():
             except BackendAuthError:
                 pass
     return {"saved_job_ids": set()}
+
+
+@app.context_processor
+def inject_email_templates():
+    """Nạp danh sách mẫu email ra MỌI trang có nút "✉ Mẫu email"
+    (contacts.html, company_detail.html — popup dùng chung, markup nằm
+    1 lần ở base.html) — base.html tự nhúng thành <script
+    id="emailTemplatesData"> để app.js đọc (xem getEmailTemplatesData()).
+
+    CHỈ gọi API khi user là staff đã đăng nhập (nút "✉ Mẫu email" chỉ
+    hiện ở trang staff) — tránh round-trip mạng thừa cho học viên/khách
+    chưa đăng nhập, giống lý do inject_saved_job_ids() ở trên chỉ gọi
+    khi cần.
+
+    Lỗi gọi API (CrawlerAPIError) bị NUỐT ở đây (không flash) — 1 trang
+    bất kỳ lỡ gặp lúc backend chập chờn không nên vì thế mà hỏng luôn cả
+    trang đó chỉ vì phần phụ trợ (popup mẫu email) không tải được; popup
+    khi đó tự hiện "Chưa có mẫu email nào" (xem .et-template-empty)."""
+    if current_user.is_authenticated and current_user.is_staff:
+        access_token, _ = _auth_tokens_from_session()
+        if access_token:
+            try:
+                templates = db_data.list_email_templates(access_token)
+                return {"email_templates": templates}
+            except CrawlerAPIError:
+                pass
+    return {"email_templates": []}
 
 
 # ---------------------------------------------------------------------------

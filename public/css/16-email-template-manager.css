@@ -1,0 +1,149 @@
+/* Used by: _email_template_manager.html — tab "Quản lý mẫu email"
+   (/contacts?tab=quan-ly). Dùng chung tokens/màu với
+   14-email-templates.css (popup chọn mẫu) để 2 khu vực nhìn nhất quán,
+   nhưng tách file riêng vì đây là trang quản lý (list + form CRUD),
+   khác bản chất với popup chỉ đọc/copy. */
+
+.et-manager-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.et-manager-head .lede {
+  margin: 0;
+  max-width: 640px;
+}
+
+.et-manager-form {
+  margin-bottom: 24px;
+}
+
+.et-manager-form h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+}
+
+.et-manager-body-textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* .form-grid > label.span-N (07-forms.css) chỉ nhắm <label> con trực
+   tiếp — khối checkbox trạng thái bên dưới dùng <div> (không phải
+   <label>, vì bên trong nó CHỨA nhiều <label> checkbox con), nên cần tự
+   khai lại grid-column ở đây cho riêng .et-manager-status-field. */
+.form-grid > div.span-4.et-manager-status-field { grid-column: span 4; }
+
+.et-manager-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.et-manager-status-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.et-manager-status-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.et-manager-status-check input[type="checkbox"] {
+  width: auto;
+}
+
+.et-placeholder-help {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+}
+
+.et-placeholder-help summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.et-placeholder-help dl {
+  margin: 10px 0 0;
+}
+
+.et-placeholder-help dt {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  color: var(--teal);
+  margin-top: 8px;
+}
+
+.et-placeholder-help dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.et-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.et-manager-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.et-manager-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.et-manager-card-head strong {
+  font-family: var(--font-display);
+}
+
+.et-manager-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.et-manager-body-preview {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.et-manager-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}

@@ -1,94 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Danh sách contact — MindX Career Hub{% endblock %}
+{% block title %}{{ 'Quản lý mẫu email' if tab == 'quan-ly' else 'Danh sách contact' }} — MindX Career Hub{% endblock %}
 {% block content %}
 {% set next_url = request.path %}
 
 <header class="page-head">
   <div>
     <span class="eyebrow">Career Hub / Doanh nghiệp</span>
-    <h1>Danh sách contact</h1>
-    <p class="lede">Toàn bộ người liên hệ HR đã thu thập được, gộp từ mọi công ty — lọc theo trạng thái, công ty hoặc tìm theo tên để theo dõi tiến độ liên hệ.</p>
+    <h1>{{ 'Quản lý mẫu email' if tab == 'quan-ly' else 'Danh sách contact' }}</h1>
+    <p class="lede">
+      {% if tab == 'quan-ly' %}
+        Thêm/sửa/xoá các mẫu email dùng khi liên hệ doanh nghiệp — thay đổi ở đây áp dụng ngay cho popup "✉ Mẫu email" ở mọi bảng contact.
+      {% else %}
+        Toàn bộ người liên hệ HR đã thu thập được, gộp từ mọi công ty — lọc theo trạng thái, công ty hoặc tìm theo tên để theo dõi tiến độ liên hệ.
+      {% endif %}
+    </p>
   </div>
+  {% if tab != 'quan-ly' %}
   <a class="btn btn-primary" href="{{ url_for('contacts.add_any') }}">＋ Thêm người liên hệ</a>
+  {% endif %}
 </header>
 
-<form class="filter-bar" method="get">
-  <input type="text" name="q" placeholder="Tìm theo tên contact…" value="{{ filters.q }}">
+<nav class="tab-nav">
+  <a href="{{ url_for('contacts.index', tab='danh-sach') }}" class="{{ 'active' if tab != 'quan-ly' else '' }}">
+    Danh sách contact
+  </a>
+  <a href="{{ url_for('contacts.index', tab='quan-ly') }}" class="{{ 'active' if tab == 'quan-ly' else '' }}">
+    Quản lý mẫu email
+  </a>
+</nav>
 
-  <select name="company_id">
-    <option value="">Mọi công ty</option>
-    {% for c in companies %}
-      <option value="{{ c.id }}" {{ 'selected' if filters.company_id == c.id }}>{{ c.company }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="status">
-    <option value="">Mọi trạng thái</option>
-    {% for s in statuses %}
-      <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
-    {% endfor %}
-  </select>
-
-  <button type="submit" class="btn btn-ghost">Lọc</button>
-  {% if filters.q or filters.company_id or filters.status %}
-    <a class="btn btn-text" href="{{ url_for('contacts.index') }}">Xóa lọc</a>
-  {% endif %}
-</form>
-
-<p class="result-count">{{ contacts|length }} contact phù hợp</p>
-
-{% if contacts %}
-<div class="contact-table-wrap">
-  <table class="contact-table">
-    <thead>
-      <tr>
-        <th>Tên</th>
-        <th>Công ty</th>
-        <th>Chức danh</th>
-        <th>Email</th>
-        <th>SĐT</th>
-        <th>Nguồn</th>
-        <th>Liên hệ gần nhất</th>
-        <th>Trạng thái</th>
-        <th>Phụ trách</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for c in contacts %}
-      {% set company_name = c.company_name %}
-      <tr>
-        <td><strong>{{ c.contact_name }}</strong></td>
-        <td>
-          {% if c.company_id %}
-          <a href="{{ url_for('companies.detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
-          {% else %}
-          <span class="muted">—</span>
-          {% endif %}
-        </td>
-        <td class="muted">{{ c.title or '—' }}</td>
-        <td class="muted">{{ c.email or '—' }}</td>
-        <td class="muted">{{ c.phone or '—' }}</td>
-        <td class="muted">{{ c.source or '—' }}</td>
-        <td class="muted">{{ c.last_contacted|format_date if c.last_contacted else '—' }}</td>
-        <td>{% include "_contact_status_cell.html" with context %}</td>
-        <td>{% include "_contact_assign_cell.html" with context %}</td>
-        <td class="actions-cell">
-          {% include "_contact_email_template_button.html" with context %}
-          <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
-          <form method="post" action="{{ url_for('contacts.delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
-            <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+{% if tab == 'quan-ly' %}
+  {% include "_email_template_manager.html" %}
 {% else %}
-<div class="empty-state">
-  <p>Chưa có contact nào khớp bộ lọc.</p>
-</div>
+  {% include "_contact_list.html" %}
 {% endif %}
 
 {% endblock %}

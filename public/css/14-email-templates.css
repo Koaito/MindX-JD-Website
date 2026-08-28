@@ -142,3 +142,15 @@
   font-size: 13px;
   color: var(--muted);
 }
+
+/* Danh sách mẫu rỗng (chưa có mẫu nào trong DB, hoặc JSON server-render
+   lỗi/không đọc được) — thay vì popup trống trơn không rõ lý do. */
+.et-template-empty {
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 16px 14px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}

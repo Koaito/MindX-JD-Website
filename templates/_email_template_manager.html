@@ -1,0 +1,139 @@
+{# Tab "Quản lý mẫu email" (/contacts?tab=quan-ly) — thay 6 mẫu HARDCODE
+   cứng trước đây trong public/app.js (biến EMAIL_TEMPLATES) bằng CRUD
+   thật lưu ở backend. 2 phần:
+     1) Form thêm/sửa mẫu (card phía trên, ẩn mặc định — bấm "+ Thêm mẫu
+        email" hoặc "Sửa" ở 1 mẫu trong danh sách mới hiện ra)
+     2) Danh sách mẫu hiện có (et-manager-grid), mỗi mẫu 1 card
+        (et-manager-card) kèm nút Sửa/Xoá.
+
+   Biến truyền vào từ blueprints/contacts.py::_email_templates_tab():
+     templates         : list các mẫu (đã _normalize_template)
+     placeholder_help   : dict {{...}} -> chú giải cách điền
+     editing            : mẫu đang sửa (None nếu đang ở chế độ thêm mới)
+     status_choices     : tuple 4 mã trạng thái contact
+     status_map         : dict mã -> nhãn tiếng Việt (CONTACT_STATUS_MAP)
+#}
+<div class="et-manager-head">
+  <p class="lede">Mẫu ở đây dùng chung cho popup "✉ Mẫu email" ở mọi bảng contact (trang này lẫn trang chi tiết công ty) — sửa/xoá ở đây có hiệu lực ngay cho toàn hệ thống.</p>
+  {% if not editing %}
+  <a class="btn btn-primary" href="#et-manager-form" id="etShowAddForm">＋ Thêm mẫu email</a>
+  {% endif %}
+</div>
+
+<div class="form-card et-manager-form" id="et-manager-form" {{ 'style=display:none;' if not editing }}>
+  <h3>{{ 'Sửa mẫu email' if editing else 'Thêm mẫu email mới' }}</h3>
+
+  {% if placeholder_help %}
+  <details class="et-placeholder-help">
+    <summary>Danh sách placeholder có thể dùng trong nội dung mẫu</summary>
+    <dl>
+      {% for ph, help_text in placeholder_help.items() %}
+      <dt><code>{{ ph }}</code></dt>
+      <dd>{{ help_text }}</dd>
+      {% endfor %}
+    </dl>
+  </details>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('contacts.email_template_edit', template_id=editing.id) if editing else url_for('contacts.email_template_add') }}">
+    <div class="form-grid">
+      <label class="span-3">Tiêu đề mẫu *
+        <input type="text" name="title" required maxlength="255" value="{{ editing.title if editing else '' }}">
+      </label>
+      <label class="span-1">Thứ tự hiển thị
+        <input type="number" name="display_order" value="{{ editing.display_order if editing else 0 }}">
+      </label>
+      <label class="span-4">Mô tả ngắn (hiện dưới tiêu đề trong popup chọn mẫu)
+        <input type="text" name="description" maxlength="500" value="{{ editing.description if editing else '' }}">
+      </label>
+      <label class="span-4">Nội dung mẫu *
+        <textarea name="body" rows="10" required class="et-manager-body-textarea">{{ editing.body if editing else '' }}</textarea>
+      </label>
+      <div class="span-4 et-manager-status-field">
+        <span class="et-manager-field-label">Gợi ý cho trạng thái contact</span>
+        <div class="et-manager-status-checks">
+          {% for code in status_choices %}
+          <label class="et-manager-status-check">
+            <input type="checkbox" name="recommended_for" value="{{ code }}"
+              {{ 'checked' if editing and code in editing.recommended_for }}>
+            {{ status_map.get(code, code) }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <label class="span-4">
+        {{ 'Ghi chú lịch sử thao tác — bắt buộc nếu có thay đổi' if editing else 'Ghi chú lịch sử thao tác (không bắt buộc)' }}
+        <textarea name="note" rows="2" placeholder="{{ 'Lý do sửa mẫu email này (các ss_team khác sẽ xem được ở mục Lịch sử thao tác)…' if editing else 'Ghi chú thêm nếu cần (không bắt buộc)…' }}"></textarea>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if editing else 'Lưu mẫu email' }}</button>
+      <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly') }}">Hủy</a>
+    </div>
+  </form>
+</div>
+
+{% if templates %}
+<div class="et-manager-grid">
+  {% for tpl in templates %}
+  <div class="et-manager-card">
+    <div class="et-manager-card-head">
+      <strong>{{ tpl.title }}</strong>
+      <span class="muted">#{{ tpl.display_order }}</span>
+    </div>
+    {% if tpl.description %}<p class="muted">{{ tpl.description }}</p>{% endif %}
+    {% if tpl.recommended_for %}
+    <div class="et-manager-tags">
+      {% for code in tpl.recommended_for %}
+      <span class="et-suggested-tag">{{ status_map.get(code, code) }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <p class="et-manager-body-preview">{{ tpl.body[:160] }}{{ '…' if tpl.body|length > 160 }}</p>
+    <div class="et-manager-card-actions">
+      <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly', edit=tpl.id) }}#et-manager-form">Sửa</a>
+      <form method="post" action="{{ url_for('contacts.email_template_delete', template_id=tpl.id) }}" onsubmit="return et_confirmDelete(this);" style="display:inline;">
+        <input type="hidden" name="note" value="">
+        <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có mẫu email nào — bấm "＋ Thêm mẫu email" để tạo mẫu đầu tiên.</p>
+</div>
+{% endif %}
+
+<script>
+  // Xoá mẫu email bắt buộc phải có note (backend trả 422 nếu thiếu) —
+  // hỏi trực tiếp qua prompt() thay vì làm hẳn 1 form/modal riêng cho
+  // từng thao tác xoá, giữ đơn giản giống pattern confirm() hiện có ở
+  // _contact_list.html (nút Xóa contact).
+  function et_confirmDelete(formEl) {
+    var note = window.prompt("Nhập lý do xoá mẫu email này (bắt buộc):", "");
+    if (note === null) return false;
+    note = note.trim();
+    if (!note) {
+      showToast("Cần nhập lý do xoá mẫu email.", "error");
+      return false;
+    }
+    formEl.querySelector('input[name="note"]').value = note;
+    return true;
+  }
+
+  // Bấm "+ Thêm mẫu email" -> hiện form thêm (mặc định ẩn khi không sửa
+  // mẫu nào, tránh form choán chỗ ngay khi vào trang chỉ để xem danh
+  // sách — hành vi tương tự "editing" đã tự hiện form khi có ?edit=).
+  (function () {
+    var showBtn = document.getElementById("etShowAddForm");
+    if (!showBtn) return;
+    showBtn.addEventListener("click", function (evt) {
+      evt.preventDefault();
+      var formCard = document.getElementById("et-manager-form");
+      formCard.style.display = "";
+      formCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  })();
+</script>

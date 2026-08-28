@@ -167,6 +167,12 @@
   </div>
 </div>
 
+{# 08/2026 — danh sách mẫu email (đọc bởi getEmailTemplatesData() trong
+   app.js, xem context_processor inject_email_templates trong app.py).
+   Dùng |tojson (Jinja/MarkupSafe tự escape đúng cho <script> context)
+   thay vì tự json.dumps() rồi nhúng thô — an toàn hơn, tránh lỗi
+   escape thủ công (vd ký tự "</script>" xuất hiện trong body mẫu). #}
+<script id="emailTemplatesData" type="application/json">{{ email_templates|tojson }}</script>
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version('app.js') }}"></script>
 </body>
 </html>

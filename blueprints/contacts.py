@@ -17,6 +17,21 @@ contacts_bp = Blueprint("contacts", __name__)
 @contacts_bp.route("/contacts")
 @staff_required
 def index():
+    """Trang "Danh sách contact" — có 2 tab (query param ?tab=...), cùng
+    pattern ?tab=export|import ở data_management.py:
+      danh-sach : bảng contact gộp toàn hệ thống (hành vi cũ, mặc định)
+      quan-ly   : quản lý mẫu email liên hệ (list + form thêm/sửa/xoá)
+
+    Chỉ tab "danh-sach" mới cần load contacts/companies/staff — tab
+    "quan-ly" tự load riêng ở _email_templates_tab() bên dưới, tránh
+    gọi API thừa không dùng tới khi đang ở tab kia."""
+    tab = request.args.get("tab", "danh-sach")
+    if tab not in ("danh-sach", "quan-ly"):
+        tab = "danh-sach"
+
+    if tab == "quan-ly":
+        return _email_templates_tab()
+
     status_vn = request.args.get("status", "")
     company_id = request.args.get("company_id", "")
     search = request.args.get("q", "").strip()
@@ -47,10 +62,86 @@ def index():
     staff_by_id = {u["ss_user_id"]: u for u in staff_members}
 
     return render_template(
-        "contacts.html", contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
+        "contacts.html", tab=tab, contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
         staff_members=staff_members, staff_by_id=staff_by_id,
         filters={"status": status_vn, "company_id": company_id, "q": search},
     )
+
+
+def _email_templates_tab():
+    """Tab "Quản lý mẫu email" (/contacts?tab=quan-ly) — danh sách mẫu +
+    2 form thêm/sửa render trực tiếp trong _email_template_manager.html
+    (không route riêng /contacts/email-templates/add, giữ mọi thao tác
+    trong 1 trang, giống style _dm_import.html gộp nhiều bước 1 chỗ)."""
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        templates = db_data.list_email_templates(access_token)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        templates = []
+
+    try:
+        placeholder_help = db_data.get_placeholder_help(access_token)
+    except CrawlerAPIError:
+        placeholder_help = {}
+
+    edit_id = request.args.get("edit", "")
+    editing = None
+    if edit_id:
+        try:
+            editing = db_data.get_email_template(access_token, edit_id)
+        except CrawlerAPIError as exc:
+            flash(str(exc), "error")
+        if editing is None and edit_id:
+            flash("Không tìm thấy mẫu email cần sửa (có thể đã bị xoá).", "error")
+
+    return render_template(
+        "contacts.html", tab="quan-ly", templates=templates,
+        placeholder_help=placeholder_help, editing=editing,
+        status_choices=db_data.CONTACT_STATUS_CHOICES, status_map=db_data.CONTACT_STATUS_MAP,
+    )
+
+
+@contacts_bp.route("/contacts/email-templates/add", methods=["POST"])
+@staff_required
+def email_template_add():
+    recommended_for = request.form.getlist("recommended_for")
+    form = {**request.form.to_dict(), "recommended_for": recommended_for}
+    try:
+        _call_authed(db_data.create_email_template, form)
+        flash("Đã thêm mẫu email.", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("contacts.index", tab="quan-ly"))
+
+
+@contacts_bp.route("/contacts/email-templates/<string:template_id>/edit", methods=["POST"])
+@staff_required
+def email_template_edit(template_id):
+    recommended_for = request.form.getlist("recommended_for")
+    form = {**request.form.to_dict(), "recommended_for": recommended_for}
+    try:
+        _call_authed(db_data.update_email_template, template_id, form)
+        flash("Đã cập nhật mẫu email.", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("contacts.index", tab="quan-ly", edit=template_id))
+    return redirect(url_for("contacts.index", tab="quan-ly"))
+
+
+@contacts_bp.route("/contacts/email-templates/<string:template_id>/delete", methods=["POST"])
+@staff_required
+def email_template_delete(template_id):
+    note = (request.form.get("note") or "").strip()
+    if not note:
+        flash("Xoá mẫu email bắt buộc phải nhập ghi chú lý do.", "error")
+        return redirect(url_for("contacts.index", tab="quan-ly"))
+    try:
+        _call_authed(db_data.delete_email_template, template_id, note)
+        flash("Đã xoá mẫu email.", "success")
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("contacts.index", tab="quan-ly"))
 
 
 @contacts_bp.route("/contacts/add", methods=["GET", "POST"])

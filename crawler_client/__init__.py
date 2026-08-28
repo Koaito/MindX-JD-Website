@@ -140,6 +140,19 @@ from .import_export import (
     resolve_company,
     import_confirm,
 )
+# 08/2026 (xem lịch sử trao đổi "chia phần danh sách contact thành 2
+# phần: danh sách + quản lý mẫu email") — thay 6 mẫu HARDCODE cứng ở
+# public/app.js bằng CRUD thật, persist ở backend.
+from .email_templates import (
+    CONTACT_STATUS_CHOICES,
+    _normalize_template,
+    list_email_templates,
+    get_email_template,
+    create_email_template,
+    update_email_template,
+    delete_email_template,
+    get_placeholder_help,
+)
 
 __all__ = [
     "CrawlerAPIError",
@@ -223,4 +236,11 @@ __all__ = [
     "verify_field",
     "resolve_company",
     "import_confirm",
+    "CONTACT_STATUS_CHOICES",
+    "list_email_templates",
+    "get_email_template",
+    "create_email_template",
+    "update_email_template",
+    "delete_email_template",
+    "get_placeholder_help",
 ]

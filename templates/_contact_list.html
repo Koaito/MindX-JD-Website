@@ -1,0 +1,83 @@
+{# Tab "Danh sách contact" — nội dung y hệt contacts.html trước khi tách
+   2 tab (08/2026), chỉ chuyển ra file include riêng để contacts.html
+   đóng vai trò khung tab-nav (giống pattern data_management.html +
+   _dm_export.html/_dm_import.html). #}
+<form class="filter-bar" method="get">
+  <input type="hidden" name="tab" value="danh-sach">
+  <input type="text" name="q" placeholder="Tìm theo tên contact…" value="{{ filters.q }}">
+
+  <select name="company_id">
+    <option value="">Mọi công ty</option>
+    {% for c in companies %}
+      <option value="{{ c.id }}" {{ 'selected' if filters.company_id == c.id }}>{{ c.company }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status">
+    <option value="">Mọi trạng thái</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.q or filters.company_id or filters.status %}
+    <a class="btn btn-text" href="{{ url_for('contacts.index', tab='danh-sach') }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ contacts|length }} contact phù hợp</p>
+
+{% if contacts %}
+<div class="contact-table-wrap">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>Tên</th>
+        <th>Công ty</th>
+        <th>Chức danh</th>
+        <th>Email</th>
+        <th>SĐT</th>
+        <th>Nguồn</th>
+        <th>Liên hệ gần nhất</th>
+        <th>Trạng thái</th>
+        <th>Phụ trách</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contacts %}
+      {% set company_name = c.company_name %}
+      <tr>
+        <td><strong>{{ c.contact_name }}</strong></td>
+        <td>
+          {% if c.company_id %}
+          <a href="{{ url_for('companies.detail', company_id=c.company_id) }}">{{ c.company_name or '—' }}</a>
+          {% else %}
+          <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ c.title or '—' }}</td>
+        <td class="muted">{{ c.email or '—' }}</td>
+        <td class="muted">{{ c.phone or '—' }}</td>
+        <td class="muted">{{ c.source or '—' }}</td>
+        <td class="muted">{{ c.last_contacted|format_date if c.last_contacted else '—' }}</td>
+        <td>{% include "_contact_status_cell.html" with context %}</td>
+        <td>{% include "_contact_assign_cell.html" with context %}</td>
+        <td class="actions-cell">
+          {% include "_contact_email_template_button.html" with context %}
+          <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
+          <form method="post" action="{{ url_for('contacts.delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
+            <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>Chưa có contact nào khớp bộ lọc.</p>
+</div>
+{% endif %}
