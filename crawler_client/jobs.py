@@ -153,7 +153,17 @@ def _build_parsed_content(form) -> dict:
 # Jobs
 # ---------------------------------------------------------------------------
 
-def list_jobs(q="", industry="", level="", location="", status="", created_by="", limit=200, offset=0):
+def list_jobs(q="", industry="", level="", location="", status="", created_by="",
+               limit=200, offset=0, include_content=False):
+    """include_content (thêm 08/2026, xem lịch sử trao đổi bug "tab Tình
+    trạng dữ liệu báo sai 100% job thiếu nội dung"): mặc định False,
+    GIỮ NGUYÊN hành vi cũ — backend GET /jobs không trả parsed_content,
+    payload nhẹ, đủ dùng cho mọi nơi chỉ cần tên/lương/company (dashboard,
+    danh sách job, staff-activity...). Truyền True CHỈ khi thật sự cần
+    đọc skills/requirements/benefits/description ngay ở list (hiện chỉ
+    crawl_status.py dùng, xem job_field_health()) — backend SELECT thêm
+    cột parsed_content (JSONB dài) khi param này = true, xem
+    api/routers/jobs.py::list_jobs() bên scrap-jd-api."""
     params = {"limit": limit, "offset": offset}
     if q:
         params["keyword"] = q
@@ -171,6 +181,8 @@ def list_jobs(q="", industry="", level="", location="", status="", created_by=""
         # created_by NULL nên không bao giờ khớp filter này, xem
         # api/routers/jobs.py::list_jobs().
         params["created_by"] = created_by
+    if include_content:
+        params["include_content"] = "true"
     data = _request("GET", "/jobs", params=params) or {}
     items = data.get("items", data if isinstance(data, list) else [])
     return [_normalize_job(j) for j in items]
@@ -210,19 +222,28 @@ _MAX_JOBS_PAGE = 200
 _ALL_JOBS_SAFETY_CAP = 5000  # chặn vòng lặp vô hạn nếu backend trả total sai
 
 
-def list_all_jobs(q="", industry="", level="", location="", status="", created_by=""):
+def list_all_jobs(q="", industry="", level="", location="", status="", created_by="",
+                   include_content=False):
     """Lấy TOÀN BỘ job khớp filter bằng cách tự phân trang theo đúng
     limit tối đa backend cho phép (200/lần), gộp lại thành 1 list — dùng
     khi cần dữ liệu chi tiết (không chỉ đếm) của mọi job, ví dụ nhóm job
     theo tháng deadline/date_collected cho dashboard, hoặc "mọi job 1
-    staff đã tự nhập tay" cho trang /staff-activity (created_by=uid)."""
+    staff đã tự nhập tay" cho trang /staff-activity (created_by=uid).
+
+    include_content: mặc định False — hầu hết nơi gọi hàm này (dashboard,
+    companies, staff-activity) không cần skills/requirements/benefits/
+    description, chỉ truyền True ở nơi THẬT SỰ cần đọc nội dung JD ngay
+    lúc list (hiện chỉ crawl_status.py, xem list_jobs() ở trên và
+    job_field_health()) — tránh kéo parsed_content (JSONB dài) không
+    cần thiết cho các nơi khác, dù giờ backend đã hỗ trợ."""
     total = count_jobs(q=q, industry=industry, level=level, location=location,
                         status=status, created_by=created_by)
     all_items: list = []
     offset = 0
     while offset < total and offset < _ALL_JOBS_SAFETY_CAP:
         page = list_jobs(q=q, industry=industry, level=level, location=location,
-                          status=status, created_by=created_by, limit=_MAX_JOBS_PAGE, offset=offset)
+                          status=status, created_by=created_by, limit=_MAX_JOBS_PAGE,
+                          offset=offset, include_content=include_content)
         if not page:
             break
         all_items.extend(page)

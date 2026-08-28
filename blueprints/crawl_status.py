@@ -39,7 +39,13 @@ def _status_tab_context() -> dict:
         companies = []
 
     try:
-        jobs = db_data.list_all_jobs()
+        # include_content=True (thêm 08/2026) — BẮT BUỘC ở tab này, khác
+        # mọi nơi khác đang gọi list_all_jobs() mặc định False. Tab này
+        # cần đọc skills/requirements/benefits/description để đếm thiếu
+        # (job_field_health()), mà backend GET /jobs mặc định KHÔNG trả
+        # parsed_content — thiếu tham số này sẽ quay lại đúng bug cũ (báo
+        # sai 100% job thiếu nội dung dù DB có đủ, xem lịch sử trao đổi).
+        jobs = db_data.list_all_jobs(include_content=True)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         jobs = []
