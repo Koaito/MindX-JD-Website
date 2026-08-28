@@ -59,6 +59,9 @@ from .jobs import (
     update_job_status,
     JOB_HEALTH_FIELDS,
     job_field_health,
+    list_expired_open_jobs,
+    job_health_by_source,
+    find_duplicate_job_groups,
 )
 from .data_health import count_missing_fields
 from .companies import (
@@ -78,6 +81,7 @@ from .companies import (
     delete_company,
     COMPANY_HEALTH_FIELDS,
     company_field_health,
+    count_companies_without_contact,
 )
 from .contacts import (
     CONTACT_STATUS_MAP,
@@ -188,6 +192,9 @@ __all__ = [
     "update_job_status",
     "JOB_HEALTH_FIELDS",
     "job_field_health",
+    "list_expired_open_jobs",
+    "job_health_by_source",
+    "find_duplicate_job_groups",
     "count_missing_fields",
     "PARTNERSHIP_POTENTIAL_MAP",
     "PARTNERSHIP_POTENTIAL_MAP_REV",
@@ -201,6 +208,7 @@ __all__ = [
     "delete_company",
     "COMPANY_HEALTH_FIELDS",
     "company_field_health",
+    "count_companies_without_contact",
     "CONTACT_STATUS_MAP",
     "CONTACT_STATUS_MAP_REV",
     "list_all_contacts",

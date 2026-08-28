@@ -5,17 +5,24 @@
 
   Mục đích: cho admin thấy nhanh company/job đang thiếu field gì/tỉ lệ
   bao nhiêu MÀ KHÔNG cần vào thẳng database — context build sẵn ở
-  blueprints/crawl_status.py::_status_tab_context(), template này chỉ
-  render lại `company_health_rows`/`job_health_rows` (mỗi dòng dict
+  blueprints/crawl_status.py::_status_tab_context(), template này render
+  lại `company_health_rows`/`job_health_rows` (mỗi dòng dict
   field/label/missing/total/pct_missing) + tổng company_health_total/
-  job_health_total.
+  job_health_total, CỘNG THÊM 4 khối mở rộng (08/2026, xem lịch sử trao
+  đổi): job hết hạn còn OPEN, breakdown theo nguồn crawl, job nghi
+  trùng, company thiếu contact.
 
   Tái dùng .bar-row/.bar-track/.bar-fill (public/css/08-dashboard.css)
   y hệt cách dashboard.html vẽ "Job theo ngành/level" — cùng 1 thước đo
   trực quan (thanh %). Luôn dùng .bar-fill (KHÔNG luân phiên
   .bar-fill-alt như dashboard) — CHỦ Ý toàn bộ thanh cùng 1 màu đỏ
-  (--accent, xem 00-tokens.css) cho cả 2 khối bên dưới, theo yêu cầu
+  (--accent, xem 00-tokens.css) cho cả 2 khối đầu tiên, theo yêu cầu
   08/2026 (trước đó có bản luân phiên đỏ/xanh teal, đã bỏ).
+
+  4 khối mới tái dùng .contact-table/.contact-table-wrap/
+  .dash-table-fixed + .pagination-list-nav (đã có sẵn, xem
+  dashboard.html "JD sắp hết hạn cần đẩy gấp"/"JD ế") — CÙNG pattern
+  bảng + phân trang phía client, không phải component mới.
 #}
 
 <section class="card">
@@ -40,11 +47,33 @@
   {% endif %}
 </section>
 
-<section class="card">
+<section class="card" style="margin-top: 22px;">
+  <h4 class="status-card-title">Company chưa có người liên hệ (contact HR)</h4>
+  <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+    Tính trên {{ company_no_contact_total }} company đang active. Company không có contact nào thì team SS
+    không có cách chủ động liên hệ hợp tác — vào từng trang công ty để thêm người liên hệ.
+  </p>
+
+  {% if company_no_contact_total == 0 %}
+  <p class="empty-placeholder">Chưa có company nào hoặc không tải được dữ liệu.</p>
+  {% else %}
+    {% set pct_no_contact = ((company_no_contact_missing / company_no_contact_total) * 100) | round | int if company_no_contact_total else 0 %}
+    <div class="bar-row bar-row--wide-value">
+      <span class="bar-label">Chưa có contact</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width: {{ pct_no_contact }}%"></div>
+      </div>
+      <span class="bar-value">{{ company_no_contact_missing }}/{{ company_no_contact_total }} ({{ pct_no_contact }}%)</span>
+    </div>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 22px;">
   <h4 class="status-card-title">Job đang thiếu dữ liệu theo từng trường</h4>
   <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
     Tính trên toàn bộ {{ job_health_total }} job hiện có.
-    Chỉ tính field NỘI DUNG (kỹ năng, yêu cầu, phúc lợi, mô tả, hạn nộp, lương) — không tính field crawl tự gán như ngành/level/địa điểm.
+    Chỉ tính field NỘI DUNG (kỹ năng, yêu cầu, phúc lợi, mô tả, hạn nộp) — không tính field crawl tự gán như ngành/level/địa điểm,
+    và không tính lương (job "Thỏa thuận" không công khai mức lương là trạng thái hợp lệ, không phải thiếu dữ liệu).
   </p>
 
   {% if job_health_total == 0 %}
@@ -59,5 +88,94 @@
       <span class="bar-value">{{ row.missing }}/{{ row.total }} ({{ row.pct_missing }}%)</span>
     </div>
     {% endfor %}
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 22px;">
+  <h4 class="status-card-title">Job thiếu dữ liệu theo từng nguồn crawl</h4>
+  <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+    Breakdown bảng "Job đang thiếu dữ liệu" ở trên theo từng nguồn (TopCV/VietnamWorks/CareerViet/nhập tay) —
+    biết nguồn nào crawl thiếu nhiều để ưu tiên sửa parser đúng nguồn đó.
+  </p>
+
+  {% if job_health_by_source %}
+    {% for group in job_health_by_source %}
+    <div style="margin-bottom: 18px;">
+      <div style="font-weight: 600; margin-bottom: 8px;">{{ group.source }} <span class="muted" style="font-weight: 400; color: var(--muted);">({{ group.total }} job)</span></div>
+      {% for row in group.rows %}
+      <div class="bar-row bar-row--wide-value">
+        <span class="bar-label">{{ row.label }}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: {{ row.pct_missing }}%"></div>
+        </div>
+        <span class="bar-value">{{ row.missing }}/{{ row.total }} ({{ row.pct_missing }}%)</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty-placeholder">Chưa có job nào hoặc không tải được dữ liệu.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 22px;">
+  <h4 class="status-card-title">Job đã hết hạn nhưng vẫn đang "Đang tuyển" <span class="muted" style="font-weight: 400; color: var(--muted);">({{ expired_open_jobs|length }})</span></h4>
+  <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+    Deadline đã qua nhưng job_status vẫn OPEN — học viên vẫn thấy job này còn tuyển dù thật ra đã hết hạn.
+    Cân nhắc chạy job bảo trì "Đóng job hết hạn" ở tab Bảo trì dữ liệu.
+  </p>
+
+  {% if expired_open_jobs %}
+  <div class="contact-table-wrap">
+    <table class="contact-table dash-table-fixed">
+      <colgroup><col style="width: 34%;"><col style="width: 30%;"><col style="width: 18%;"><col style="width: 18%;"></colgroup>
+      <thead><tr><th>Vị trí</th><th>Công ty</th><th>Deadline</th><th>Nguồn</th></tr></thead>
+      <tbody id="pg-expired-open-jobs" data-paginate-size="20">
+        {% for j in expired_open_jobs %}
+        <tr>
+          <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+          <td>{{ j.company }}</td>
+          <td>{{ j.deadline | format_date }}</td>
+          <td>{{ j.source or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination-list-nav" data-paginate-for="pg-expired-open-jobs"></div>
+  {% else %}
+  <p class="empty-placeholder">Không có job nào hết hạn mà vẫn đang mở — ổn.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 22px;">
+  <h4 class="status-card-title">Job nghi trùng lặp <span class="muted" style="font-weight: 400; color: var(--muted);">({{ duplicate_job_groups|length }} nhóm)</span></h4>
+  <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
+    Cùng công ty + cùng tên vị trí, cả 2 job đều đang "Đang tuyển" — có thể do crawl trùng, kiểm tra lại trước khi đóng bớt job cũ.
+  </p>
+
+  {% if duplicate_job_groups %}
+    {% for group in duplicate_job_groups %}
+    <div style="margin-bottom: 14px;">
+      <div style="font-weight: 600; margin-bottom: 6px;">{{ group.company }} — {{ group.position }} <span class="muted" style="font-weight: 400; color: var(--muted);">({{ group.jobs|length }} job)</span></div>
+      <div class="contact-table-wrap">
+        <table class="contact-table dash-table-fixed">
+          <colgroup><col style="width: 46%;"><col style="width: 27%;"><col style="width: 27%;"></colgroup>
+          <thead><tr><th>Vị trí</th><th>Deadline</th><th>Nguồn</th></tr></thead>
+          <tbody>
+            {% for j in group.jobs %}
+            <tr>
+              <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+              <td>{{ j.deadline | format_date }}</td>
+              <td>{{ j.source or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty-placeholder">Không có job nào nghi trùng — ổn.</p>
   {% endif %}
 </section>

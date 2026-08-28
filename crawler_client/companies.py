@@ -156,6 +156,34 @@ def company_field_health(companies):
     return count_missing_fields(companies, COMPANY_HEALTH_FIELDS)
 
 
+def count_companies_without_contact(companies, contacts):
+    """Đếm company ĐANG ACTIVE chưa có bất kỳ contact (người liên hệ HR)
+    nào trong bảng contacts — quan trọng vì company không có contact thì
+    team SS không có cách nào chủ động liên hệ hợp tác tuyển dụng, dù
+    company đó có bao nhiêu job đăng lên cũng vậy (thêm 08/2026, tab
+    Tình trạng dữ liệu, xem lịch sử trao đổi).
+
+    Nhận sẵn list company đã _normalize_company() VÀ list contact đã
+    _normalize_contact() (list_all_contacts(), có company_id trên mỗi
+    contact) — cùng nguyên tắc company_field_health(): nơi gọi
+    (crawl_status.py) tự fetch, hàm này chỉ tính on-the-fly, không gọi
+    API. Chỉ tính contact ĐANG ACTIVE (is_active — contact đã xoá mềm
+    không tính là "đã có người liên hệ").
+
+    Trả (missing: int, total: int) — total = số company active (bỏ
+    company đã xoá mềm, is_active=False, giống cách company_health_rows
+    đang tính), missing = số company trong đó có company_id không xuất
+    hiện ở bất kỳ contact active nào."""
+    active_companies = [c for c in companies if c.get("is_active", True)]
+    company_ids_with_contact = {
+        c.get("company_id") for c in contacts if c.get("is_active", True)
+    }
+    missing = sum(
+        1 for c in active_companies if c.get("id") not in company_ids_with_contact
+    )
+    return missing, len(active_companies)
+
+
 def get_company(company_id):
     """Trả kèm jobs (CompanyDetailOut) — dùng cho trang chi tiết công ty."""
     raw = _request("GET", f"/companies/{company_id}")

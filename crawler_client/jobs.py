@@ -41,6 +41,103 @@ def job_field_health(jobs):
     """
     return count_missing_fields(jobs, JOB_HEALTH_FIELDS)
 
+
+def list_expired_open_jobs(jobs, today=None):
+    """Trả list job có deadline < hôm nay (đã qua hạn) nhưng
+    status_raw vẫn là 'OPEN' — dữ liệu "rác" hiển thị nhầm cho học viên
+    thấy job còn tuyển dù thật ra đã hết hạn (thêm 08/2026, tab Tình
+    trạng dữ liệu, xem lịch sử trao đổi).
+
+    Nhận sẵn list job đã _normalize_job() (cùng nguyên tắc
+    job_field_health() — không tự fetch). Job không có deadline (None)
+    KHÔNG tính vào đây — không đủ căn cứ để nói "đã hết hạn", đã tính
+    riêng ở field "Hạn nộp" trong JOB_HEALTH_FIELDS.
+
+    today: ngày để so sánh, mặc định None -> tự lấy now_vn().date()
+    (import trễ tránh vòng lặp, xem docstring các nơi khác dùng helpers
+    trong crawler_client/). Cho phép truyền vào để test dễ hơn (không
+    phải mock now_vn())."""
+    from helpers import now_vn, _parse_any_date
+
+    if today is None:
+        today = now_vn().date()
+
+    result = []
+    for job in jobs:
+        if job.get("status_raw") != "OPEN":
+            continue
+        deadline = _parse_any_date(job.get("deadline")) if isinstance(job.get("deadline"), str) else job.get("deadline")
+        if deadline is not None and deadline < today:
+            result.append(job)
+    return result
+
+
+def job_health_by_source(jobs):
+    """Breakdown job_field_health() theo TỪNG NGUỒN crawl (source_name —
+    TopCV/VietnamWorks/CareerViet/MANUAL/"" nếu chưa từng ghi log nguồn)
+    thay vì gộp chung 1 bảng — biết nguồn nào crawl "kém" (tỉ lệ thiếu
+    field cao) cần ưu tiên sửa parser riêng cho nguồn đó (thêm 08/2026,
+    tab Tình trạng dữ liệu, xem lịch sử trao đổi).
+
+    Nhận sẵn list job đã _normalize_job() (cùng nguyên tắc
+    job_field_health()). Group theo raw["source"] (đã chuẩn hoá thành
+    "" nếu null — xem _normalize_job()), "" hiển thị là "Không rõ nguồn"
+    ở template, KHÔNG loại khỏi bảng (job thiếu source cũng là 1 dạng
+    thiếu dữ liệu đáng biết).
+
+    Trả list[dict]: {"source": tên nguồn (hoặc "Không rõ nguồn"),
+    "total": tổng job nguồn đó, "rows": kết quả job_field_health() CHỈ
+    trên job nguồn đó}. Sắp xếp theo total giảm dần (nguồn crawl nhiều
+    job nhất lên đầu) — không sort theo % thiếu vì nguồn ít job dễ bị
+    % thiếu nhiễu (vd 1 job thiếu 1 field = 100%)."""
+    groups: dict[str, list] = {}
+    for job in jobs:
+        source = job.get("source") or "Không rõ nguồn"
+        groups.setdefault(source, []).append(job)
+
+    result = [
+        {"source": source, "total": len(source_jobs), "rows": job_field_health(source_jobs)}
+        for source, source_jobs in groups.items()
+    ]
+    result.sort(key=lambda g: g["total"], reverse=True)
+    return result
+
+
+def find_duplicate_job_groups(jobs):
+    """Nhóm job nghi TRÙNG NHAU (cùng company_id + cùng position, so
+    khớp không phân biệt hoa/thường + bỏ khoảng trắng thừa) trong 1
+    lượt duyệt TOÀN BỘ list job có sẵn — KHÔNG gọi lại API cho từng job
+    (khác is_duplicate_candidate() ở dưới, hàm đó phù hợp check nhanh 1
+    job lúc thêm mới, không phù hợp chạy 585 lần liên tiếp cho tab
+    thống kê này). Thêm 08/2026, tab Tình trạng dữ liệu — xem lịch sử
+    trao đổi.
+
+    Nhận sẵn list job đã _normalize_job(). Chỉ tính job đang OPEN — job
+    đã CLOSED trùng job khác không phải vấn đề cần xử lý gấp (không
+    hiển thị song song cho học viên nữa).
+
+    Trả list[dict], mỗi dict {"company": tên công ty, "position": tên vị
+    trí (bản gốc, chưa lowercase), "jobs": list job trong nhóm trùng đó
+    (>= 2 job)} — sắp xếp theo số job trong nhóm giảm dần. Nhóm chỉ 1
+    job (không trùng ai) không xuất hiện trong kết quả."""
+    groups: dict[tuple[str, str], list] = {}
+    for job in jobs:
+        if job.get("status_raw") != "OPEN":
+            continue
+        company_id = job.get("company_id")
+        position = (job.get("position") or "").strip().lower()
+        if not company_id or not position:
+            continue
+        groups.setdefault((company_id, position), []).append(job)
+
+    result = [
+        {"company": jobs_in_group[0]["company"], "position": jobs_in_group[0]["position"], "jobs": jobs_in_group}
+        for jobs_in_group in groups.values()
+        if len(jobs_in_group) >= 2
+    ]
+    result.sort(key=lambda g: len(g["jobs"]), reverse=True)
+    return result
+
 # ---------------------------------------------------------------------------
 # Bảng ánh xạ VN <-> mã backend — form/hiển thị dùng tiếng Việt, request gửi
 # lên backend dùng đúng enum backend yêu cầu.
