@@ -1,6 +1,6 @@
 """Dashboard blueprint - team SS homepage with insights"""
 
-from datetime import date, datetime
+from datetime import date
 from flask import Blueprint, render_template, flash, request
 
 import crawler_client as db_data
@@ -9,7 +9,7 @@ import backend_auth
 from backend_auth import BackendAuthError
 from utils.decorators import staff_required
 from constants import INDUSTRIES, JOB_STATUSES
-from helpers import _auth_tokens_from_session, _parse_any_date, _jobs_by_month
+from helpers import _auth_tokens_from_session, _parse_any_date, _jobs_by_month, now_vn
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -25,7 +25,7 @@ def _merge_engagement_into_jobs(jobs, engagement_jobs):
 
 
 def _jd_needing_push(jobs, days_min=7, days_max=14):
-    today = datetime.now().date()
+    today = now_vn().date()
     result = []
     for job in jobs:
         if job.get("status_raw") != "OPEN":
@@ -45,7 +45,7 @@ def _jd_needing_push(jobs, days_min=7, days_max=14):
 
 
 def _jd_stale(jobs, min_age_days=30):
-    today = datetime.now().date()
+    today = now_vn().date()
     result = []
     for job in jobs:
         if job.get("status_raw") != "OPEN":
@@ -65,7 +65,7 @@ def _jd_stale(jobs, min_age_days=30):
 
 
 def _top_skills(jobs, days_recent=30, top_n=10):
-    today = datetime.now().date()
+    today = now_vn().date()
     counts = {}
     for job in jobs:
         d = _parse_any_date(job.get("date_collected"))
@@ -111,7 +111,7 @@ def _salary_ranges_by_industry_level(jobs):
 
 
 def _companies_high_potential_no_contact(companies, contacts, quiet_days=60):
-    today = datetime.now().date()
+    today = now_vn().date()
     contacts_by_company = {}
     for ct in contacts:
         contacts_by_company.setdefault(ct.get("company_id"), []).append(ct)
@@ -168,7 +168,7 @@ def _contacts_needing_followup(contacts, quiet_days=14):
     contact chưa từng có date_collected lẫn last_contacted (dữ liệu thiếu)
     thì bỏ qua, không tính là quá hạn để tránh báo nhầm hàng loạt.
     """
-    today = datetime.now().date()
+    today = now_vn().date()
     result = []
     for c in contacts:
         if (c.get("status_raw") or "") == "IN_PARTNERSHIP":
@@ -187,7 +187,7 @@ def _contacts_needing_followup(contacts, quiet_days=14):
 
 
 def _companies_job_activity(jobs, companies, expanding_days=30, expanding_min_jobs=2, quiet_days=75, recent_jobs_shown=5):
-    today = datetime.now().date()
+    today = now_vn().date()
     jobs_by_company = {}
     for j in jobs:
         d = _parse_any_date(j.get("date_collected"))
@@ -233,7 +233,7 @@ def _pct_change(current, previous):
 
 
 def _monthly_recap(jobs, companies, engagement_monthly):
-    today = datetime.now().date()
+    today = now_vn().date()
     this_y, this_m = today.year, today.month
     last_y, last_m = (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
 

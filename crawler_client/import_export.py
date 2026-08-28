@@ -103,7 +103,14 @@ def export_entity(access_token, entity_type, file_format="xlsx", filters=None):
     if "filename=" in disposition:
         filename = disposition.split("filename=")[-1].strip('"; ')
     if not filename:
-        ts = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Giờ VN (thêm 08/2026, đồng bộ với helpers.now_vn() — không import
+        # thẳng từ helpers.py ở đây vì helpers.py lại import ngược từ
+        # crawler_client, import thẳng sẽ gây circular import). Trước đây
+        # dùng datetime.now() trần -> server chạy UTC (Vercel) nên tên file
+        # xuất ra lệch 7 tiếng so với giờ bấm nút thật.
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        ts = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y%m%d_%H%M%S")
         ext = "xlsx" if file_format == "xlsx" else "csv"
         filename = f"{entity_type}_export_{ts}.{ext}"
     return res.content, filename, content_type

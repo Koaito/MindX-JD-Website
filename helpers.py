@@ -16,7 +16,8 @@ Gom về đây để chỉ có DUY NHẤT 1 bản mỗi hàm — sửa 1 nơi, c
 toàn bộ app.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from flask import request, session
 from markupsafe import Markup, escape
@@ -24,6 +25,35 @@ from markupsafe import Markup, escape
 import backend_auth
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
+
+
+# ---------------------------------------------------------------------------
+# Giờ Việt Nam (thêm 08/2026 — báo lỗi "giờ trên web bị lệch")
+# ---------------------------------------------------------------------------
+# GỐC RỄ: server chạy trên Vercel, mặc định giờ hệ thống là UTC (không có
+# biến môi trường TZ nào set khác) — trong khi TOÀN BỘ `datetime.now()`
+# trong app (dashboard.py tính "hôm nay", format_date() hiển thị giờ chạy
+# crawl/lịch sử thao tác/lần đăng nhập cuối...) trước giờ coi giờ server
+# = giờ hiển thị cho người dùng, không hề quy đổi -> mọi mốc giờ hiển thị
+# ra bị LỆCH ĐÚNG 7 TIẾNG so với giờ Việt Nam thật (VD: chạy lúc 21:36 giờ
+# VN thì hệ thống lưu/trả về 14:36 UTC, rồi hiển thị thẳng "14:36" luôn
+# thay vì quy đổi lại 21:36). Ảnh hưởng RÕ NHẤT vào khung 00:00-07:00 giờ
+# VN: lúc đó server UTC vẫn còn là NGÀY HÔM TRƯỚC, nên các phép tính dựa
+# vào "hôm nay" (đếm ngược hạn nộp job, thống kê theo tháng ở dashboard...)
+# bị lùi sai 1 ngày trong đúng khung giờ đó.
+#
+# Cách dùng: MỌI chỗ cần biết "bây giờ"/"hôm nay" theo giờ người dùng nhìn
+# thấy phải gọi now_vn() (KHÔNG dùng datetime.now() trần) — xem
+# blueprints/dashboard.py. format_date() bên dưới tự quy đổi sẵn cho các
+# giá trị datetime lấy từ backend (created_at/started_at/last_login_at...).
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def now_vn():
+    """"Bây giờ" theo giờ Việt Nam (UTC+7) — dùng thay cho datetime.now()
+    trần ở MỌI nơi cần so sánh/hiển thị theo ngày giờ người dùng nhìn thấy.
+    Xem giải thích gốc rễ ở khối comment ngay phía trên."""
+    return datetime.now(VN_TZ)
 
 
 # ---------------------------------------------------------------------------
@@ -112,23 +142,41 @@ def format_date(value, fmt="%d/%m/%Y"):
         return "—"
     if isinstance(value, str):
         text = value.replace("Z", "+00:00")
+        parsed = None
         for parser in (
             lambda s: datetime.fromisoformat(s),
             lambda s: datetime.strptime(s, "%Y-%m-%d"),
         ):
             try:
-                return parser(text).strftime(fmt)
+                parsed = parser(text)
+                break
             except ValueError:
                 continue
-        return value
+        if parsed is None:
+            return value
+    else:
+        parsed = value
+
+    # Quy đổi sang giờ VN trước khi format (thêm 08/2026, xem giải thích ở
+    # now_vn() phía trên). Backend trả về giờ dạng UTC (có hậu tố "Z" —
+    # xem .replace("Z", "+00:00") ở trên): parser sẽ tạo ra datetime CÓ
+    # tzinfo=UTC cho các chuỗi này -> quy đổi thẳng sang VN_TZ. Với
+    # datetime/date KHÔNG có tzinfo (naive — vd chuỗi "YYYY-MM-DD" không
+    # kèm giờ, hoặc value truyền vào sẵn là đối tượng date/datetime naive
+    # từ nơi khác), coi như ĐÃ Ở ĐÚNG giờ cần hiển thị (không có "giờ" để
+    # lệch, hoặc caller tự chịu trách nhiệm) — không tự ý cộng/trừ giờ,
+    # tránh đoán sai làm lệch thêm.
+    if isinstance(parsed, datetime) and parsed.tzinfo is not None:
+        parsed = parsed.astimezone(VN_TZ)
+
     try:
-        return value.strftime(fmt)
+        return parsed.strftime(fmt)
     except AttributeError:
         return "—"
 
 
 def _jobs_by_month(jobs, date_field, months_back=6, only_past=False):
-    today = datetime.now().date()
+    today = now_vn().date()
     month_keys = []
     y, m = today.year, today.month
     for _ in range(months_back):
