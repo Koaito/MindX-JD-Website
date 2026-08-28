@@ -73,6 +73,8 @@ from .companies import (
     create_company,
     update_company,
     delete_company,
+    COMPANY_HEALTH_FIELDS,
+    company_field_health,
 )
 from .contacts import (
     CONTACT_STATUS_MAP,
@@ -191,6 +193,8 @@ __all__ = [
     "create_company",
     "update_company",
     "delete_company",
+    "COMPANY_HEALTH_FIELDS",
+    "company_field_health",
     "CONTACT_STATUS_MAP",
     "CONTACT_STATUS_MAP_REV",
     "list_all_contacts",

@@ -6,6 +6,11 @@ khác) — xem utils/decorators.py::admin_required.
 
 TAB "crawl" (mặc định) — nội dung y hệt trang cũ, dời sang
 _crawl_tab.html, KHÔNG đổi logic.
+TAB "status" — "Tình trạng dữ liệu" (08/2026): bảng company đang thiếu
+field gì/tỉ lệ bao nhiêu, cho admin xem mà KHÔNG cần vào thẳng database
+— context build ở blueprints/crawl_status.py (file riêng, CHỈ ĐỌC,
+không có route/form trigger nào nên import Ở ĐẦU file này, không như
+"maintenance" bên dưới).
 TAB "maintenance" — 5 job bảo trì dữ liệu (backfill_company_profiles,
 enrich_profile_from_website, enrich_web_info, get_fb_linkedin,
 check_expired_jobs), route trigger/status/logs khai ở
@@ -32,6 +37,11 @@ import crawler_client as db_data
 from crawler_client import CrawlerAPIError
 from utils.decorators import admin_required
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+# Tab "status" (Tình trạng dữ liệu) CHỈ ĐỌC, không có route riêng nào
+# đăng ký vào crawl_bp -> import thẳng ở đầu file được (khác
+# blueprints.crawl_maintenance phải import trễ ở cuối file vì file đó
+# cần import ngược crawl_bp, xem docstring cuối file này).
+from blueprints.crawl_status import _status_tab_context
 
 crawl_bp = Blueprint("crawl", __name__)
 
@@ -67,18 +77,24 @@ def _active_run_for_source(source):
 @crawl_bp.route("/crawl")
 @admin_required
 def index():
-    """Trang chính — 2 tab (?tab=crawl mặc định | ?tab=maintenance).
+    """Trang chính — 3 tab (?tab=crawl mặc định | ?tab=status | ?tab=maintenance).
 
     Tab 'crawl': Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
     1/nguồn), Khu C (lịch sử, filter + phân trang) — y hệt trước đây.
+
+    Tab 'status': bảng company đang thiếu field gì/tỉ lệ bao nhiêu, xem
+    docstring _status_tab_context() (blueprints/crawl_status.py).
 
     Tab 'maintenance': build context riêng ở
     _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
     merge vào đây — tách hàm để file này không phình to, KHÔNG tính lại
     context tab đang KHÔNG hiển thị (đỡ gọi API thừa lúc chỉ xem 1 tab)."""
     tab = request.args.get("tab", "crawl")
-    if tab not in ("crawl", "maintenance"):
+    if tab not in ("crawl", "status", "maintenance"):
         tab = "crawl"
+
+    if tab == "status":
+        return render_template("crawl.html", tab=tab, **_status_tab_context())
 
     if tab == "maintenance":
         # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó

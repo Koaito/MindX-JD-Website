@@ -124,6 +124,54 @@ def list_company_cities():
     return sorted(cities)
 
 
+# Field nào tính vào thống kê "thiếu dữ liệu" ở tab Tình trạng dữ liệu
+# (blueprints/crawl_status.py) — company_name/id KHÔNG đưa vào vì luôn
+# có sẵn (backend bắt buộc lúc tạo company), không có ý nghĩa thống kê.
+# Thứ tự ở đây = thứ tự hiển thị trên UI (xem lịch sử trao đổi 08/2026).
+COMPANY_HEALTH_FIELDS = [
+    ("tax_id", "Mã số thuế"),
+    ("website", "Website"),
+    ("industry", "Ngành"),
+    ("address", "Địa chỉ"),
+    ("company_size", "Quy mô"),
+    ("fanpage", "Fanpage"),
+    ("linkedin_company", "LinkedIn"),
+]
+
+
+def company_field_health(companies):
+    """Đếm số company thiếu (rỗng) từng field trong COMPANY_HEALTH_FIELDS.
+
+    Nhận sẵn list company đã _normalize_company() (KHÔNG tự gọi
+    list_all_companies() ở đây) — để nơi gọi (crawl_status.py) tự quyết
+    định lấy company từ đâu/khi nào, giống cách dashboard.py truyền
+    `companies`/`jobs` vào các hàm _companies_*/_jd_* thay vì mỗi hàm tự
+    fetch riêng — tránh gọi API lặp lại nhiều lần cho cùng 1 lần render
+    trang.
+
+    "Thiếu" = giá trị rỗng/None sau chuẩn hoá — _normalize_company() đã
+    quy None -> "" cho mọi field ở đây nên chỉ cần check falsy, không
+    cần phân biệt None với "".
+
+    Trả về list dict theo ĐÚNG thứ tự COMPANY_HEALTH_FIELDS (không sort
+    theo % thiếu) để UI ổn định, dễ quét mắt qua nhiều lần load — sort
+    theo mức độ thiếu nhiều/ít nếu cần sẽ để phía template/JS tự làm.
+    """
+    total = len(companies)
+    rows = []
+    for field, label in COMPANY_HEALTH_FIELDS:
+        missing = sum(1 for c in companies if not c.get(field))
+        pct_missing = round(missing / total * 100) if total else 0
+        rows.append({
+            "field": field,
+            "label": label,
+            "missing": missing,
+            "total": total,
+            "pct_missing": pct_missing,
+        })
+    return rows
+
+
 def get_company(company_id):
     """Trả kèm jobs (CompanyDetailOut) — dùng cho trang chi tiết công ty."""
     raw = _request("GET", f"/companies/{company_id}")
