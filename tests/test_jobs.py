@@ -18,9 +18,8 @@ File blueprint phức tạp nhất trong 10 blueprint (234 dòng). Trọng tâm:
 
 import pytest
 
-from crawler_client import CrawlerAPIError
 from backend_auth import BackendAuthError
-
+from crawler_client import CrawlerAPIError
 
 # ---------------------------------------------------------------------------
 # index() — danh sách job, route công khai
@@ -177,15 +176,13 @@ class TestResolveCompanyId:
 
     def test_existing_mode_missing_company_id_raises(self, flask_app):
         from blueprints.jobs import _resolve_company_id
-        with flask_app.test_request_context():
-            with pytest.raises(CrawlerAPIError):
-                _resolve_company_id({"company_mode": "existing", "company_id": ""})
+        with flask_app.test_request_context(), pytest.raises(CrawlerAPIError):
+            _resolve_company_id({"company_mode": "existing", "company_id": ""})
 
     def test_new_company_mode_missing_name_raises(self, flask_app):
         from blueprints.jobs import _resolve_company_id
-        with flask_app.test_request_context():
-            with pytest.raises(CrawlerAPIError):
-                _resolve_company_id({"company_mode": "new", "new_company_name": ""})
+        with flask_app.test_request_context(), pytest.raises(CrawlerAPIError):
+            _resolve_company_id({"company_mode": "new", "new_company_name": ""})
 
     def test_new_company_mode_creates_and_returns_new_id(self, flask_app, mocker):
         from blueprints.jobs import _resolve_company_id

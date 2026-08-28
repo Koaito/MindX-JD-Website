@@ -12,10 +12,9 @@ TTL) — đảm bảo dashboard gọi đúng hàm này (không phải LEVELS tĩ
 bị xoá khỏi constants.py) để tính jobs_by_level.
 """
 
-import pytest
 
-from crawler_client import CrawlerAPIError
 from backend_auth import BackendAuthError
+from crawler_client import CrawlerAPIError
 
 
 def _mock_all_dashboard_deps(mocker, *, jobs=None, companies=None, level_codes=None):

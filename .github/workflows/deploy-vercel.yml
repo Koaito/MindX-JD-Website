@@ -36,6 +36,17 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Cài ruff (linter)
+        # Thêm 08/2026 cùng đợt rà soát khả năng mở rộng — trước đây
+        # không có bước lint tự động nào, lỗi kiểu quên re-export 1 hàm
+        # mới ở crawler_client/__init__.py (bug thật đã xảy ra, gây 500
+        # AttributeError ở production) là loại lỗi ruff (F401) bắt được
+        # ngay lúc gõ code. Cấu hình rule ở ruff.toml (chỉ bật F + E9).
+        run: pip install ruff
+
+      - name: Chạy ruff
+        run: ruff check .
+
       - name: Chạy test
         # Biến môi trường chỉ để pytest chạy được (import app.py cần có
         # giá trị, KHÔNG phải secret thật) — xem env_loader.py/

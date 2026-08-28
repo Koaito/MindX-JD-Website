@@ -1,0 +1,30 @@
+# Ruff (linter) — thêm 08/2026 khi rà soát khả năng mở rộng codebase.
+# Trước đây KHÔNG có type checker/linter tự động nào chạy trong CI — bug
+# thật đã xảy ra (thêm update_company_potential() vào crawler_client/
+# companies.py nhưng quên re-export ở __init__.py -> AttributeError 500
+# ở production) LÀ ĐÚNG LOẠI LỖI ruff (F401 unused-import / "chưa thêm
+# vào __all__") bắt được ngay lúc gõ code, không cần đợi user báo lỗi.
+# (Có test riêng chặn CHÍNH bug này ở tests/test_crawler_client.py::
+# TestReExportCompleteness — ruff + test đó bổ trợ nhau: ruff bắt sớm
+# lúc code, test chặn chắc lúc CI dù lỡ ruff không chạy.)
+#
+# Chỉ bật F (pyflakes) và E9 (lỗi cú pháp) — CHƯA bật E/W (style pycode-
+# style) hay các bộ rule mới hơn của ruff (RUF/BLE/DTZ/SIM/UP...) vì
+# codebase hiện tại có phong cách riêng khá nhất quán, bật hết ngay sẽ
+# ra hàng chục lỗi style không thật sự quan trọng, làm loãng tín hiệu
+# của F401/F811/F821 thật sự đáng chú ý. Có thể bật thêm dần sau.
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E9", "F"]
+
+[lint.per-file-ignores]
+# crawler_client/__init__.py là "barrel module" CHỦ ĐÍCH re-export toàn
+# bộ tên (kể cả helper private _xxx dùng nội bộ cho test/module khác
+# patch trực tiếp, xem docstring đầu file) — ruff coi mọi import không
+# nằm trong __all__ là "unused", nhưng đây LÀ TOÀN BỘ mục đích tồn tại
+# của file này, không phải lỗi. Bản thân __all__ list thiếu tên PUBLIC
+# (không có "_" ở đầu) đã có test riêng chặn chắc hơn ruff (xem
+# tests/test_crawler_client.py::TestReExportCompleteness).
+"crawler_client/__init__.py" = ["F401"]

@@ -1,12 +1,22 @@
 """Staff blueprint - team SS account management"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import current_user
-from utils.decorators import staff_required
+
 import backend_auth
 from backend_auth import BackendAuthError
 from constants import ROLE_LABELS
 from helpers import _auth_tokens_from_session
+from utils.decorators import staff_required
 
 staff_bp = Blueprint("staff", __name__)
 

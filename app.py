@@ -7,14 +7,12 @@ load_env_file()
 from flask import Flask
 from flask_login import LoginManager, current_user
 
-from auth import BackendUser
 import backend_auth
-from backend_auth import BackendAuthError
-
 import crawler_client as db_data
-from crawler_client import CrawlerAPIError
-
+from auth import BackendUser
+from backend_auth import BackendAuthError
 from constants import ROLE_LABELS
+from crawler_client import CrawlerAPIError
 from helpers import (
     _auth_tokens_from_session,
     _clear_auth_tokens,
@@ -134,18 +132,18 @@ def inject_email_templates():
 # Register Blueprints
 # ---------------------------------------------------------------------------
 
+from blueprints.activity_logs import activity_logs_bp
 from blueprints.auth import auth_bp
-from blueprints.my_stuff import my_stuff_bp
-from blueprints.jobs import jobs_bp
 from blueprints.companies import companies_bp
 from blueprints.contacts import contacts_bp
-from blueprints.dashboard import dashboard_bp
-from blueprints.staff import staff_bp
-from blueprints.students import students_bp
-from blueprints.staff_activity import staff_activity_bp
-from blueprints.activity_logs import activity_logs_bp
-from blueprints.data_management import data_mgmt_bp
 from blueprints.crawl import crawl_bp
+from blueprints.dashboard import dashboard_bp
+from blueprints.data_management import data_mgmt_bp
+from blueprints.jobs import jobs_bp
+from blueprints.my_stuff import my_stuff_bp
+from blueprints.staff import staff_bp
+from blueprints.staff_activity import staff_activity_bp
+from blueprints.students import students_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(my_stuff_bp)

@@ -2,12 +2,9 @@
 
 import math
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
-from flask_login import current_user
 
 import crawler_client as db_data
 from crawler_client import CrawlerAPIError
-import backend_auth
-from backend_auth import BackendAuthError
 from utils.decorators import staff_required
 from constants import COMPANIES_PER_PAGE, PARTNERSHIP_POTENTIALS, CITIES_VN, CONTACT_STATUSES
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args

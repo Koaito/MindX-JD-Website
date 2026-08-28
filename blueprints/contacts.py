@@ -1,15 +1,14 @@
 """Contacts blueprint - company contact person management"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
-from flask_login import current_user
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
-from utils.decorators import staff_required
 from constants import CONTACT_STATUSES
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed
+from utils.decorators import staff_required
 
 contacts_bp = Blueprint("contacts", __name__)
 

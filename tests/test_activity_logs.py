@@ -7,10 +7,9 @@ update_note() đã chuyển sang dùng _call_authed chung — test dưới đây
 xác nhận ở CẤP ĐỘ ROUTE THẬT rằng bug đó không còn tái diễn.
 """
 
-import pytest
 
-from crawler_client import CrawlerAPIError
 from backend_auth import BackendAuthError
+from crawler_client import CrawlerAPIError
 
 
 def _mock_logs_deps(mocker, *, logs=None, total=0, companies=None, users=None):
@@ -140,7 +139,7 @@ class TestActivityLogsUpdateNote:
             follow_redirects=True,
         )
         assert resp.status_code == 200
-        assert "không có quyền".encode("utf-8") in resp.data or b"quy\xe1\xbb\x81n" in resp.data
+        assert "không có quyền".encode() in resp.data or b"quy\xe1\xbb\x81n" in resp.data
 
     def test_401_triggers_transparent_refresh_no_crash(self, staff_client, mocker):
         """CỐT LÕI của bug lịch sử: access token hết hạn ngay lúc sửa note

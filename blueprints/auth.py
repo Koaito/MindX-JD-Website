@@ -1,10 +1,10 @@
 """Authentication blueprint - register, login, logout, password management"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_user, logout_user, login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 
-from auth import BackendUser
 import backend_auth
+from auth import BackendUser
 from backend_auth import BackendAuthError
 from constants import INDUSTRIES
 from helpers import _auth_tokens_from_session, _clear_auth_tokens, _store_auth_tokens

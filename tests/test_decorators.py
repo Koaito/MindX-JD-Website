@@ -14,7 +14,6 @@ giả riêng, để test đi qua đúng decorator thật đang gắn trên bluep
 thật.
 """
 
-import pytest
 
 
 class TestStaffRequiredNotAuthenticated:

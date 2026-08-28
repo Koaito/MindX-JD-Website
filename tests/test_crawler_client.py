@@ -22,7 +22,6 @@ import pytest
 
 import crawler_client
 
-
 # ---------------------------------------------------------------------------
 # get_enums / get_level_codes — cache TTL 5 phút
 # ---------------------------------------------------------------------------
@@ -147,3 +146,94 @@ class TestMapSymmetry:
         backward = getattr(crawler_client, rev_name)
         for backend_code, vn_label in forward.items():
             assert backward[vn_label] == backend_code
+
+
+# ---------------------------------------------------------------------------
+# Re-export completeness — bug thật ĐÃ XẢY RA (08/2026): thêm hàm
+# update_company_potential() vào crawler_client/companies.py nhưng quên
+# thêm vào danh sách `from .companies import (...)` + __all__ ở
+# crawler_client/__init__.py -> mọi nơi gọi qua `db_data.update_company_
+# potential(...)` (cách gọi chuẩn của cả repo, xem docstring __init__.py)
+# ăn AttributeError ngay ở production, KHÔNG lỗi lúc import module — vì
+# `crawler_client.companies.update_company_potential` vẫn tồn tại bình
+# thường, chỉ là không được re-export lên `crawler_client`.
+#
+# __init__.py CỐ Ý liệt kê thủ công (không dùng `from .x import *`) để
+# tường minh/dễ đọc — đánh đổi là dễ quên 1 dòng khi thêm hàm mới. Test
+# dưới đây tự dò TOÀN BỘ hàm public (không bắt đầu bằng "_") khai báo Ở
+# CẤP MODULE (không tính hàm lồng bên trong hàm khác) của MỌI submodule
+# crawler_client/*.py, rồi assert từng hàm đó:
+#   1. Có mặt trong crawler_client.__all__
+#   2. `crawler_client.<tên>` trỏ ĐÚNG object hàm đó (không phải bị hàm
+#      cùng tên ở submodule khác ghi đè nhầm)
+# Không cần thêm dòng nào ở đây khi thêm hàm public mới — test tự quét
+# lại toàn bộ package mỗi lần chạy CI, sẽ đỏ ngay nếu ai quên re-export,
+# thay vì đợi user bấm nút và ăn 500 ở production như lần trước.
+# ---------------------------------------------------------------------------
+
+import ast
+import importlib
+import pathlib
+
+_CRAWLER_CLIENT_DIR = pathlib.Path(crawler_client.__file__).parent
+
+# Submodule nào KHÔNG cần dò (không phải "domain" thật, hoặc __init__.py
+# tự chủ động KHÔNG re-export toàn bộ — hiện chưa có case nào, để trống
+# sẵn cho tương lai nếu phát sinh 1 submodule nội bộ thuần túy).
+_SKIP_SUBMODULES = {"__init__"}
+
+
+def _public_toplevel_functions(py_file: pathlib.Path) -> list[str]:
+    """Trả về tên mọi function/class khai báo Ở CẤP MODULE (không lồng
+    trong hàm/class khác) trong 1 file .py, bỏ qua tên bắt đầu bằng "_"
+    (helper nội bộ, không kỳ vọng phải export ra ngoài submodule)."""
+    tree = ast.parse(py_file.read_text(encoding="utf-8"))
+    names = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if not node.name.startswith("_"):
+                names.append(node.name)
+    return names
+
+
+def _all_domain_submodules() -> list[str]:
+    return sorted(
+        p.stem for p in _CRAWLER_CLIENT_DIR.glob("*.py")
+        if p.stem not in _SKIP_SUBMODULES
+    )
+
+
+class TestReExportCompleteness:
+    @pytest.mark.parametrize("submodule_name", _all_domain_submodules())
+    def test_every_public_function_is_reexported(self, submodule_name):
+        py_file = _CRAWLER_CLIENT_DIR / f"{submodule_name}.py"
+        public_names = _public_toplevel_functions(py_file)
+        if not public_names:
+            pytest.skip(f"{submodule_name}.py không có hàm/class public cấp module.")
+
+        submodule = importlib.import_module(f"crawler_client.{submodule_name}")
+        missing_from_all = []
+        missing_from_package = []
+        wrong_object = []
+
+        for name in public_names:
+            if name not in crawler_client.__all__:
+                missing_from_all.append(name)
+            if not hasattr(crawler_client, name):
+                missing_from_package.append(name)
+            elif getattr(crawler_client, name) is not getattr(submodule, name):
+                wrong_object.append(name)
+
+        assert not missing_from_all, (
+            f"crawler_client/{submodule_name}.py có hàm public chưa thêm vào "
+            f"__all__ ở crawler_client/__init__.py: {missing_from_all}"
+        )
+        assert not missing_from_package, (
+            f"crawler_client/{submodule_name}.py có hàm public chưa `from ."
+            f"{submodule_name} import ...` ở crawler_client/__init__.py: "
+            f"{missing_from_package}"
+        )
+        assert not wrong_object, (
+            f"crawler_client.<tên> đang trỏ NHẦM object khác (đụng tên với "
+            f"submodule khác) cho: {wrong_object} (từ {submodule_name}.py)"
+        )

@@ -1,15 +1,16 @@
 """Dashboard blueprint - team SS homepage with insights"""
 
 from datetime import date
-from flask import Blueprint, render_template, flash, request
 
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
+from flask import Blueprint, flash, render_template, request
+
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
-from utils.decorators import staff_required
 from constants import INDUSTRIES, JOB_STATUSES
-from helpers import _auth_tokens_from_session, _parse_any_date, _jobs_by_month, now_vn
+from crawler_client import CrawlerAPIError
+from helpers import _auth_tokens_from_session, _jobs_by_month, _parse_any_date, now_vn
+from utils.decorators import staff_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
 

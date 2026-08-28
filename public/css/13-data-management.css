@@ -12,7 +12,6 @@
 
 .dm-entity-tab {
   padding: 8px 16px;
-  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--ink-soft);
@@ -176,10 +175,8 @@
 .dm-tag {
   display: inline-block;
   padding: 3px 9px;
-  border-radius: 999px;
   font-size: 11.5px;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .dm-tag-new { background: #E4F3E9; color: #2E8B57; }
@@ -610,7 +607,6 @@
   font-weight: 600;
   background: var(--teal-soft);
   padding: 2px 8px;
-  border-radius: 999px;
 }
 
 .dm-modal-create-new {

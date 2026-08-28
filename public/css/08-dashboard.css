@@ -157,7 +157,6 @@
   font-size: 11.5px;
   font-weight: 600;
   padding: 1px 7px;
-  border-radius: 999px;
   margin-left: 6px;
 }
 
@@ -175,10 +174,8 @@
   font-size: 11px;
   font-weight: 600;
   padding: 3px 9px;
-  border-radius: 999px;
   background: var(--amber-soft);
   color: var(--amber);
-  white-space: nowrap;
 }
 
 /* ---------------- Phân trang client-side (app.js: initClientListPagination) ---------------- */

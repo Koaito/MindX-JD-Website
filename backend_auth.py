@@ -22,6 +22,7 @@ tiếng Việt, sẵn sàng flash cho user.
 """
 
 import os
+
 import requests
 
 CRAWLER_API_URL = os.environ.get("CRAWLER_API_URL", "https://scrap-jd-api.onrender.com").rstrip("/")

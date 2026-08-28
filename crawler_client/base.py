@@ -62,8 +62,8 @@ gán contact. TUỲ CHỌN (None hợp lệ) cho: sửa/xoá JD, sửa company, 
 contact.
 """
 
-import os
 import logging
+import os
 
 import requests
 

@@ -1,13 +1,14 @@
 """Staff Activity blueprint - monitor team SS member activities"""
 
-from flask import Blueprint, render_template, redirect, url_for, flash, abort
-from utils.decorators import staff_required
+from flask import Blueprint, abort, flash, render_template
+
 import backend_auth
-from backend_auth import BackendAuthError
 import crawler_client as db_data
-from crawler_client import CrawlerAPIError
+from backend_auth import BackendAuthError
 from constants import CONTACT_STATUSES
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session
+from utils.decorators import staff_required
 
 staff_activity_bp = Blueprint("staff_activity", __name__)
 

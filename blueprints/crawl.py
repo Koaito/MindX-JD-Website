@@ -28,20 +28,20 @@ cũ, sống bền qua restart server."""
 
 import math
 
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
-from flask_login import current_user
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
 import backend_auth
-from backend_auth import BackendAuthError
 import crawler_client as db_data
-from crawler_client import CrawlerAPIError
-from utils.decorators import admin_required
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from backend_auth import BackendAuthError
+
 # Tab "status" (Tình trạng dữ liệu) CHỈ ĐỌC, không có route riêng nào
 # đăng ký vào crawl_bp -> import thẳng ở đầu file được (khác
 # blueprints.crawl_maintenance phải import trễ ở cuối file vì file đó
 # cần import ngược crawl_bp, xem docstring cuối file này).
 from blueprints.crawl_status import _status_tab_context
+from crawler_client import CrawlerAPIError
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from utils.decorators import admin_required
 
 crawl_bp = Blueprint("crawl", __name__)
 
@@ -152,8 +152,7 @@ def index():
         runs = result["items"]
         total_runs = result["total"]
         total_pages = max(1, math.ceil(total_runs / per_page))
-        if page > total_pages:
-            page = total_pages
+        page = min(page, total_pages)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         runs, total_runs, total_pages, page, per_page = [], 0, 1, 1, 30
@@ -342,4 +341,4 @@ def latest_log_run():
 # crawl_bp đã được gán (dòng 21) — crawl_maintenance.py làm
 # `from blueprints.crawl import crawl_bp`, đặt import này ở ĐẦU file sẽ
 # vỡ vì crawl_bp chưa tồn tại lúc đó.
-from blueprints import crawl_maintenance  # noqa: E402,F401
+from blueprints import crawl_maintenance  # noqa: F401

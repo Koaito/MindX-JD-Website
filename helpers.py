@@ -16,7 +16,7 @@ Gom về đây để chỉ có DUY NHẤT 1 bản mỗi hàm — sửa 1 nơi, c
 toàn bộ app.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from flask import request, session
@@ -25,7 +25,6 @@ from markupsafe import Markup, escape
 import backend_auth
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
-
 
 # ---------------------------------------------------------------------------
 # Giờ Việt Nam (thêm 08/2026 — báo lỗi "giờ trên web bị lệch")
@@ -104,8 +103,7 @@ def _paginate_args(default_per_page):
         page = int(request.args.get("page", 1))
     except (TypeError, ValueError):
         page = 1
-    if page < 1:
-        page = 1
+    page = max(page, 1)
     return page, default_per_page
 
 
@@ -214,5 +212,5 @@ def to_bullets(value):
     lines = [ln for ln in lines if ln]
     if len(lines) <= 1:
         return Markup("<p>{}</p>").format(value)
-    items = "".join("<li>{}</li>".format(escape(ln)) for ln in lines)
+    items = "".join(f"<li>{escape(ln)}</li>" for ln in lines)
     return Markup("<ul class=\"jd-bullets\">{}</ul>").format(Markup(items))

@@ -19,8 +19,6 @@ suggestion/duplicate check):
 
 import io
 
-import pytest
-
 from crawler_client import CrawlerAPIError
 
 

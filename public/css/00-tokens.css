@@ -166,6 +166,43 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
+/* ============================================================
+   PILL/BADGE DÙNG CHUNG (thêm 08/2026) — trước đây border-radius:999px
+   (hình viên thuốc) + white-space:nowrap được khai báo LẶP LẠI riêng lẻ
+   ở ~16 class chip/badge/tag rải rác 8 file CSS khác nhau (04, 05, 07,
+   08, 13, 14, 15). Hậu quả THẬT ĐÃ XẢY RA 2 LẦN trong cùng 1 đợt sửa:
+   sửa .ticket-industry (badge ngành ở job card) bị xuống dòng, tưởng
+   xong, hôm sau .fit-chip (chip "Chưa đánh giá" ở bảng công ty) bị y
+   hệt lỗi đó — vì đây là 2 khai báo ĐỘC LẬP, sửa 1 chỗ không tự sửa
+   chỗ kia.
+
+   Gom về đây: MỌI class chip/badge/tag hình viên thuốc liệt kê chung 1
+   selector list, dùng chung border-radius + white-space + font-weight.
+   Từng file CSS domain (04/05/07/08/13/14/15) CHỈ còn giữ lại phần đặc
+   thù của mình (màu nền/chữ, font-size, padding — vì các chip to nhỏ
+   khác nhau tuỳ chỗ dùng). Thêm 1 chip/badge MỚI ở đâu đó trong tương
+   lai? Thêm tên class vào danh sách dưới đây (1 dòng), KHÔNG viết lại
+   3 dòng border-radius/white-space/font-weight ở file domain riêng —
+   nếu quên thêm vào đây thì chip mới vẫn có nguy cơ bị xuống dòng y
+   hệt 2 lần trước, nên đây là nơi DUY NHẤT cần nhớ khi thêm chip mới. */
+.ticket-industry,
+.ticket-level,
+.status-chip,
+.fit-chip,
+.role-chip,
+.you-badge,
+.potential-suggestion,
+.pct-badge,
+.reason-tag,
+.dm-entity-tab,
+.dm-tag,
+.dm-modal-suggestion-score,
+.et-suggested-tag,
+.crawl-live-widget-count {
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;

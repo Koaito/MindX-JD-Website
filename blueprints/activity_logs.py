@@ -1,13 +1,15 @@
 """Activity Logs blueprint - system-wide activity tracking"""
 
 import math
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from utils.decorators import staff_required
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from utils.decorators import staff_required
 
 activity_logs_bp = Blueprint("activity_logs", __name__)
 
@@ -45,8 +47,7 @@ def logs():
         logs = result["items"]
         total_logs = result["total"]
         total_pages = max(1, math.ceil(total_logs / per_page))
-        if page > total_pages:
-            page = total_pages
+        page = min(page, total_pages)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         logs, total_logs, total_pages, page = [], 0, 1, 1

@@ -1,11 +1,12 @@
 """Students blueprint - student activity monitoring and CV download"""
 
-from flask import Blueprint, render_template, redirect, request, url_for, flash, abort
-from flask_login import login_required, current_user
-from utils.decorators import staff_required
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
 import backend_auth
 from backend_auth import BackendAuthError
 from helpers import _auth_tokens_from_session
+from utils.decorators import staff_required
 
 students_bp = Blueprint("students", __name__)
 

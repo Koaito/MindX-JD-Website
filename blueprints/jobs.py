@@ -2,19 +2,26 @@
 
 import math
 from types import SimpleNamespace
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
-from utils.decorators import staff_required
 from constants import (
-    INDUSTRIES, LOCATIONS, JOB_STATUSES, JOBS_PER_PAGE,
-    WORK_TYPES, SALARY_TYPES, SALARY_PERIODS, CITIES_VN,
+    CITIES_VN,
+    INDUSTRIES,
+    JOB_STATUSES,
+    JOBS_PER_PAGE,
+    LOCATIONS,
+    SALARY_PERIODS,
+    SALARY_TYPES,
+    WORK_TYPES,
 )
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from utils.decorators import staff_required
 
 jobs_bp = Blueprint("jobs", __name__)
 
@@ -66,8 +73,7 @@ def index():
     try:
         total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status_filter)
         total_pages = max(1, math.ceil(total_jobs / per_page))
-        if page > total_pages:
-            page = total_pages
+        page = min(page, total_pages)
         jobs = db_data.list_jobs(
             q=q, industry=industry, level=level, location=location, status=status_filter,
             limit=per_page, offset=(page - 1) * per_page,

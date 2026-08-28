@@ -1,12 +1,21 @@
 """My Stuff blueprint - student's saved jobs and applications"""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
-from flask_login import login_required, current_user
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required
 
-import crawler_client as db_data
-from crawler_client import CrawlerAPIError
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session
 
 my_stuff_bp = Blueprint("my_stuff", __name__)

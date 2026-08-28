@@ -18,19 +18,19 @@ sql/migration_add_maintenance_runs.sql phía backend)."""
 
 import math
 
-from flask import jsonify, render_template, request, redirect, url_for, flash
+from flask import flash, jsonify, redirect, request, url_for
 
 import backend_auth
-from backend_auth import BackendAuthError
 import crawler_client as db_data
-from crawler_client import CrawlerAPIError
-from utils.decorators import admin_required
-from helpers import _call_authed, _paginate_args, _auth_tokens_from_session
+from backend_auth import BackendAuthError
 
 # Import trễ để tránh vòng lặp import thật sự (crawl.py import module
 # này ở CUỐI file, sau khi crawl_bp đã tồn tại) — xem docstring cuối
 # blueprints/crawl.py.
 from blueprints.crawl import crawl_bp
+from crawler_client import CrawlerAPIError
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from utils.decorators import admin_required
 
 
 def _active_maintenance_runs() -> dict:
@@ -83,8 +83,7 @@ def _maintenance_tab_context() -> dict:
         runs = result["items"]
         total_runs = result["total"]
         total_pages = max(1, math.ceil(total_runs / per_page))
-        if page > total_pages:
-            page = total_pages
+        page = min(page, total_pages)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         runs, total_runs, total_pages, page, per_page = [], 0, 1, 1, 30

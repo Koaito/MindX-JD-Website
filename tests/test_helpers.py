@@ -11,10 +11,9 @@ from datetime import date
 import pytest
 from markupsafe import Markup
 
-from crawler_client import CrawlerAPIError
-from backend_auth import BackendAuthError
 import helpers
-
+from backend_auth import BackendAuthError
+from crawler_client import CrawlerAPIError
 
 # ---------------------------------------------------------------------------
 # parse_date
