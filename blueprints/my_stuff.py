@@ -68,6 +68,9 @@ def job_toggle_save_json(job_id):
 @my_stuff_bp.route("/saved-jobs")
 @login_required
 def saved_jobs():
+    if current_user.is_staff:
+        return redirect(url_for("dashboard.index"))
+
     access_token, _ = _auth_tokens_from_session()
     try:
         saved = backend_auth.list_my_saved_jobs(access_token)
