@@ -22,6 +22,35 @@
   margin-bottom: 24px;
 }
 
+/* 08/2026 (yêu cầu "card form Sửa mẫu email to ra 150% chiều ngang hiện
+   tại"): .form-card vốn KHÔNG có max-width riêng — nó đã lấp đầy 100%
+   .content (là 1fr trong CSS Grid .shell, cạnh sidebar), tức đã ở mức
+   rộng tối đa có sẵn. Không thể set width:150% ngay trên .et-manager-
+   form vì % width luôn tính theo PARENT của chính nó — muốn "150% so
+   với bề rộng hiện tại của chính nó" phải tách ra 1 wrapper cha
+   (.et-manager-form-scroll) giữ nguyên bề rộng như cũ (100% khu vực
+   sẵn có), rồi set width:150% NGAY TRÊN .et-manager-form bên trong
+   wrapper đó — lúc này % sẽ tính theo bề rộng wrapper = đúng bề rộng
+   "hiện tại" của card trước khi phóng to.
+
+   Card phóng to sẽ tràn ra ngoài khu vực nội dung bình thường — cho
+   overflow-x: auto NGAY TẠI wrapper này (không phải toàn trang) để chỉ
+   khu vực form cuộn ngang khi cần, không kéo cả trang bị thanh cuộn
+   ngang xấu. Kết hợp thêm --sidebar-width giảm 90% chỉ trên trang này
+   (xem :root:has(#et-manager-form) ở 00-tokens.css) để nhường thêm ít
+   không gian, giảm bớt phần phải cuộn. */
+.et-manager-form-scroll {
+  overflow-x: auto;
+  /* Padding-bottom nhỏ để thanh cuộn ngang (nếu xuất hiện) không dính
+     sát vào card, dễ nhìn hơn. */
+  padding-bottom: 4px;
+}
+
+.et-manager-form {
+  width: 110%;
+  max-width: 110%;
+}
+
 .et-manager-form h3 {
   margin: 0 0 12px;
   font-family: var(--font-display);
@@ -102,7 +131,13 @@
 
 .et-manager-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* 08/2026 (yêu cầu "mở rộng card mẫu email theo chiều ngang thêm
+     100%"): 280px -> 560px, gấp đôi bề rộng tối thiểu mỗi card. Card
+     tự co giãn theo 1fr như cũ, chỉ đổi ngưỡng auto-fill xuống ít cột
+     hơn trên cùng 1 bề rộng màn hình (vd 2 cột -> 1 cột ở màn hình
+     thường, xem 10-pagination-responsive.css nếu cần chỉnh breakpoint
+     kèm theo). */
+  grid-template-columns: repeat(auto-fill, minmax(560px, 1fr));
   gap: 16px;
 }
 

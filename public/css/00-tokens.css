@@ -113,6 +113,17 @@ html.sidebar-collapsed {
   --sidebar-width: 76px;
 }
 
+/* 08/2026 (đi kèm .et-manager-form width:150% ở 16-email-template-
+   manager.css) — nhường thêm chút không gian ngang cho trang /contacts
+   (nơi duy nhất có #et-manager-form trong DOM, kể cả khi đang ẩn),
+   giảm bớt phần card phải cuộn ngang. CHỈ áp dụng cho state sidebar
+   bình thường — bỏ qua khi đã .sidebar-collapsed (76px, không cần thu
+   nhỏ thêm nữa). Dùng :has() để scope đúng 1 trang, không đụng
+   --sidebar-width của toàn bộ site. */
+:root:has(#et-manager-form):not(.sidebar-collapsed) {
+  --sidebar-width: 223px; /* 248px * 90% */
+}
+
 * { box-sizing: border-box; }
 
 /* 08/2026 (theo yêu cầu thảo luận: "100% giống hệt 90% hiện tại")
