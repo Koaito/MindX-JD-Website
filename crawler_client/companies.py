@@ -3,6 +3,7 @@ backend -> field template đang dùng."""
 
 from .base import _request
 from .jobs import _normalize_job
+from .data_health import count_missing_fields
 
 # Đánh giá tiềm năng hợp tác của company — staff tự chấm tay qua UI add/edit
 # company (xem sql/migration_add_partnership_potential.sql). UNVERIFIED =
@@ -149,27 +150,10 @@ def company_field_health(companies):
     fetch riêng — tránh gọi API lặp lại nhiều lần cho cùng 1 lần render
     trang.
 
-    "Thiếu" = giá trị rỗng/None sau chuẩn hoá — _normalize_company() đã
-    quy None -> "" cho mọi field ở đây nên chỉ cần check falsy, không
-    cần phân biệt None với "".
-
-    Trả về list dict theo ĐÚNG thứ tự COMPANY_HEALTH_FIELDS (không sort
-    theo % thiếu) để UI ổn định, dễ quét mắt qua nhiều lần load — sort
-    theo mức độ thiếu nhiều/ít nếu cần sẽ để phía template/JS tự làm.
+    Logic đếm thật sự nằm ở count_missing_fields() (data_health.py) —
+    dùng CHUNG với job_field_health() (jobs.py), xem docstring ở đó.
     """
-    total = len(companies)
-    rows = []
-    for field, label in COMPANY_HEALTH_FIELDS:
-        missing = sum(1 for c in companies if not c.get(field))
-        pct_missing = round(missing / total * 100) if total else 0
-        rows.append({
-            "field": field,
-            "label": label,
-            "missing": missing,
-            "total": total,
-            "pct_missing": pct_missing,
-        })
-    return rows
+    return count_missing_fields(companies, COMPANY_HEALTH_FIELDS)
 
 
 def get_company(company_id):

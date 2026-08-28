@@ -2,6 +2,40 @@
 template đang dùng."""
 
 from .base import _request
+from .data_health import count_missing_fields
+
+# Field nào tính vào thống kê "thiếu dữ liệu" ở tab Tình trạng dữ liệu
+# (blueprints/crawl_status.py) — chỉ chọn field NỘI DUNG (job content
+# thật sự cần cho học viên đọc/ứng tuyển), KHÔNG đưa vào field crawl
+# metadata (source, jd_link, date_collected...) hay field luôn có sẵn
+# do backend set mặc định (industry/level/location/work_type — crawl
+# tự gán, status luôn có OPEN/CLOSED). Có thể bớt/thêm field sau này —
+# chỉ cần sửa list này, không đụng logic đếm (count_missing_fields ở
+# data_health.py).
+#
+# "salary" xử lý RIÊNG bằng predicate thay vì check field "salary" (chuỗi
+# hiển thị) vì _fmt_salary() LUÔN trả về ít nhất "Thỏa thuận" khi rỗng —
+# never falsy nên check thẳng sẽ không bao giờ bắt được job thiếu lương.
+# "Thiếu lương" đúng nghĩa = CẢ salary_min LẪN salary_max đều rỗng.
+JOB_HEALTH_FIELDS = [
+    ("skills", "Kỹ năng"),
+    ("requirements", "Yêu cầu công việc"),
+    ("benefits", "Phúc lợi"),
+    ("description", "Mô tả công việc"),
+    ("deadline", "Hạn nộp"),
+    ("salary", "Lương", lambda j: not j.get("salary_min") and not j.get("salary_max")),
+]
+
+
+def job_field_health(jobs):
+    """Đếm số job thiếu (rỗng) từng field trong JOB_HEALTH_FIELDS.
+
+    Nhận sẵn list job đã _normalize_job() — cùng nguyên tắc
+    company_field_health() (companies.py): nơi gọi (crawl_status.py) tự
+    quyết định lấy job từ đâu, hàm này không tự fetch. Logic đếm thật
+    sự dùng CHUNG count_missing_fields() (data_health.py) với company.
+    """
+    return count_missing_fields(jobs, JOB_HEALTH_FIELDS)
 
 # ---------------------------------------------------------------------------
 # Bảng ánh xạ VN <-> mã backend — form/hiển thị dùng tiếng Việt, request gửi

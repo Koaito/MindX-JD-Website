@@ -57,7 +57,10 @@ from .jobs import (
     create_job,
     update_job,
     update_job_status,
+    JOB_HEALTH_FIELDS,
+    job_field_health,
 )
+from .data_health import count_missing_fields
 from .companies import (
     PARTNERSHIP_POTENTIAL_MAP,
     PARTNERSHIP_POTENTIAL_MAP_REV,
@@ -183,6 +186,9 @@ __all__ = [
     "create_job",
     "update_job",
     "update_job_status",
+    "JOB_HEALTH_FIELDS",
+    "job_field_health",
+    "count_missing_fields",
     "PARTNERSHIP_POTENTIAL_MAP",
     "PARTNERSHIP_POTENTIAL_MAP_REV",
     "list_companies",

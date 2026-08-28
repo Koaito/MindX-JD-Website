@@ -595,3 +595,13 @@
     max-width: none;
   }
 }
+
+/* Tab "Tình trạng dữ liệu" (_status_tab.html, 08/2026). Tiêu đề mỗi
+   khối ("Company/Job đang thiếu dữ liệu...") to GẤP ĐÔI mặc định
+   .card h4 (14px, xem 06-detail-page.css) — dùng class riêng thay vì
+   sửa .card h4 toàn cục vì .card h4 đang dùng chung ở nhiều trang khác
+   (job_detail.html, company_detail.html...), sửa thẳng sẽ ảnh hưởng
+   ngoài ý muốn tới các trang đó. */
+.status-card-title {
+  font-size: 28px;
+}
