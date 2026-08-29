@@ -105,6 +105,7 @@
         <form method="post" action="{{ url_for('my_stuff.job_toggle_save', job_id=job.id) }}"
               class="save-job-form" data-json-action="{{ url_for('my_stuff.job_toggle_save_json', job_id=job.id) }}"
               data-saved-label="🔖 Đã lưu" data-unsaved-label="🔖 Lưu job">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
             {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
           </button>

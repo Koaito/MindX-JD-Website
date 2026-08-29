@@ -68,6 +68,7 @@
           {% include "_contact_email_template_button.html" with context %}
           <a class="btn btn-text" href="{{ url_for('contacts.edit', company_id=c.company_id, contact_id=c.id) }}">Sửa</a>
           <form method="post" action="{{ url_for('contacts.delete', company_id=c.company_id, contact_id=c.id) }}" onsubmit="return confirm('Xoá người liên hệ này? (Có thể xem lại ở trang công ty, chưa mất hẳn dữ liệu)');" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
           </form>
         </td>

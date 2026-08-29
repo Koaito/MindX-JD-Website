@@ -9,6 +9,7 @@
     <p class="lede">Tạo tài khoản để lưu job yêu thích và theo dõi cơ hội việc làm phù hợp với bạn.</p>
 
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Họ và tên *
         <input type="text" name="full_name" value="{{ form.get('full_name', '') }}" required>
       </label>

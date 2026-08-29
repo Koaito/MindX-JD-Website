@@ -25,6 +25,7 @@
        code, chỉ không còn form nào ở trang này gọi tới nữa. #}
     <form method="post" action="{{ url_for('crawl.trigger_batch') }}"
           class="form-grid form-card crawl-batch-form" data-source="{{ source }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="source" value="{{ source }}">
       <div class="crawl-category-field">
         <div class="crawl-category-head">

@@ -13,6 +13,7 @@
 </header>
 
 <form class="form-card" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="form-grid">
     <label class="span-2">Tên công ty *
       <input type="text" name="company" required value="{{ company.company if company else '' }}">

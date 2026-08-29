@@ -35,6 +35,7 @@
 
     <form method="post" action="{{ url_for('crawl.maintenance_trigger', job_type=jt) }}"
           class="form-grid form-card maint-trigger-form" data-job-type="{{ jt }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="span-2">
         Giới hạn (limit)
         {% if jt in require_limit_job_types %}

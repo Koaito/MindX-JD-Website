@@ -24,6 +24,7 @@
   <summary class="btn btn-text" style="cursor:pointer;">{{ c.status or '— Chưa rõ —' }}</summary>
   <form method="post" action="{{ url_for('contacts.update_status', company_id=c.company_id, contact_id=c.id) }}"
         style="margin-top:6px;display:flex;gap:6px;flex-direction:column;min-width:200px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="{{ next_url }}">
     <select name="status">
       {% for s in statuses %}

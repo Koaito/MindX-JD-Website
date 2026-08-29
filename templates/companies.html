@@ -87,6 +87,7 @@
               {% endif %}
             </summary>
             <form method="post" action="{{ url_for('companies.update_potential', company_id=c.id) }}" class="potential-edit-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <select name="partnership_potential">
                 {% for p in partnership_potentials %}

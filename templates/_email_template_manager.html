@@ -36,6 +36,7 @@
   {% endif %}
 
   <form method="post" action="{{ url_for('contacts.email_template_edit', template_id=editing.id) if editing else url_for('contacts.email_template_add') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
       <label class="span-3">Tiêu đề mẫu *
         <input type="text" name="title" required maxlength="255" value="{{ editing.title if editing else '' }}">
@@ -93,6 +94,7 @@
     <div class="et-manager-card-actions">
       <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly', edit=tpl.id) }}#et-manager-form">Sửa</a>
       <form method="post" action="{{ url_for('contacts.email_template_delete', template_id=tpl.id) }}" onsubmit="return et_confirmDelete(this);" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="note" value="">
         <button class="btn btn-text btn-danger-text" type="submit">Xóa</button>
       </form>

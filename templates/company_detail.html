@@ -25,6 +25,7 @@
   <form method="post" action="{{ url_for('companies.delete', company_id=company.id) }}"
         onsubmit="return confirm('Xoá công ty này? (Xoá mềm — JD và người liên hệ liên quan vẫn giữ nguyên, có thể xem lại ở Lịch sử thao tác)');"
         style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <textarea name="note" required rows="2" placeholder="Lý do xoá công ty này — bắt buộc…" style="flex:1;min-width:220px;"></textarea>
     <button class="btn btn-danger" type="submit">Xác nhận xoá</button>
   </form>
@@ -109,6 +110,7 @@
                 <td class="muted">{{ c.phone or '—' }}</td>
                 <td>
                   <form method="post" action="{{ url_for('contacts.hard_delete', company_id=company.id, contact_id=c.id) }}" onsubmit="return confirm('Xoá HẲN người liên hệ này? Không thể khôi phục lại được.');" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="btn btn-text btn-danger-text" type="submit">Xoá hẳn</button>
                   </form>
                 </td>
@@ -143,6 +145,7 @@
     <h3>Xóa người liên hệ</h3>
     <p id="deleteContactName" style="margin: 12px 0;"></p>
     <form method="post" id="deleteContactForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label style="display:block; margin-bottom:12px;">
         <strong>Lý do xoá (bắt buộc)</strong>
         <textarea name="note" required rows="3" placeholder="Nhập lý do xoá người liên hệ này…" style="width:100%; margin-top:6px;"></textarea>

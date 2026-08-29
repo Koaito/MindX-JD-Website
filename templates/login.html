@@ -9,6 +9,7 @@
     <p class="lede">Đăng nhập để lưu job yêu thích và quản lý danh sách ứng tuyển của bạn.</p>
 
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Email
         <input type="email" name="email" value="{{ resend_email or '' }}" required autofocus>
       </label>
@@ -22,6 +23,7 @@
 
     {% if show_resend %}
     <form method="post" action="{{ url_for('auth.resend_verification') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="email" value="{{ resend_email }}">
       <button class="btn btn-ghost btn-block" type="submit">Gửi lại email xác thực</button>
     </form>

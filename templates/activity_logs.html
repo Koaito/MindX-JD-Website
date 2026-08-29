@@ -153,7 +153,8 @@
    vừa bấm để bơm vào <form> bên trong, KHÔNG render N modal ẩn sẵn cho
    N dòng.
 
-   Vẫn là <form method="post"> submit thật (không AJAX) — giữ NGUYÊN
+   Vẫn là <form method="post">
+   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> submit thật (không AJAX) — giữ NGUYÊN
    hành vi backend hiện có (route update_note() trả redirect + flash,
    không trả JSON) để không phải sửa gì phía blueprints/activity_logs.py.
    Textarea (thay vì input 1 dòng như prompt() cũ) — note vốn đã hỗ trợ
@@ -166,6 +167,7 @@
       <button type="button" class="note-modal-close" id="note-modal-close" aria-label="Đóng">×</button>
     </div>
     <form method="post" id="note-modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <textarea name="note" id="note-modal-textarea" rows="5" placeholder="Nhập ghi chú…"></textarea>
       <div class="note-modal-actions">
         <button type="button" class="btn btn-ghost" id="note-modal-cancel">Huỷ</button>

@@ -9,6 +9,7 @@
 
     <form method="post" enctype="multipart/form-data"
           action="{{ url_for('data_mgmt.import_preview', entity_type=entity_type) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="dm-file-label">
         <span>Chọn file (.csv, .xlsx)</span>
         <input type="file" name="file" accept=".csv,.xlsx" required>
@@ -87,6 +88,7 @@
 
   <form method="post" id="dm-confirm-form"
         action="{{ url_for('data_mgmt.import_confirm', entity_type=entity_type) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="preview_id" value="{{ preview.preview_id }}">
     <input type="hidden" name="resolutions" id="dm-resolutions-input" value="[]">
 
@@ -598,6 +600,7 @@
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": window.getCsrfToken(),
       },
       body: JSON.stringify({
         preview_id: previewId, row_index: rowIndex, field_name: field, value: value,
@@ -714,6 +717,7 @@
         headers: {
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": window.getCsrfToken(),
         },
         body: JSON.stringify({
           preview_id: previewId, row_index: rowIndex, company_id: companyId,

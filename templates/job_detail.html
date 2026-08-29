@@ -64,6 +64,7 @@
     <section class="card">
       <h4>Cập nhật trạng thái</h4>
       <form method="post" action="{{ url_for('jobs.update_status', job_id=job.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <select name="status">
           {% for s in statuses %}
             <option value="{{ s }}" {{ 'selected' if job.status == s }}>{{ s }}</option>
@@ -131,6 +132,7 @@
         <form method="post" action="{{ url_for('my_stuff.job_toggle_save', job_id=job.id) }}" style="margin-top: 8px;"
               class="save-job-form" data-json-action="{{ url_for('my_stuff.job_toggle_save_json', job_id=job.id) }}"
               data-saved-label="🔖 Bỏ lưu job này" data-unsaved-label="🔖 Lưu job này" data-swap-emphasis="true">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn {{ 'btn-primary' if job.id not in saved_job_ids else 'btn-ghost' }} btn-block" type="submit">
             {{ '🔖 Lưu job này' if job.id not in saved_job_ids else '🔖 Bỏ lưu job này' }}
           </button>
@@ -164,6 +166,7 @@
     <h3>Cập nhật trạng thái job</h3>
     <p style="margin: 12px 0;">Đổi trạng thái job <strong>"{{ job.position }}"</strong></p>
     <form method="post" id="jobStatusForm" action="{{ url_for('jobs.update_status', job_id=job.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="status" id="jobStatusInput">
       <label style="display:block; margin-bottom:12px;">
         <strong>Ghi chú (không bắt buộc)</strong>
@@ -183,6 +186,7 @@
     <h3>Đóng job</h3>
     <p id="jobDeleteName" style="margin: 12px 0;"></p>
     <form method="post" id="jobDeleteForm" action="{{ url_for('jobs.delete', job_id=job.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label style="display:block; margin-bottom:12px;">
         <strong>Lý do đóng job (không bắt buộc)</strong>
         <textarea name="activity_note" rows="3" placeholder="Nhập lý do đóng job này…" style="width:100%; margin-top:6px;"></textarea>
@@ -201,6 +205,7 @@
     <h3>Nộp hồ sơ ứng tuyển</h3>
     <p style="margin: 8px 0 16px;">Vị trí: <strong>{{ job.position }}</strong> — {{ job.company }}</p>
     <form method="post" action="{{ url_for('my_stuff.job_apply', job_id=job.id) }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label style="display:block; margin-bottom:12px;">
         <strong>File CV của bạn (PDF) <span style="color:#d9534f;">*</span></strong>
         <input type="file" name="cv_file" accept=".pdf" required style="width:100%; margin-top:6px; padding:6px 0;">
@@ -227,6 +232,7 @@
       CV đã nộp sẽ bị xoá khỏi hệ thống, bạn có thể ứng tuyển lại sau nếu đổi ý.
     </p>
     <form method="post" action="{{ url_for('my_stuff.job_withdraw', job_id=job.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label style="display:block; margin-bottom:16px;">
         <strong>Lý do huỷ (không bắt buộc)</strong>
         <textarea name="note" rows="3" placeholder="Cho Team SS biết vì sao bạn đổi ý, để team hỗ trợ tốt hơn lần sau…" style="width:100%; margin-top:6px;"></textarea>

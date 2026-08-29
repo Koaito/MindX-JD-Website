@@ -17,6 +17,7 @@
       <h1>Liên kết đã hết hạn</h1>
       <p class="lede">Link xác thực chỉ có hiệu lực trong 24 giờ. Nhập email đã đăng ký để nhận link mới.</p>
       <form method="post" action="{{ url_for('auth.resend_verification') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Email
           <input type="email" name="email" required autofocus>
         </label>

@@ -5,6 +5,22 @@
 (function () {
   "use strict";
 
+  // ---- CSRF token helper --------------------------------------------------
+  //
+  // Flask-WTF's CSRFProtect checks either the form field "csrf_token" (for
+  // normal <form> POSTs, already covered by the hidden input Jinja renders
+  // in every form) or the X-CSRFToken header (for fetch()/XHR POSTs, which
+  // never submit that hidden field). Reads the token from the <meta
+  // name="csrf-token"> tag rendered once in base.html <head>. Exposed on
+  // window because _dm_import.html's inline <script> (verify field /
+  // resolve duplicate company calls) runs in its own closure and can't see
+  // this function otherwise — same pattern as showToast() below.
+  function getCsrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute("content") : "";
+  }
+  window.getCsrfToken = getCsrfToken;
+
   // ---- Sidebar collapse/expand toggle -----------------------------------
   //
   // The actual class add happens synchronously in an inline <script> in
@@ -119,7 +135,7 @@
 
     fetch(jsonUrl, {
       method: "POST",
-      headers: { "X-Requested-With": "XMLHttpRequest" },
+      headers: { "X-Requested-With": "XMLHttpRequest", "X-CSRFToken": getCsrfToken() },
     })
       .then(function (res) {
         return res.json().then(function (data) {

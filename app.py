@@ -4,8 +4,10 @@ from env_loader import load_env_file
 
 load_env_file()
 
-from flask import Flask, render_template
+from flask import Flask, flash, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 
 import backend_auth
 import crawler_client as db_data
@@ -23,6 +25,18 @@ from helpers import (
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mindx-ss-dev-key")
+
+# Deploy trên Vercel luôn qua HTTPS — set tường minh thay vì trông chờ default
+# của Flask, để cookie session không bao giờ bị gửi qua kênh không mã hoá và
+# không bị gửi kèm request cross-site.
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# CSRF protection cho toàn bộ form POST (xem templates/*.html — mỗi form có
+# {{ csrf_token() }} hidden input) và các request fetch() POST bằng JS (gắn
+# header X-CSRFToken qua getCsrfToken(), đọc từ <meta name="csrf-token"> ở
+# base.html).
+csrf = CSRFProtect(app)
 
 login_manager = LoginManager(app)
 login_manager.login_view = "auth.login"
@@ -175,6 +189,15 @@ app.register_blueprint(crawl_bp)
 # tone: "muted" (404 — không có gì sai, chỉ là không tồn tại),
 #       "warn" (400/403 — cảnh báo, không phải hệ thống hỏng),
 #       "danger" (500 — thật sự có lỗi ở server).
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Token CSRF thiếu/hết hạn (session quá lâu không thao tác, hoặc mở lại
+    form từ tab cũ) — thay vì văng ra lỗi 400 khó hiểu, flash thông báo dễ
+    hiểu rồi quay lại trang trước để người dùng thử lại thao tác."""
+    flash("Phiên làm việc đã hết hạn, vui lòng thử lại.", "error")
+    return redirect(request.referrer or url_for("dashboard.index"))
 
 
 @app.errorhandler(400)

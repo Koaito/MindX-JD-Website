@@ -92,6 +92,7 @@
           {% else %}
             <div class="role-actions">
               <form method="post" action="{{ url_for('staff.update_role', ss_user_id=u.ss_user_id) }}" class="status-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <select name="role" onchange="this.form.submit()">
                   {% for r in roles %}
                     <option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ role_labels.get(r, r) }}</option>
@@ -99,6 +100,7 @@
                 </select>
               </form>
               <form method="post" action="{{ url_for('staff.update_active_status', ss_user_id=u.ss_user_id) }}" class="status-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if u.is_active %}
                   <input type="hidden" name="is_active" value="false">
                   <button type="submit" class="btn btn-text btn-danger-text"
