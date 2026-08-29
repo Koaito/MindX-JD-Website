@@ -28,6 +28,8 @@ cũ, sống bền qua restart server."""
 
 import math
 
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
 import backend_auth
@@ -40,7 +42,7 @@ from backend_auth import BackendAuthError
 # cần import ngược crawl_bp, xem docstring cuối file này).
 from blueprints.crawl_status import _status_tab_context
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _store_auth_tokens
 from utils.decorators import admin_required
 
 crawl_bp = Blueprint("crawl", __name__)
@@ -58,6 +60,14 @@ crawl_bp = Blueprint("crawl", __name__)
 # đủ để card CareerViet xuất hiện.
 _SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks", "careerviet": "CareerViet"}
 
+# Pool dùng chung để song song hoá vòng lặp per-source ở index() bên
+# dưới (thêm 08/2026) — max_workers=4 dư ra 1 so với 3 nguồn hiện có
+# (_SOURCE_LABELS) để thêm nguồn mới sau này (đội "đa dạng hoá nguồn
+# crawl" đang có kế hoạch, xem lịch sử trao đổi) không cần sửa số này
+# ngay lập tức mới chạy đúng — vẫn nên rà lại nếu số nguồn tăng nhiều
+# hơn nữa. Tạo 1 lần ở module-level, không tạo mới mỗi request.
+_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="crawl-io")
+
 
 def _active_run_for_source(source):
     """Trả dict crawl_run đang 'running' hoặc 'queued' cho 1 nguồn (ưu
@@ -72,6 +82,56 @@ def _active_run_for_source(source):
         if result["items"]:
             return result["items"][0]
     return None
+
+
+def _source_active_state(source, access_token):
+    """Gói TRỌN 2 bước tuần tự cần cho 1 nguồn (lấy run đang chạy, rồi
+    NẾU có batch_id thì lấy thêm tiến độ batch) thành 1 hàm — dùng để
+    chạy SONG SONG NHIỀU NGUỒN CÙNG LÚC ở index() bên dưới (thêm
+    08/2026, xem lịch sử trao đổi "/crawl chậm 4.69s vì gọi tuần tự
+    từng nguồn"). 2 bước bên trong 1 nguồn VẪN tuần tự (batch phụ thuộc
+    run.batch_id, không tránh được) — chỉ số NGUỒN (hiện 3: TopCV/
+    VietnamWorks/CareerViet, xem _SOURCE_LABELS) mới chạy song song với
+    nhau.
+
+    access_token: PHẢI lấy sẵn ở main thread (flask.session) TRƯỚC khi
+    submit hàm này vào ThreadPoolExecutor — hàm này chạy trên worker
+    thread, KHÔNG có Flask request/session context, nên KHÔNG được gọi
+    _call_authed()/_auth_tokens_from_session() (đọc session sẽ raise
+    "Working outside of request context", và nếu cố refresh token bên
+    trong nữa thì càng không an toàn — nhiều thread ghi session cùng
+    lúc). Do đó hàm này gọi thẳng db_data.list_crawl_runs()/
+    get_crawl_batch_status() với access_token truyền tay, KHÔNG qua
+    _call_authed() — nếu access_token đã hết hạn (401), lỗi đó được trả
+    về nguyên vẹn cho index() xử lý, index() tự quyết định refresh rồi
+    submit lại 1 lượt (xem index() bên dưới), KHÔNG refresh ở đây.
+
+    Trả (source, run, batch, error) thay vì raise/flash trực tiếp —
+    nơi gọi (index()) tự flash() lại trên main thread sau khi lấy
+    .result()."""
+    try:
+        run = None
+        for status in ("running", "queued"):
+            result = db_data.list_crawl_runs(access_token, source=source, status=status, limit=1)
+            if result["items"]:
+                run = result["items"][0]
+                break
+    except CrawlerAPIError as exc:
+        return source, None, None, exc
+
+    if not run or not run.get("batch_id"):
+        return source, run, None, None
+
+    # 08/2026 — nếu run đang chạy của nguồn này thuộc 1 batch (batch_id
+    # khác None, xem docstring crawler_client/crawl.py::_normalize_crawl_run),
+    # lấy thêm tiến độ TỔNG của batch (checklist đủ N category) để Khu B
+    # hiện card "2/6 category xong" thay vì card 1-category cũ. Lỗi ở
+    # đây KHÔNG chặn render trang (card vẫn hiện, chỉ thiếu checklist).
+    try:
+        batch = db_data.get_crawl_batch_status(access_token, run["batch_id"])
+    except CrawlerAPIError as exc:
+        return source, run, None, exc
+    return source, run, batch, None
 
 
 @crawl_bp.route("/crawl")
@@ -113,29 +173,50 @@ def index():
 
     active_runs = {}
     active_batches = {}
-    for source in sources:
+    # Song song hoá vòng lặp per-source (thêm 08/2026, xem lịch sử trao
+    # đổi "/crawl chậm 4.69s — cùng nguyên nhân round-trip tuần tự như
+    # /companies") — trước đây for source in sources: gọi
+    # _active_run_for_source() (+ batch status nếu có) TUẦN TỰ từng
+    # nguồn, tổng thời gian = tổng round-trip mọi nguồn. Giờ bắn cả
+    # N nguồn cùng lúc qua _pool, tổng thời gian ≈ nguồn CHẬM NHẤT.
+    #
+    # access_token lấy 1 LẦN ở đây (main thread, có Flask session
+    # context) rồi truyền tay vào _source_active_state() chạy trên
+    # worker thread — KHÔNG gọi _call_authed() bên trong thread pool
+    # (xem docstring _source_active_state() để biết lý do: session
+    # proxy của Flask cần request context, worker thread không có).
+    # Nếu access_token hết hạn (401) ở BẤT KỲ nguồn nào, refresh 1 LẦN
+    # trên main thread rồi submit lại TOÀN BỘ — refresh token là ghi
+    # session, chỉ an toàn làm ở main thread, không phải việc mỗi
+    # request/nguồn tự refresh riêng.
+    access_token, refresh_token = _auth_tokens_from_session()
+
+    def _run_all_sources(token):
+        futures = {source: _pool.submit(_source_active_state, source, token) for source in sources}
+        return {source: futures[source].result() for source in sources}
+
+    results = _run_all_sources(access_token)
+    had_401 = any(
+        isinstance(error, CrawlerAPIError) and error.status_code == 401
+        for _s, _r, _b, error in results.values()
+    )
+    if had_401 and refresh_token:
         try:
-            run = _active_run_for_source(source)
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            run = None
+            pair = backend_auth.refresh(refresh_token)
+        except BackendAuthError:
+            pair = None
+        if pair:
+            _store_auth_tokens(pair["access_token"], pair["refresh_token"])
+            results = _run_all_sources(pair["access_token"])
+
+    for source in sources:
+        _src, run, batch, error = results[source]
+        if error:
+            flash(str(error), "error")
         if run:
             active_runs[source] = run
-            # 08/2026 — nếu run đang chạy của nguồn này thuộc 1 batch
-            # (batch_id khác None, xem docstring
-            # crawler_client/crawl.py::_normalize_crawl_run), lấy thêm
-            # tiến độ TỔNG của batch (checklist đủ N category) để Khu B
-            # hiện card "2/6 category xong" thay vì card 1-category cũ.
-            # Lỗi ở đây KHÔNG chặn render trang (card vẫn hiện, chỉ
-            # thiếu checklist) — giống cách active_runs xử lý lỗi ở trên.
-            if run.get("batch_id"):
-                try:
-                    batch = _call_authed(db_data.get_crawl_batch_status, run["batch_id"])
-                except CrawlerAPIError as exc:
-                    flash(str(exc), "error")
-                    batch = None
-                if batch:
-                    active_batches[source] = batch
+            if batch:
+                active_batches[source] = batch
 
     # Filter lịch sử
     f_source = request.args.get("source", "")

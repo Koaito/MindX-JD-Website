@@ -1,6 +1,8 @@
 """Companies blueprint - company listing and CRUD operations"""
 
 import math
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
 import crawler_client as db_data
@@ -8,9 +10,17 @@ from crawler_client import CrawlerAPIError
 from utils.decorators import staff_required
 from constants import COMPANIES_PER_PAGE, PARTNERSHIP_POTENTIALS, CITIES_VN, CONTACT_STATUSES
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
-from potential_score import suggest_partnership_potential
+from potential_score import suggest_partnership_potential, suggest_partnership_potential_from_signals
 
 companies_bp = Blueprint("companies", __name__)
+
+# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
+# (index() bên dưới) — max_workers=3 KHỚP ĐÚNG số lệnh gọi độc lập tối
+# đa cần chạy cùng lúc ở đây (cities/count/list), không cần hơn. Tạo 1
+# lần ở module-level (KHÔNG tạo mới mỗi request) — ThreadPoolExecutor
+# giữ sẵn thread, tránh chi phí spawn/destroy thread lặp lại mỗi lần
+# load trang /companies.
+_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="companies-io")
 
 
 @companies_bp.route("/companies")
@@ -20,13 +30,27 @@ def index():
     city = request.args.get("city", "")
     page, per_page = _paginate_args(COMPANIES_PER_PAGE)
 
+    # Song song hoá 3 lệnh gọi backend ĐỘC LẬP NHAU (thêm 08/2026, xem
+    # lịch sử trao đổi "companies chậm 4s vì gọi tuần tự") — cities,
+    # count, list KHÔNG phụ thuộc kết quả của nhau, trước đây gọi lần
+    # lượt (tổng thời gian = tổng 3 round-trip), giờ bắn cùng lúc bằng
+    # ThreadPoolExecutor (tổng thời gian ≈ round-trip CHẬM NHẤT trong 3
+    # cái, không phải tổng cộng). An toàn tuyệt đối — cả 3 đều là GET
+    # thuần, không có side-effect, không tranh chấp trạng thái với
+    # nhau. requests (dùng trong crawler_client/base.py) tự nhả GIL lúc
+    # I/O chờ mạng, nên threading vẫn tăng tốc thật dù có GIL.
     try:
-        cities = db_data.list_company_cities()
-        total_companies = db_data.count_companies(q=q, city=city)
+        cities_future = _pool.submit(db_data.list_company_cities)
+        count_future = _pool.submit(db_data.count_companies, q=q, city=city)
+        list_future = _pool.submit(
+            db_data.list_companies, q=q, city=city, limit=per_page, offset=(page - 1) * per_page,
+        )
+        cities = cities_future.result()
+        total_companies = count_future.result()
+        companies = list_future.result()
         total_pages = max(1, math.ceil(total_companies / per_page))
         if page > total_pages:
             page = total_pages
-        companies = db_data.list_companies(q=q, city=city, limit=per_page, offset=(page - 1) * per_page)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         companies, cities, total_companies, total_pages, page = [], [], 0, 1, 1
@@ -34,30 +58,29 @@ def index():
     # Gợi ý tiềm năng hợp tác NGAY TRÊN DANH SÁCH (thêm 08/2026) — trước
     # đây suggestion chỉ tính ở trang /companies/<id>/edit vì cần
     # company.jobs + contacts (GET /companies list KHÔNG kèm jobs, xem
-    # _normalize_company()). Ở đây dùng list_all_jobs()/list_all_contacts()
-    # (2 lệnh gọi TỔNG, đã dùng sẵn kiểu này ở dashboard.py) rồi group theo
-    # company_id trong Python — RẺ HƠN NHIỀU so với gọi get_company() +
-    # list_contacts() riêng cho từng công ty trong trang (per_page=20 dòng
-    # sẽ thành 40 lệnh gọi API nếu làm kiểu N+1). Không chặn trang nếu lỗi
-    # — chỉ đơn giản là chip "Tiềm năng" không có tooltip hover.
+    # _normalize_company()).
+    #
+    # ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "fix gốc — thêm endpoint SQL
+    # GROUP BY"): trước đây dùng list_all_jobs()/list_all_contacts() —
+    # kéo TOÀN BỘ job/contact trong DB về Flask rồi tự group bằng
+    # Python, tốn round-trip TỈ LỆ THUẬN với tổng số job/contact toàn
+    # hệ thống (list_all_jobs() tự phân trang 200 job/lần — DB càng
+    # nhiều job, trang /companies càng chậm, kể cả khi trang chỉ hiện
+    # per_page=20 công ty). Giờ dùng get_partnership_signals(company_ids)
+    # — CHỈ hỏi backend đúng company_id của per_page công ty đang hiển
+    # thị, backend tự GROUP BY trong Postgres (có index company_id),
+    # trả sẵn 3 boolean/company — chi phí trang này không còn phụ thuộc
+    # tổng số job/contact trong DB nữa, chỉ phụ thuộc per_page (cố
+    # định, không lớn dần theo thời gian như cách cũ). Không chặn trang
+    # nếu lỗi — chỉ đơn giản là chip "Tiềm năng" không có tooltip hover.
     if companies:
-        access_token, _ = _auth_tokens_from_session()
         try:
-            all_jobs = db_data.list_all_jobs()
-            all_contacts = db_data.list_all_contacts(access_token) if access_token else []
+            signals = db_data.get_partnership_signals([c["id"] for c in companies])
         except CrawlerAPIError:
-            all_jobs, all_contacts = [], []
-
-        jobs_by_company = {}
-        for j in all_jobs:
-            jobs_by_company.setdefault(j["company_id"], []).append(j)
-        contacts_by_company = {}
-        for ct in all_contacts:
-            contacts_by_company.setdefault(ct["company_id"], []).append(ct)
+            signals = {}
 
         for c in companies:
-            company_for_score = {**c, "jobs": jobs_by_company.get(c["id"], [])}
-            suggestion = suggest_partnership_potential(company_for_score, contacts_by_company.get(c["id"], []))
+            suggestion = suggest_partnership_potential_from_signals(c, signals.get(c["id"], {}))
             suggestion["level_label"] = db_data.PARTNERSHIP_POTENTIAL_MAP.get(suggestion["level"], suggestion["level"])
             c["suggestion"] = suggestion
 

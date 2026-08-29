@@ -33,8 +33,48 @@ _HIGH_THRESHOLD = 4
 _MEDIUM_THRESHOLD = 2
 
 
+def _score_criteria(*, has_open_entry_job, matches_target_industry, is_hn_hcm,
+                     has_responded, has_company_size) -> dict:
+    """Lõi chấm điểm DÙNG CHUNG giữa suggest_partnership_potential()
+    (tính từ list jobs/contacts đầy đủ, trang /companies/<id>/edit) và
+    suggest_partnership_potential_from_signals() (tính từ booleans đã
+    group sẵn ở backend, trang /companies — xem docstring hàm đó, thêm
+    08/2026 để bỏ list_all_jobs()/list_all_contacts() khỏi trang danh
+    sách). Tách riêng để 2 nơi gọi LUÔN dùng đúng 1 ngưỡng/1 nhãn tiêu
+    chí, không lệch nhau khi sau này cần sửa."""
+    reasons = []
+    criteria = []
+
+    def _add(label, met):
+        criteria.append({"label": label, "met": met})
+        if met:
+            reasons.append(label)
+
+    _add("Đang có job Intern/Fresher/Junior còn tuyển (OPEN)", has_open_entry_job)
+    _add("Có job thuộc đúng nhóm ngành MindX đào tạo (Code/Data/BA/UI-UX)", matches_target_industry)
+    _add("Trụ sở/địa điểm tại Hà Nội hoặc TP.HCM", is_hn_hcm)
+    _add("Đã từng có người liên hệ phản hồi hoặc đang hợp tác", has_responded)
+    _add("Đã xác định được quy mô nhân sự", has_company_size)
+
+    score = sum([
+        has_open_entry_job, matches_target_industry, is_hn_hcm,
+        has_responded, has_company_size,
+    ])
+
+    if score >= _HIGH_THRESHOLD:
+        level = "HIGH"
+    elif score >= _MEDIUM_THRESHOLD:
+        level = "MEDIUM"
+    else:
+        level = "LOW"
+
+    return {"level": level, "score": score, "max_score": 5, "reasons": reasons, "criteria": criteria}
+
+
 def suggest_partnership_potential(company: dict, contacts: list) -> dict:
-    """Tính điểm gợi ý tiềm năng hợp tác từ dữ liệu công ty + contact.
+    """Tính điểm gợi ý tiềm năng hợp tác từ dữ liệu công ty + contact
+    ĐẦY ĐỦ (dùng ở trang /companies/<id>/edit — company đã có sẵn .jobs
+    qua get_company(), không tốn thêm round-trip nào để lấy lại).
 
     company: dict đã chuẩn hoá qua crawler_client._normalize_company()
              (cần .jobs, .city, .company_size) — .jobs là None nếu công
@@ -54,45 +94,55 @@ def suggest_partnership_potential(company: dict, contacts: list) -> dict:
       }
     """
     jobs = company.get("jobs") or []
-    reasons = []
-    criteria = []
-
-    def _add(label, met):
-        criteria.append({"label": label, "met": met})
-        if met:
-            reasons.append(label)
 
     has_open_entry_job = any(
         j.get("status_raw") == "OPEN" and j.get("level") in _ENTRY_LEVELS
         for j in jobs
     )
-    _add("Đang có job Intern/Fresher/Junior còn tuyển (OPEN)", has_open_entry_job)
-
     matches_target_industry = any(j.get("industry") in INDUSTRIES for j in jobs)
-    _add("Có job thuộc đúng nhóm ngành MindX đào tạo (Code/Data/BA/UI-UX)", matches_target_industry)
-
     is_hn_hcm = (company.get("city") or "") in _HN_HCM
-    _add("Trụ sở/địa điểm tại Hà Nội hoặc TP.HCM", is_hn_hcm)
-
     has_responded = any((c.get("status_raw") or "") in _RESPONDED_STATUSES for c in contacts)
-    _add("Đã từng có người liên hệ phản hồi hoặc đang hợp tác", has_responded)
-
     has_company_size = bool((company.get("company_size") or "").strip())
-    _add("Đã xác định được quy mô nhân sự", has_company_size)
 
-    score = sum([
-        has_open_entry_job,
-        matches_target_industry,
-        is_hn_hcm,
-        has_responded,
-        has_company_size,
-    ])
+    return _score_criteria(
+        has_open_entry_job=has_open_entry_job,
+        matches_target_industry=matches_target_industry,
+        is_hn_hcm=is_hn_hcm,
+        has_responded=has_responded,
+        has_company_size=has_company_size,
+    )
 
-    if score >= _HIGH_THRESHOLD:
-        level = "HIGH"
-    elif score >= _MEDIUM_THRESHOLD:
-        level = "MEDIUM"
-    else:
-        level = "LOW"
 
-    return {"level": level, "score": score, "max_score": 5, "reasons": reasons, "criteria": criteria}
+def suggest_partnership_potential_from_signals(company: dict, signals: dict) -> dict:
+    """Biến thể của suggest_partnership_potential() dùng ở trang DANH
+    SÁCH công ty (/companies, blueprints/companies.py::index()) — thêm
+    08/2026 để thay thế cách cũ (gọi list_all_jobs() + list_all_contacts(),
+    kéo TOÀN BỘ job/contact trong DB về Flask rồi tự group bằng Python,
+    xem lịch sử trao đổi "companies chậm 4s vì round-trip tỉ lệ thuận
+    số job").
+
+    Khác suggest_partnership_potential() ở chỗ KHÔNG nhận list jobs/
+    contacts thật — nhận thẳng 3 tín hiệu boolean đã group sẵn bằng SQL
+    ở backend (xem crawler_client.get_partnership_signals() +
+    db.get_partnership_signals() bên scrap-jd-api). 2 tiêu chí còn lại
+    (is_hn_hcm, has_company_size) KHÔNG cần round-trip riêng — đã có sẵn
+    ngay trên `company` (city/company_size, trả kèm mọi lần GET
+    /companies, không cần join job/contact).
+
+    company: dict đã chuẩn hoá (._normalize_company()) — dùng .city,
+             .company_size, giống suggest_partnership_potential().
+    signals: 1 giá trị trong dict trả về từ
+             crawler_client.get_partnership_signals(), hoặc {} nếu
+             company đó không có trong response (coi như cả 3 tín hiệu
+             job/contact đều False — company chưa có job/contact nào
+             khớp tiêu chí)."""
+    is_hn_hcm = (company.get("city") or "") in _HN_HCM
+    has_company_size = bool((company.get("company_size") or "").strip())
+
+    return _score_criteria(
+        has_open_entry_job=bool(signals.get("has_open_entry_job")),
+        matches_target_industry=bool(signals.get("matches_target_industry")),
+        is_hn_hcm=is_hn_hcm,
+        has_responded=bool(signals.get("has_responded")),
+        has_company_size=has_company_size,
+    )

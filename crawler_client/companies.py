@@ -108,6 +108,40 @@ def count_companies(q="", city="", created_by=""):
     return data.get("total", 0)
 
 
+def get_partnership_signals(company_ids):
+    """GET /companies/partnership-signals — thay thế list_all_jobs() +
+    list_all_contacts() (kéo TOÀN BỘ job/contact về Flask rồi tự group
+    bằng Python) từng dùng ở blueprints/companies.py::index() để tính
+    gợi ý "Tiềm năng hợp tác" (potential_score.suggest_partnership_potential())
+    ngay trên bảng danh sách công ty (thêm 08/2026, xem lịch sử trao đổi
+    "companies chậm 4s vì round-trip tuần tự tỉ lệ thuận với số job").
+
+    Backend tự tính sẵn bằng SQL GROUP BY (xem
+    db.get_partnership_signals() bên scrap-jd-api) — KHÔNG còn round-
+    trip nào tỉ lệ thuận với tổng số job/contact trong hệ thống, chỉ 1
+    lệnh gọi duy nhất bất kể DB có bao nhiêu job.
+
+    company_ids: list company_id CẦN tín hiệu (thường là đúng
+    per_page công ty đang hiển thị trên 1 trang, KHÔNG phải toàn bộ DB)
+    — bắt buộc truyền, rỗng thì backend trả {} luôn (xem
+    db.get_partnership_signals(), không gọi API nếu danh sách rỗng, đỡ
+    1 lệnh gọi thừa khi trang không có company nào — vd kết quả tìm
+    kiếm rỗng).
+
+    Trả dict {company_id: {"has_open_entry_job": bool,
+    "matches_target_industry": bool, "has_responded": bool}} — company
+    không có trong dict coi như cả 3 đều False (không có job/contact
+    nào khớp tiêu chí), nơi gọi tự .get(id, {}) khi build gợi ý."""
+    if not company_ids:
+        return {}
+    # requests hỗ trợ list trong params -> tự lặp lại thành
+    # ?company_id=a&company_id=b (đúng cú pháp FastAPI Query(list[str])
+    # mong đợi ở router, xem api/routers/companies.py), không cần tự
+    # nối chuỗi tay.
+    data = _request("GET", "/companies/partnership-signals", params={"company_id": company_ids}) or {}
+    return data
+
+
 def list_company_cities():
     """Cần liệt kê MỌI company để gom danh sách thành phố — backend giới
     hạn tối đa 200 record/lần (limit<=200), nên lặp trang (offset) thay
