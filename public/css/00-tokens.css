@@ -198,7 +198,8 @@ a { color: inherit; text-decoration: none; }
 .dm-tag,
 .dm-modal-suggestion-score,
 .et-suggested-tag,
-.crawl-live-widget-count {
+.crawl-live-widget-count,
+.error-chip {
   border-radius: 999px;
   white-space: nowrap;
 }

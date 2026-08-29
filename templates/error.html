@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Lỗi {{ code }} — MindX Career Hub{% endblock %}
+{% block content %}
+
+<div class="error-page">
+  <span class="eyebrow">Career Hub / Lỗi {{ code }}</span>
+  <div class="error-code error-code--{{ tone }}">{{ code }}</div>
+  <span class="error-chip error-chip--{{ tone }}">{{ chip_label }}</span>
+  <h1>{{ title }}</h1>
+  <p class="lede">{{ message }}</p>
+
+  <div class="error-actions">
+    <a class="btn btn-primary" href="{{ url_for('jobs.index') }}">Về danh sách job</a>
+    <button type="button" class="btn btn-ghost" onclick="if (document.referrer) { history.back(); } else { window.location.href = '{{ url_for('jobs.index') }}'; }">← Quay lại</button>
+  </div>
+</div>
+
+{% endblock %}

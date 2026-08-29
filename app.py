@@ -4,7 +4,7 @@ from env_loader import load_env_file
 
 load_env_file()
 
-from flask import Flask
+from flask import Flask, render_template
 from flask_login import LoginManager, current_user
 
 import backend_auth
@@ -157,6 +157,84 @@ app.register_blueprint(staff_activity_bp)
 app.register_blueprint(activity_logs_bp)
 app.register_blueprint(data_mgmt_bp)
 app.register_blueprint(crawl_bp)
+
+
+# ---------------------------------------------------------------------------
+# Trang lỗi tuỳ chỉnh (400/403/404/500)
+# ---------------------------------------------------------------------------
+# 1 template dùng chung (templates/error.html) + 1 stylesheet dùng chung
+# (public/css/17-error-pages.css) cho cả 4 mã lỗi — layout giống hệt
+# nhau, chỉ khác số/nội dung/tông màu ("tone"), nên tách 4 file riêng
+# là dư thừa. Vẫn extends base.html (giữ nguyên sidebar + flash stack)
+# để người dùng luôn có đường quay lại nav, không bị "văng" ra trang
+# trắng không lối thoát — các route abort(404)/abort(403) rải rác ở
+# blueprints/*.py (jobs, companies, contacts, staff_activity,
+# my_stuff, data_management...) từ trước tới giờ rơi vào trang lỗi mặc
+# định của Flask (không đồng bộ giao diện) vì chưa đăng ký handler.
+#
+# tone: "muted" (404 — không có gì sai, chỉ là không tồn tại),
+#       "warn" (400/403 — cảnh báo, không phải hệ thống hỏng),
+#       "danger" (500 — thật sự có lỗi ở server).
+
+
+@app.errorhandler(400)
+def handle_400(e):
+    return (
+        render_template(
+            "error.html",
+            code=400,
+            tone="warn",
+            chip_label="Yêu cầu không hợp lệ",
+            title="Yêu cầu không hợp lệ",
+            message="Có gì đó không đúng với dữ liệu vừa gửi lên. Thử quay lại và kiểm tra lại thao tác vừa rồi.",
+        ),
+        400,
+    )
+
+
+@app.errorhandler(403)
+def handle_403(e):
+    return (
+        render_template(
+            "error.html",
+            code=403,
+            tone="warn",
+            chip_label="Không đủ quyền",
+            title="Bạn không có quyền truy cập trang này",
+            message="Tài khoản hiện tại không đủ quyền cho khu vực này. Nếu bạn nghĩ đây là nhầm lẫn, liên hệ quản trị viên team SS.",
+        ),
+        403,
+    )
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    return (
+        render_template(
+            "error.html",
+            code=404,
+            tone="muted",
+            chip_label="Không tìm thấy",
+            title="Không tìm thấy trang này",
+            message="Đường dẫn không tồn tại, hoặc job/công ty này đã bị xoá hay ngừng tuyển. Kiểm tra lại link, hoặc quay về danh sách job.",
+        ),
+        404,
+    )
+
+
+@app.errorhandler(500)
+def handle_500(e):
+    return (
+        render_template(
+            "error.html",
+            code=500,
+            tone="danger",
+            chip_label="Lỗi hệ thống",
+            title="Có lỗi xảy ra ở hệ thống",
+            message="Một sự cố ngoài ý muốn vừa xảy ra ở server. Thử tải lại trang — nếu vẫn lỗi, báo lại cho team kỹ thuật kèm theo thao tác bạn vừa làm.",
+        ),
+        500,
+    )
 
 
 # ---------------------------------------------------------------------------

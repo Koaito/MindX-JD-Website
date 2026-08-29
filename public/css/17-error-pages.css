@@ -1,0 +1,88 @@
+/* ---------------- Error pages ---------------- */
+/* Used by: templates/error.html — rendered by the @app.errorhandler(...)
+   handlers in app.py for 400/403/404/500 (kept as one shared template +
+   one shared stylesheet, not 4 separate pages, since the layout is
+   identical and only the number/copy/tone change — same reasoning as
+   .status-chip having 1 shared shape + per-status color, see
+   00-tokens.css pill list). Stays inside {% block content %} so the
+   sidebar/shell/flash stack from base.html render normally — a broken
+   link or a permission error shouldn't dump the user onto a stripped
+   page with no way back to nav. */
+
+.error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  /* Roughly centers within the visible viewport under the page's own
+     top padding, without pinning to a fixed px height that would look
+     off on short/tall windows. Divide by --zoom-scale for the same
+     reason .shell does (see 00-tokens.css html{zoom} comment) — vh is
+     measured pre-zoom. */
+  min-height: calc(60vh / var(--zoom-scale));
+  padding: 24px 20px 40px;
+  margin: 0 auto;
+  max-width: 520px;
+}
+
+.error-page .eyebrow { margin-bottom: 4px; }
+
+.error-code {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 108px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 4px 0 10px;
+}
+
+/* Tone = how serious the error is, not a fixed per-code color — a 404
+   is "nothing here", not a malfunction, so it stays quiet/muted rather
+   than alarming red like a real 500. */
+.error-code--muted { color: var(--muted); }
+.error-code--warn { color: var(--amber); }
+.error-code--danger { color: #B23A22; } /* matches .flash-error / .toast-error text */
+
+.error-page h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.error-page .lede {
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+.error-chip {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.error-chip--muted { background: #EDEFEC; color: var(--muted); }
+.error-chip--warn { background: var(--amber-soft); color: var(--amber); }
+.error-chip--danger { background: #FBE7E4; color: #B23A22; }
+
+.error-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* .btn-ghost used for "Quay lại" is a <button>, not an <a> (needs
+   history.back(), no URL exists for "wherever the user came from") —
+   .btn's base rule already covers both display: inline-block reads
+   fine on <button>, but reset the couple of <button>-only UA defaults
+   .btn-ghost/.btn don't already touch. */
+.error-actions button.btn {
+  font-family: var(--font-body);
+  line-height: 1.2;
+}

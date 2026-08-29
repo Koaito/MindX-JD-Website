@@ -106,4 +106,8 @@
   html.sidebar-collapsed .nav a,
   html.sidebar-collapsed .brand,
   html.sidebar-collapsed .auth-box { justify-content: flex-start; }
+  /* .error-code (17-error-pages.css) at 108px wraps/overflows the
+     narrower mobile .content padding (24px above) — scale it down
+     rather than let 3 digits fight for space under ~400px. */
+  .error-code { font-size: 72px; }
 }
