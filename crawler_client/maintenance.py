@@ -82,12 +82,19 @@ MAINTENANCE_JOBS = [
 # vì tự lặp MAINTENANCE_JOBS mỗi lần cần 1 nhãn.
 MAINTENANCE_JOB_LABELS = {j["job_type"]: j["label"] for j in MAINTENANCE_JOBS}
 
-# 08/2026 — BẮT BUỘC truyền "limit" cho 2 job này khi trigger (khớp
+# 08/2026 — BẮT BUỘC truyền "limit" cho job này khi trigger (khớp
 # MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT phía backend, xem
 # api/schemas/maintenance.py) — form ở _maintenance_tab.html tự thêm
-# `required` cho input limit của đúng 2 card này (lớp chặn ĐẦU, backend
+# `required` cho input limit của đúng card này (lớp chặn ĐẦU, backend
 # 400 là lớp chặn CUỐI, không phải duy nhất).
-MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT = frozenset({"enrich_web_info", "get_fb_linkedin"})
+#
+# 08/2026 (sửa bug) — TRƯỚC ĐÂY còn có "get_fb_linkedin" trong set này
+# theo giả định sai (còn sót lại từ trước khi mô tả job này được sửa
+# đúng ở trên — job KHÔNG gọi Tavily/Gemini, hoàn toàn miễn phí), khiến
+# card "Tìm Facebook/LinkedIn công ty" luôn ép nhập limit dù không có
+# rủi ro tốn phí gì nếu để trống chạy hết. Đã đồng bộ lại đúng với
+# MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT phía backend.
+MAINTENANCE_JOB_TYPES_REQUIRE_LIMIT = frozenset({"enrich_web_info"})
 
 # Chỉ job_type này nhận dry_run/check_deadline_only — card của job_type
 # khác KHÔNG render 2 checkbox này (xem _maintenance_tab.html).
