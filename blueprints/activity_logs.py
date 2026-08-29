@@ -1,6 +1,7 @@
 """Activity Logs blueprint - system-wide activity tracking"""
 
 import math
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
@@ -12,6 +13,13 @@ from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
 from utils.decorators import staff_required
 
 activity_logs_bp = Blueprint("activity_logs", __name__)
+
+# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
+# (logs() bên dưới) — max_workers=3 KHỚP ĐÚNG số lệnh gọi độc lập tối
+# đa cần chạy cùng lúc ở đây (audit logs/companies dropdown/staff
+# dropdown). Tạo 1 lần ở module-level (KHÔNG tạo mới mỗi request),
+# giống pattern đã áp dụng ở companies.py.
+_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="activity-logs-io")
 
 
 def _list_all_companies():
@@ -34,16 +42,30 @@ def logs():
     actor_id = request.args.get("actor_id", "")
 
     access_token, _ = _auth_tokens_from_session()
-    try:
-        # Pagination
-        page, per_page = _paginate_args(50)  # 50 logs/trang
-        offset = (page - 1) * per_page
 
-        result = db_data.list_audit_logs(
-            access_token, view=view, entity_type=entity_type,
-            company_id=company_id, actor_id=actor_id,
-            limit=per_page, offset=offset,
-        )
+    # Pagination
+    page, per_page = _paginate_args(50)  # 50 logs/trang
+    offset = (page - 1) * per_page
+
+    # Song song hoá 3 lệnh gọi backend ĐỘC LẬP NHAU — list_audit_logs
+    # (đã filter + phân trang theo view/entity_type/company/actor),
+    # danh sách công ty và danh sách staff (2 dropdown filter) KHÔNG
+    # phụ thuộc kết quả của nhau. Trước đây gọi tuần tự (tổng thời gian
+    # = tổng 3 round-trip), giờ bắn cùng lúc bằng ThreadPoolExecutor
+    # (tổng thời gian ≈ round-trip CHẬM NHẤT trong 3 cái). An toàn
+    # tuyệt đối — cả 3 đều là GET thuần, không có side-effect. Mỗi
+    # future được except riêng để 1 lệnh lỗi không chặn 2 lệnh còn lại.
+    logs_future = _pool.submit(
+        db_data.list_audit_logs,
+        access_token, view=view, entity_type=entity_type,
+        company_id=company_id, actor_id=actor_id,
+        limit=per_page, offset=offset,
+    )
+    companies_future = _pool.submit(_list_all_companies)
+    users_future = _pool.submit(backend_auth.list_users, access_token)
+
+    try:
+        result = logs_future.result()
         logs = result["items"]
         total_logs = result["total"]
         total_pages = max(1, math.ceil(total_logs / per_page))
@@ -54,12 +76,12 @@ def logs():
 
     # Dropdown công ty/staff cho filter
     try:
-        companies = _list_all_companies()
+        companies = companies_future.result()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         companies = []
     try:
-        all_users = backend_auth.list_users(access_token)
+        all_users = users_future.result()
         staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
     except BackendAuthError as exc:
         flash(str(exc), "error")

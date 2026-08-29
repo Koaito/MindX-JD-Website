@@ -1,5 +1,7 @@
 """Contacts blueprint - company contact person management"""
 
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 import backend_auth
@@ -11,6 +13,13 @@ from helpers import _auth_tokens_from_session, _call_authed
 from utils.decorators import staff_required
 
 contacts_bp = Blueprint("contacts", __name__)
+
+# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
+# (index() bên dưới, tab "danh-sach") — max_workers=3 KHỚP ĐÚNG số lệnh
+# gọi độc lập tối đa cần chạy cùng lúc ở đây (contacts/companies/staff).
+# Tạo 1 lần ở module-level (KHÔNG tạo mới mỗi request), giống pattern
+# đã áp dụng ở companies.py.
+_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="contacts-io")
 
 
 @contacts_bp.route("/contacts")
@@ -38,22 +47,36 @@ def index():
     status_raw = db_data.CONTACT_STATUS_MAP_REV.get(status_vn, "") if status_vn else ""
 
     access_token, _ = _auth_tokens_from_session()
+
+    # Song song hoá 3 lệnh gọi backend ĐỘC LẬP NHAU — list_all_contacts
+    # (đã filter theo status/company/search), list_all_companies (dropdown
+    # filter) và list_users (map người phụ trách) KHÔNG phụ thuộc kết quả
+    # của nhau. Trước đây gọi tuần tự (tổng thời gian = tổng 3 round-trip),
+    # giờ bắn cùng lúc bằng ThreadPoolExecutor (tổng thời gian ≈ round-trip
+    # CHẬM NHẤT trong 3 cái). An toàn tuyệt đối — cả 3 đều là GET thuần,
+    # không có side-effect, không tranh chấp trạng thái với nhau. Mỗi
+    # future được except riêng để 1 lệnh lỗi không chặn 2 lệnh còn lại.
+    contacts_future = _pool.submit(
+        db_data.list_all_contacts,
+        access_token, status_raw=status_raw, company_id=company_id, search=search,
+    )
+    companies_future = _pool.submit(db_data.list_all_companies)
+    users_future = _pool.submit(backend_auth.list_users, access_token)
+
     try:
-        contacts = db_data.list_all_contacts(
-            access_token, status_raw=status_raw, company_id=company_id, search=search,
-        )
+        contacts = contacts_future.result()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         contacts = []
 
     try:
-        companies = db_data.list_all_companies()
+        companies = companies_future.result()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         companies = []
 
     try:
-        all_users = backend_auth.list_users(access_token)
+        all_users = users_future.result()
         staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
     except BackendAuthError as exc:
         flash(str(exc), "error")
