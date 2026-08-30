@@ -142,6 +142,27 @@ def get_partnership_signals(company_ids):
     return data
 
 
+def get_company_data_health(access_token):
+    """GET /companies/data-health — thay thế cho việc crawl_status.py
+    từng phải gọi list_all_companies() + list_all_contacts() rồi tự đếm
+    field rỗng bằng Python (company_field_health()/
+    count_companies_without_contact() ở companies.py này). Backend tự
+    tính bằng SQL (xem db.get_company_data_health() bên scrap-jd-api).
+
+    CẦN access_token (khác get_partnership_signals() ở trên, chỉ cần
+    API_KEY) — backend route này require_role("ss_team") vì phải JOIN
+    qua company_contacts (thông tin liên hệ nhạy cảm), cùng lý do mọi
+    hàm ở contacts.py đều cần access_token.
+
+    Trả thẳng dict backend trả về, ĐÃ ĐÚNG shape crawl_status.py cần:
+    company_health_rows/company_health_total/company_no_contact_missing/
+    company_no_contact_total."""
+    return _request("GET", "/companies/data-health", access_token=access_token) or {
+        "company_health_rows": [], "company_health_total": 0,
+        "company_no_contact_missing": 0, "company_no_contact_total": 0,
+    }
+
+
 def list_company_cities():
     """Cần liệt kê MỌI company để gom danh sách thành phố — backend giới
     hạn tối đa 200 record/lần (limit<=200), nên lặp trang (offset) thay

@@ -352,6 +352,35 @@ def list_all_jobs(q="", industry="", level="", location="", status="", created_b
     return all_items
 
 
+def get_job_data_health():
+    """GET /jobs/data-health — thay thế cho việc crawl_status.py từng
+    phải gọi list_all_jobs(include_content=True) rồi tự đếm/group/tìm
+    trùng bằng Python (job_field_health()/list_expired_open_jobs()/
+    job_health_by_source()/find_duplicate_job_groups() ở jobs.py này —
+    xem lịch sử trao đổi "crawl_status.py nặng nhất trong các route đã
+    audit"). Backend tự tính bằng SQL (xem db.get_job_data_health() bên
+    scrap-jd-api) — KHÔNG BAO GIỜ kéo parsed_content (JSONB dài) về đây
+    nữa, chi phí không tăng theo tổng số job trong hệ thống.
+
+    Public (không cần access_token) — khớp GET /jobs/data-health bên
+    backend (không có require_role, chỉ cần X-API-Key).
+
+    Trả thẳng dict backend trả về, ĐÃ ĐÚNG shape crawl_status.py cần
+    (backend tự đặt tên field khớp với hợp đồng cũ: job_health_rows/
+    job_health_total/expired_open_jobs/job_health_by_source/
+    duplicate_job_groups — mỗi job trong expired_open_jobs/
+    duplicate_job_groups[].jobs đã có sẵn id/position/company/deadline/
+    source, KHÔNG cần _normalize_job() vì đây không phải job đầy đủ, chỉ
+    là view rút gọn cho bảng hiển thị). Lỗi mạng/backend: để nguyên
+    CrawlerAPIError bay lên cho crawl_status.py tự flash + fallback rỗng,
+    giống pattern mọi nơi khác trong file này."""
+    return _request("GET", "/jobs/data-health") or {
+        "job_health_rows": [], "job_health_total": 0,
+        "expired_open_jobs": [], "job_health_by_source": [],
+        "duplicate_job_groups": [],
+    }
+
+
 def is_duplicate_candidate(job: dict) -> bool:
     matches = list_jobs(q=job["company"], limit=50)
     return any(
