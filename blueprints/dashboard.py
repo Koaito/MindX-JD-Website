@@ -1,5 +1,6 @@
 """Dashboard blueprint - team SS homepage with insights"""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from flask import Blueprint, flash, render_template, request
@@ -13,6 +14,13 @@ from helpers import _auth_tokens_from_session, _jobs_by_month, _parse_any_date, 
 from utils.decorators import staff_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
+
+# Dùng CHUNG 1 pool nhỏ cho index() bên dưới — max_workers=6 KHỚP ĐÚNG
+# số lệnh gọi backend độc lập tối đa cần chạy cùng lúc ở đây (jobs/
+# companies/users/stats/engagement/contacts). Tạo 1 lần ở module-level
+# (KHÔNG tạo mới mỗi request), giống pattern đã áp dụng ở companies.py/
+# contacts.py/activity_logs.py/staff_activity.py.
+_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="dashboard-io")
 
 
 # Dashboard helper functions (đặc thù riêng cho dashboard — không dùng ở
@@ -297,12 +305,46 @@ def _monthly_recap(jobs, companies, engagement_monthly):
 @dashboard_bp.route("/dashboard")
 @staff_required
 def index():
+    # Song song hoá 6 lệnh gọi backend ĐỘC LẬP NHAU — jobs/companies/
+    # users/stats/engagement/contacts KHÔNG phụ thuộc kết quả của nhau
+    # (thêm 08/2026, xem lịch sử trao đổi "/dashboard chậm nhất trong
+    # các trang, 4.21s — 6 round-trip tuần tự chưa từng được song song
+    # hoá dù đã ghi chú từ đợt audit đầu"). access_token lấy 1 LẦN Ở ĐÂY
+    # (main thread, có Flask session context) rồi truyền tay vào các
+    # future cần JWT (list_users/list_all_contacts) — KHÔNG gọi
+    # _auth_tokens_from_session() bên trong worker thread (session proxy
+    # của Flask cần request context, worker thread không có, giống lý do
+    # đã giải thích ở blueprints/crawl.py::_source_active_state()).
+    #
+    # Trước đây gọi tuần tự (tổng thời gian = tổng 6 round-trip), giờ
+    # bắn cùng lúc bằng ThreadPoolExecutor (tổng thời gian ≈ round-trip
+    # CHẬM NHẤT trong 6 cái). An toàn tuyệt đối — cả 6 đều là GET thuần,
+    # không có side-effect, không tranh chấp trạng thái với nhau. Mỗi
+    # future được except riêng để 1 lệnh lỗi không chặn 5 lệnh còn lại
+    # (khác hành vi CŨ ở jobs/companies — trước đây 2 lệnh đó CHUNG 1
+    # try/except nên 1 lệnh lỗi kéo cả 2 về rỗng; giờ tách riêng, lỗi
+    # jobs không còn làm rỗng companies và ngược lại — cải thiện nhỏ,
+    # không phải hành vi cố ý giữ nguyên 100%).
+    access_token, _ = _auth_tokens_from_session()
+
+    jobs_future = _pool.submit(db_data.list_all_jobs)
+    companies_future = _pool.submit(db_data.list_all_companies)
+    users_future = _pool.submit(backend_auth.list_users, access_token) if access_token else None
+    stats_future = _pool.submit(db_data.get_stats)
+    engagement_future = _pool.submit(db_data.get_engagement_stats)
+    contacts_future = _pool.submit(db_data.list_all_contacts, access_token) if access_token else None
+
     try:
-        jobs = db_data.list_all_jobs()
-        companies = db_data.list_all_companies()
+        jobs = jobs_future.result()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-        jobs, companies = [], []
+        jobs = []
+
+    try:
+        companies = companies_future.result()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        companies = []
 
     jobs_by_industry = {ind: sum(1 for j in jobs if j["industry"] == ind) for ind in INDUSTRIES}
     # gọi trực tiếp get_level_codes() (không dùng LEVELS tĩnh từ constants)
@@ -323,33 +365,34 @@ def index():
         companies_by_city[c["city"]] = companies_by_city.get(c["city"], 0) + 1
 
     total_students = None
-    access_token, _ = _auth_tokens_from_session()
-    if access_token:
+    if users_future is not None:
         try:
-            users = backend_auth.list_users(access_token)
+            users = users_future.result()
             total_students = sum(1 for u in users if u.get("role") == "user")
         except BackendAuthError:
             pass
-    
+
     total_applications = None
     total_saved_jobs = None
     try:
-        stats = db_data.get_stats()
+        stats = stats_future.result()
         total_applications = stats.get("total_applications")
         total_saved_jobs = stats.get("total_saved_jobs")
     except CrawlerAPIError:
         pass
 
     try:
-        engagement = db_data.get_engagement_stats()
+        engagement = engagement_future.result()
     except CrawlerAPIError:
         engagement = {}
     _merge_engagement_into_jobs(jobs, engagement.get("jobs", []))
 
-    try:
-        all_contacts = db_data.list_all_contacts(access_token) if access_token else []
-    except CrawlerAPIError:
-        all_contacts = []
+    all_contacts = []
+    if contacts_future is not None:
+        try:
+            all_contacts = contacts_future.result()
+        except CrawlerAPIError:
+            all_contacts = []
 
     jd_needing_push = _jd_needing_push(jobs)
     jd_stale = _jd_stale(jobs)
