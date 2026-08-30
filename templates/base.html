@@ -90,11 +90,9 @@
       <a href="{{ url_for('data_mgmt.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('data_mgmt.index') else '' }}" title="Xuất / Nhập dữ liệu">
         <span class="nav-ic">⇄</span> <span class="nav-text">Xuất / Nhập dữ liệu</span>
       </a>
-      {% if current_user.role == 'admin' %}
       <a href="{{ url_for('crawl.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('crawl.') else '' }}" title="Vận hành dữ liệu">
         <span class="nav-ic">⇊</span> <span class="nav-text">Vận hành dữ liệu</span>
       </a>
-      {% endif %}
       {% endif %}
 
       {% if current_user.is_authenticated and not current_user.is_staff %}

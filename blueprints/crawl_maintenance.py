@@ -3,6 +3,17 @@ xem lịch sử trao đổi "phương án B — generic runner dùng chung"). CH
 admin bấm chạy được (@admin_required, khớp POST /maintenance/{job_type}
 chỉ admin) — xem utils/decorators.py.
 
+08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận hành dữ
+liệu") — 3 route CHỈ ĐỌC bên dưới (maintenance_status_json,
+maintenance_logs_json, maintenance_latest_log_runs_json) đổi từ
+@admin_required sang @staff_required — ss_team xem được log
+live/trạng thái job đang chạy, khớp GET /maintenance/{run_id} + GET
+/maintenance/{run_id}/logs + GET /maintenance/latest-log-runs phía
+backend (chỉ cần 'ss_team', xem crawler_client/maintenance.py). CHỈ
+maintenance_trigger() (POST, bấm chạy job thật) còn giữ
+@admin_required — form Khu A ẩn khỏi mắt ss_team ở template (xem
+_maintenance_tab.html, current_user.role == 'admin').
+
 TÁCH FILE RIÊNG (khác gộp thẳng vào crawl.py) để crawl.py không phình
 to quá — 2 domain (crawl nguồn ngoài / bảo trì dữ liệu nội bộ) đủ khác
 nhau để tách, giống cách project đã tách domain khác (companies.py,
@@ -30,7 +41,7 @@ from backend_auth import BackendAuthError
 from blueprints.crawl import crawl_bp
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
-from utils.decorators import admin_required
+from utils.decorators import admin_required, staff_required
 
 
 def _active_maintenance_runs() -> dict:
@@ -171,7 +182,7 @@ def maintenance_trigger(job_type):
 
 
 @crawl_bp.route("/crawl/maintenance/<string:run_id>/status.json")
-@admin_required
+@staff_required
 def maintenance_status_json(run_id):
     """JSON polling — JS ở _maintenance_tab.html gọi định kỳ tới khi
     status 'done'/'error', cùng cách hoạt động status_json() bên
@@ -186,7 +197,7 @@ def maintenance_status_json(run_id):
 
 
 @crawl_bp.route("/crawl/maintenance/<string:run_id>/logs.json")
-@admin_required
+@staff_required
 def maintenance_logs_json(run_id):
     """JSON polling khu "Xem log live" tab Bảo trì — cùng cách hoạt
     động logs_json() bên crawl.py."""
@@ -200,7 +211,7 @@ def maintenance_logs_json(run_id):
 
 
 @crawl_bp.route("/crawl/maintenance/latest-log-runs.json")
-@admin_required
+@staff_required
 def maintenance_latest_log_runs_json():
     """JSON — 5 khung "Log live" (mỗi card 1 khung, LUÔN HIỆN cố định)
     gọi lúc tải trang để biết run_id GẦN NHẤT của TỪNG job_type — khác

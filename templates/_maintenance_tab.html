@@ -33,6 +33,14 @@
     </p>
     {% endif %}
 
+    {# 08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận
+       hành dữ liệu") — cùng nguyên tắc _crawl_tab.html: ss_team xem
+       được cả tab này (khớp @staff_required) nhưng KHÔNG bấm chạy job
+       bảo trì được (route crawl.maintenance_trigger vẫn
+       @admin_required) -> ẩn hẳn form bấm, chỉ admin mới thấy. #}
+    {% if current_user.role != 'admin' %}
+    <p class="crawl-source-sub">Chỉ admin mới có thể kích hoạt job bảo trì này. Bạn vẫn xem được tiến độ và lịch sử bên dưới.</p>
+    {% else %}
     <form method="post" action="{{ url_for('crawl.maintenance_trigger', job_type=jt) }}"
           class="form-grid form-card maint-trigger-form" data-job-type="{{ jt }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -64,6 +72,7 @@
         </button>
       </div>
     </form>
+    {% endif %}
 
     {# ---- Log live RIÊNG cho job_type này — xem đầu docstring file ---- #}
     {% set latest = latest_log_runs.get(jt) %}

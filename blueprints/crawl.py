@@ -1,8 +1,16 @@
 """Crawl blueprint — trang "Vận hành dữ liệu" (08/2026, đổi tên từ
 "Crawl dữ liệu" — xem lịch sử trao đổi "1 mục, 2 tab như
-data_management.py"). CHỈ admin thấy và dùng được (khớp yêu cầu gốc,
-chặt hơn @staff_required cho ss_team đang dùng ở hầu hết trang quản trị
-khác) — xem utils/decorators.py::admin_required.
+data_management.py").
+
+08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận hành dữ
+liệu") — ss_team giờ XEM được cả trang (menu sidebar, 3 tab, khu "đang
+chạy"/log live, lịch sử) qua @staff_required, khớp đúng mức GET /crawl
++ GET /crawl/{run_id} phía backend (chỉ cần 'ss_team'). CHỈ 2 route
+TRIGGER thật sự (trigger()/trigger_batch() bên dưới, ứng POST /crawl
+phía backend) còn giữ @admin_required — ss_team không bấm chạy được,
+form Khu A ẩn khỏi mắt họ ở template (xem _crawl_tab.html,
+current_user.role == 'admin'). Tab "maintenance" cùng nguyên tắc, xem
+blueprints/crawl_maintenance.py.
 
 TAB "crawl" (mặc định) — nội dung y hệt trang cũ, dời sang
 _crawl_tab.html, KHÔNG đổi logic.
@@ -41,7 +49,7 @@ from backend_auth import BackendAuthError
 from blueprints.crawl_status import _status_tab_context
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _store_auth_tokens, _io_pool as _pool
-from utils.decorators import admin_required
+from utils.decorators import admin_required, staff_required
 
 crawl_bp = Blueprint("crawl", __name__)
 
@@ -135,7 +143,7 @@ def _source_active_state(source, access_token):
 
 
 @crawl_bp.route("/crawl")
-@admin_required
+@staff_required
 def index():
     """Trang chính — 3 tab (?tab=crawl mặc định | ?tab=status | ?tab=maintenance).
 
@@ -384,7 +392,7 @@ def trigger_batch():
 
 
 @crawl_bp.route("/crawl/<string:run_id>/status.json")
-@admin_required
+@staff_required
 def status_json(run_id):
     """JSON polling — JS ở crawl.html gọi định kỳ tới khi status
     'done'/'error'. @admin_required tự trả JSON lỗi (không redirect
@@ -399,7 +407,7 @@ def status_json(run_id):
 
 
 @crawl_bp.route("/crawl/<string:run_id>/logs.json")
-@admin_required
+@staff_required
 def logs_json(run_id):
     """JSON polling khu "Xem log live" — JS ở crawl.html gọi định kỳ
     (song song với status.json) kèm ?after_id=N để chỉ lấy dòng log MỚI
@@ -416,7 +424,7 @@ def logs_json(run_id):
 
 
 @crawl_bp.route("/crawl/batch/<string:batch_id>/status.json")
-@admin_required
+@staff_required
 def batch_status_json(batch_id):
     """JSON polling cho card batch ở Khu B — JS ở crawl.html gọi định
     kỳ (khác hẳn status.json ở trên vốn poll 1 run đơn lẻ) tới khi
@@ -433,7 +441,7 @@ def batch_status_json(batch_id):
 
 
 @crawl_bp.route("/crawl/latest-log-run")
-@admin_required
+@staff_required
 def latest_log_run():
     """JSON — khung "Log live" (LUÔN HIỆN cố định trên trang, 08/2026,
     xem lịch sử trao đổi) gọi lúc tải trang để biết run_id GẦN NHẤT

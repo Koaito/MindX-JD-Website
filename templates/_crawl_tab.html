@@ -18,6 +18,15 @@
         Chọn ngành, bấm để bắt đầu 1 lượt crawl mới.
       {% endif %}
     </p>
+    {# 08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận
+       hành dữ liệu") — ss_team giờ xem được cả trang này (khớp
+       @staff_required ở blueprints/crawl.py::index()) nhưng KHÔNG bấm
+       kích hoạt crawl được (route crawl.trigger_batch vẫn
+       @admin_required) -> ẩn hẳn form bấm, chỉ admin mới thấy, tránh
+       ss_team thấy nút rồi bấm ăn lỗi 403. #}
+    {% if current_user.role != 'admin' %}
+    <p class="crawl-source-sub">Chỉ admin mới có thể kích hoạt crawl. Bạn vẫn xem được tiến độ và lịch sử bên dưới.</p>
+    {% else %}
     {# 08/2026 — đổi dropdown 1 category thành checkbox NHIỀU category
        (crawl tuần tự, xem blueprints/crawl.py::trigger_batch()). Form
        này LUÔN post về crawl.trigger_batch (kể cả tick đúng 1 ô) —
@@ -59,6 +68,7 @@
         </button>
       </div>
     </form>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
