@@ -362,3 +362,194 @@ def reset_password(token: str, new_password: str) -> dict:
     thẳng, không cần phân biệt thêm ở đây (khác wrong_credentials của
     login()) vì chỉ có 1 lý do 400 duy nhất ở route này."""
     return _request("POST", "/auth/reset-password", json={"token": token, "new_password": new_password})
+
+
+# ---------------------------------------------------------------------------
+# Nhắn tin học viên ↔ SS / SS ↔ SS (thêm 08/2026) — xem
+# backend-scrap-jd-nhan-tin.md cho kế hoạch đầy đủ (data model, state
+# machine, bảo mật). Đặt ở ĐÂY (không phải crawler_client.py) vì cùng lý
+# do mọi hàm khác trong file này — router /messages/... của backend bắt
+# buộc Authorization: Bearer <access_token>, không chỉ X-API-Key.
+# Dùng ở blueprints/messages.py.
+# ---------------------------------------------------------------------------
+
+def list_conversations(access_token: str) -> list:
+    """GET /messages/conversations — hội thoại ĐÃ CÓ ít nhất 1 tin nhắn
+    (backend suy trực tiếp từ bảng messages, xem db/messages.py::
+    list_conversations), kèm last_message_preview/last_message_at/
+    unread_count/relationship_status (None nếu là cặp SS-SS, không qua
+    state machine chat_relationships)."""
+    return _request("GET", "/messages/conversations", access_token=access_token)
+
+
+def list_pending_requests(access_token: str) -> list:
+    """GET /messages/pending-requests — CHỈ SS/admin gọi được (backend tự
+    403 nếu không phải). Học viên đang 'pending' nhưng CHƯA từng nhắn
+    (relationship có nhưng bảng messages chưa có dòng nào) nên KHÔNG nằm
+    trong list_conversations() ở trên — đây là mục "Yêu cầu đang chờ"
+    riêng cho SS."""
+    return _request("GET", "/messages/pending-requests", access_token=access_token)
+
+
+def get_unread_count(access_token: str) -> int:
+    """GET /messages/unread-count — dùng cho: (a) badge sidebar poll
+    20-30s (xem public/app.js, blueprints/messages.py::unread_count_json),
+    (b) context_processor inject_unread_message_count (app.py) hiện số
+    ngay lúc tải trang lần đầu, trước khi JS kịp poll lần nào."""
+    data = _request("GET", "/messages/unread-count", access_token=access_token)
+    return data.get("count", 0)
+
+
+def search_people(access_token: str, q: str) -> list:
+    """GET /messages/search-people?q=... — CHỈ trả id/full_name/role,
+    KHÔNG email/phone (backend tự lọc theo role người tìm: học viên chỉ
+    thấy ss_team/admin, SS/admin thấy mọi role — xem
+    backend-scrap-jd-nhan-tin.md §4). q rỗng thì không gọi API, tránh
+    round-trip thừa cho trang tìm người lúc mới mở (chưa gõ gì)."""
+    if not q:
+        return []
+    return _request("GET", "/messages/search-people", access_token=access_token, params={"q": q})
+
+
+def get_message_history(access_token: str, partner_id: str, before_id: int | None = None, limit: int = 50) -> list:
+    """GET /messages/with/{partner_id} — lịch sử đầy đủ, MỚI NHẤT TRƯỚC
+    (backend ORDER BY id DESC — caller tự đảo lại nếu cần hiển thị cũ->
+    mới, xem blueprints/messages.py::thread()). Cho xem được kể cả khi
+    quan hệ đang declined/blocked (backend chỉ chặn GỬI, không chặn XEM
+    — xem docstring route get_history phía backend)."""
+    params = {"limit": limit}
+    if before_id is not None:
+        params["before_id"] = before_id
+    return _request("GET", f"/messages/with/{partner_id}", access_token=access_token, params=params)
+
+
+def get_messages_since(access_token: str, partner_id: str, after_id: int) -> list:
+    """GET /messages/since/{partner_id}?after_id=... — polling nhẹ trong
+    lúc mở khung chat (xem public/app.js, poll ~5s/lần). Trả CŨ NHẤT
+    TRƯỚC (ORDER BY id ASC ở backend), khớp đúng thứ tự append vào cuối
+    khung chat phía JS, không cần đảo lại."""
+    return _request(
+        "GET", f"/messages/since/{partner_id}", access_token=access_token,
+        params={"after_id": after_id},
+    )
+
+
+def mark_messages_read(access_token: str, partner_id: str) -> int:
+    """POST /messages/read/{partner_id} — đánh dấu đã đọc mọi tin
+    partner_id gửi cho current_user. Gọi mỗi lần mở khung chat
+    (blueprints/messages.py::thread()) — lỗi ở đây bị caller NUỐT (không
+    flash) vì không đáng làm hỏng cả trang chỉ vì việc đánh dấu đã đọc
+    thất bại, người dùng vẫn cần xem được lịch sử tin nhắn."""
+    data = _request("POST", f"/messages/read/{partner_id}", access_token=access_token)
+    return data.get("marked_read", 0)
+
+
+def send_message(access_token: str, receiver_id: str, content: str) -> dict:
+    """POST /messages — gửi 1 tin nhắn. Response backend KHÔNG đồng nhất
+    1 shape (xem docstring api/routers/messages.py::send_message):
+      - 201: tin nhắn thật đã được lưu -> trả {'status': 'sent', **tin nhắn}.
+      - 202: học viên vừa TẠO hoặc GỬI LẠI request pending tới 1 SS lần
+        đầu — CHƯA có tin nhắn nào được lưu -> trả
+        {'status': 'pending', 'message': '...'} (message đã là câu tiếng
+        Việt sẵn sàng flash).
+    _request() dùng chung ở trên KHÔNG xử lý được 202 (chỉ coi
+    200/201/204 là thành công, phần còn lại rơi vào nhánh lỗi) nên hàm
+    này tự gọi requests.post() trực tiếp — theo đúng pattern
+    apply_to_job() ở trên (route khác cũng cần xử lý status code đặc
+    biệt ngoài quy ước chung)."""
+    url = f"{CRAWLER_API_URL}/messages"
+    try:
+        res = requests.post(
+            url, headers=_headers(access_token),
+            json={"receiver_id": receiver_id, "content": content},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise BackendAuthError(f"Không kết nối được tới backend: {exc}") from exc
+
+    if res.status_code == 201:
+        data = res.json()
+        data["status"] = "sent"
+        return data
+    if res.status_code == 202:
+        return res.json()
+
+    try:
+        detail = res.json().get("detail", "") or ""
+    except Exception:
+        detail = res.text[:300]
+
+    if res.status_code == 429:
+        raise BackendAuthError(
+            detail or "Bạn đang gửi quá nhanh, vui lòng thử lại sau ít phút.", status_code=429,
+        )
+    if res.status_code == 409:
+        raise BackendAuthError(
+            detail or "Không thể gửi — trạng thái hội thoại vừa thay đổi, tải lại trang để xem mới nhất.",
+            status_code=409,
+        )
+    if res.status_code == 403:
+        raise BackendAuthError(detail or "Bạn không có quyền nhắn tin với người này.", status_code=403)
+    if res.status_code == 404:
+        raise BackendAuthError(detail or "Không tìm thấy người nhận.", status_code=404)
+    if res.status_code == 400:
+        raise BackendAuthError(detail or "Nội dung tin nhắn không hợp lệ.", status_code=400)
+
+    raise BackendAuthError(detail or f"Lỗi khi gửi tin nhắn ({res.status_code})", status_code=res.status_code)
+
+
+def accept_message_request(access_token: str, relationship_id: str) -> dict:
+    """POST /messages/relationships/{id}/accept — CHỈ SS/admin sở hữu
+    request đó gọi được (backend tự 403 nếu không đúng role, 409 nếu
+    request đã bị xử lý bởi thao tác khác / không thuộc về mình)."""
+    return _request("POST", f"/messages/relationships/{relationship_id}/accept", access_token=access_token)
+
+
+def decline_message_request(access_token: str, relationship_id: str) -> dict:
+    """POST /messages/relationships/{id}/decline — cùng điều kiện như
+    accept_message_request() ở trên."""
+    return _request("POST", f"/messages/relationships/{relationship_id}/decline", access_token=access_token)
+
+
+def cancel_pending_request(access_token: str, ss_id: str) -> dict:
+    """POST /messages/cancel/{ss_id} — CHỈ role 'user' gọi được (backend
+    tự 403 nếu SS gọi nhầm). Học viên tự huỷ request 'pending' do CHÍNH
+    MÌNH tạo (gửi nhầm SS / đổi ý) — nhận thẳng ss_id (giống
+    block_student_in_chat() bên dưới, KHÔNG cần relationship_id) nên
+    dùng được ngay từ trang tìm người/inbox mà không vướng gap
+    relationship_id như unblock_message_relationship().
+
+    KHÁC decline (do SS làm): huỷ ở đây XOÁ HẲN row, KHÔNG áp cooldown 7
+    ngày — học viên gửi lại ngay lập tức được. 404 nếu không có request
+    pending nào đang chờ với ss_id này (đã bị SS xử lý / chưa từng gửi),
+    409 nếu SS vừa accept/decline đúng lúc gọi (race hiếm)."""
+    return _request("POST", f"/messages/cancel/{ss_id}", access_token=access_token)
+
+
+def block_student_in_chat(access_token: str, student_id: str) -> dict:
+    """POST /messages/block/{student_id} — SS/admin tự chặn 1 học viên,
+    nhận THẲNG student_id (KHÔNG cần biết relationship_id trước) nên
+    dùng được cả 2 trường hợp: chặn trước 1 học viên chưa từng có quan
+    hệ nào, LẪN chặn giữa chừng 1 hội thoại đã 'accepted' — xem docstring
+    route block_student phía backend."""
+    return _request("POST", f"/messages/block/{student_id}", access_token=access_token)
+
+
+def unblock_message_relationship(access_token: str, relationship_id: str) -> dict:
+    """POST /messages/relationships/{id}/unblock — CẦN relationship_id.
+
+    LƯU Ý (08/2026, xem trao đổi lúc làm FE): hiện KHÔNG có route backend
+    nào trả relationship_id cho 1 cặp đã 'accepted'/'blocked' —
+    ConversationOut (GET /messages/conversations) KHÔNG có field id, chỉ
+    PendingRequestOut (GET /messages/pending-requests, dành cho request
+    CHƯA từng nhắn) mới có. Nghĩa là UI (blueprints/messages.py,
+    templates/messages.html) hiện KHÔNG có cách lấy relationship_id để
+    gọi hàm này sau khi đã rời khỏi phản hồi ngay lúc vừa block (response
+    của block_student_in_chat() ở trên CÓ trả id, nhưng chỉ dùng được
+    ngay tại thời điểm đó, không có nơi nào lưu lại cho lần sau).
+
+    Hàm này vẫn viết sẵn, gọi được ngay khi backend bổ sung 1 trong 2:
+    (a) thêm field relationship_id vào ConversationOut, hoặc
+    (b) thêm route POST /messages/unblock/{student_id} mirror đúng
+        block_student_in_chat() ở trên."""
+    return _request("POST", f"/messages/relationships/{relationship_id}/unblock", access_token=access_token)

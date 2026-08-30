@@ -683,3 +683,191 @@
     initEmailTemplateModal();
   }
 })();
+
+// ============================================================
+// Hệ thống nhắn tin (thêm 08/2026) — polling khung chat (~5s) +
+// badge unread sidebar (20-30s). Vòng đời polling theo đúng
+// frontend-mindx-jobs-nhan-tin.md §4: chỉ chạy khi tab active, backoff
+// khi lỗi liên tiếp (giãn dần, reset khi thành công lại), dừng hẳn khi
+// 401 (không retry vô hạn), dọn interval khi rời trang. App này là MPA
+// (mỗi trang tải lại toàn bộ, không phải SPA điều hướng nội bộ) nên
+// "rời trang" đã tự dọn interval (context JS bị huỷ theo unload) —
+// listener beforeunload dưới đây chỉ là phòng hờ thêm, không phải cơ
+// chế dọn chính.
+//
+// XSS: escapeText() dưới đây BẮT BUỘC dùng textContent, CẤM innerHTML
+// cho nội dung tin nhắn (do user nhập) — xem §3, §5
+// frontend-mindx-jobs-nhan-tin.md.
+(function () {
+  "use strict";
+
+  var CHAT_BASE_INTERVAL = 5000;   // 5s — khung chat đang mở
+  var CHAT_MAX_INTERVAL = 30000;   // trần backoff
+  var BADGE_BASE_INTERVAL = 20000; // 20s — badge sidebar (kế hoạch: 20-30s)
+  var BADGE_MAX_INTERVAL = 45000;
+
+  function escapeText(el, text) {
+    el.textContent = text; // KHÔNG bao giờ dùng innerHTML ở đây
+  }
+
+  function formatMsgTime(iso) {
+    try {
+      var d = new Date(iso);
+      var hh = String(d.getHours()).padStart(2, "0");
+      var mm = String(d.getMinutes()).padStart(2, "0");
+      var dd = String(d.getDate()).padStart(2, "0");
+      var mo = String(d.getMonth() + 1).padStart(2, "0");
+      return hh + ":" + mm + " " + dd + "/" + mo;
+    } catch (e) {
+      return "";
+    }
+  }
+
+  // Vòng đời poll dùng chung cho cả 2 nơi (khung chat + badge) — nhận
+  // vào 1 hàm fetchOnce(onSuccess, onError) để tránh lặp lại y hệt logic
+  // backoff/pause/stop-401 2 lần.
+  function createPoller(baseInterval, maxInterval, fetchOnce) {
+    var interval = baseInterval;
+    var timer = null;
+    var stopped = false;
+
+    function restartTimer() {
+      if (timer) clearInterval(timer);
+      if (stopped) return;
+      timer = setInterval(tick, interval);
+    }
+
+    function tick() {
+      if (stopped || document.visibilityState !== "visible") return;
+      fetchOnce(
+        function onSuccess() {
+          if (interval !== baseInterval) {
+            interval = baseInterval;
+            restartTimer();
+          }
+        },
+        function onUnauthorized() {
+          stopped = true;
+          if (timer) clearInterval(timer);
+        },
+        function onError() {
+          interval = Math.min(interval * 2, maxInterval);
+          restartTimer();
+        }
+      );
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (stopped) return;
+      if (document.visibilityState === "visible") {
+        tick();
+        restartTimer();
+      } else if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    });
+
+    window.addEventListener("beforeunload", function () {
+      if (timer) clearInterval(timer);
+    });
+
+    restartTimer();
+    return { stop: function () { stopped = true; if (timer) clearInterval(timer); } };
+  }
+
+  function fetchJson(url, onSuccess, onUnauthorized, onError) {
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" }, cache: "no-store" })
+      .then(function (res) {
+        if (res.status === 401) { onUnauthorized(); return null; }
+        if (!res.ok) throw new Error("request failed: " + res.status);
+        return res.json();
+      })
+      .then(function (data) { if (data !== null) onSuccess(data); })
+      .catch(function () { onError(); });
+  }
+
+  // ---- Khung chat: append tin mới, giữ nguyên vị trí cuộn của người đọc ----
+  function initChatPolling() {
+    var container = document.getElementById("chatMessages");
+    if (!container) return;
+
+    var currentUserId = container.getAttribute("data-current-user-id");
+    var sinceUrlBase = container.getAttribute("data-since-url");
+    var lastId = parseInt(container.getAttribute("data-last-id"), 10) || 0;
+
+    container.scrollTop = container.scrollHeight; // cuộn xuống cuối lúc mở trang
+
+    function appendMessage(msg) {
+      var emptyState = container.querySelector(".chat-empty");
+      if (emptyState) emptyState.remove();
+
+      var row = document.createElement("div");
+      row.className = "msg " + (String(msg.sender_id) === String(currentUserId) ? "msg-out" : "msg-in");
+      row.setAttribute("data-id", msg.id);
+
+      var bubble = document.createElement("div");
+      bubble.className = "msg-bubble";
+      escapeText(bubble, msg.content);
+
+      var time = document.createElement("div");
+      time.className = "msg-time";
+      escapeText(time, formatMsgTime(msg.created_at));
+
+      row.appendChild(bubble);
+      row.appendChild(time);
+      container.appendChild(row);
+    }
+
+    createPoller(CHAT_BASE_INTERVAL, CHAT_MAX_INTERVAL, function (onSuccess, onUnauthorized, onError) {
+      fetchJson(
+        sinceUrlBase + "?after_id=" + lastId,
+        function (data) {
+          var wasAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 40;
+          data.forEach(function (msg) {
+            appendMessage(msg);
+            if (msg.id > lastId) lastId = msg.id;
+          });
+          if (data.length && wasAtBottom) container.scrollTop = container.scrollHeight;
+          onSuccess();
+        },
+        onUnauthorized,
+        onError
+      );
+    });
+  }
+
+  // ---- Badge unread sidebar: chạy trên MỌI trang đã đăng nhập ----
+  function initUnreadBadgePolling() {
+    var badge = document.getElementById("sidebarUnreadBadge");
+    if (!badge) return;
+
+    createPoller(BADGE_BASE_INTERVAL, BADGE_MAX_INTERVAL, function (onSuccess, onUnauthorized, onError) {
+      fetchJson(
+        "/messages/unread-count.json",
+        function (data) {
+          var count = data.count || 0;
+          if (count > 0) {
+            badge.textContent = count > 99 ? "99+" : String(count);
+            badge.hidden = false;
+          } else {
+            badge.hidden = true;
+          }
+          onSuccess();
+        },
+        onUnauthorized,
+        onError
+      );
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      initChatPolling();
+      initUnreadBadgePolling();
+    });
+  } else {
+    initChatPolling();
+    initUnreadBadgePolling();
+  }
+})();

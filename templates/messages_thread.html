@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ partner_name }} — Tin nhắn — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head chat-head">
+  <div>
+    <a class="back-link" href="{{ url_for('messages.inbox') }}">← Tin nhắn</a>
+    <h1>{{ partner_name }}
+      {% if partner_role %}<span class="role-chip">{{ role_labels.get(partner_role, partner_role) }}</span>{% endif %}
+    </h1>
+  </div>
+  {% if current_user.is_staff and partner_role == 'user' %}
+  <form method="post" action="{{ url_for('messages.block_student', student_id=partner_id) }}"
+        onsubmit="return confirm('Chặn {{ partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-ghost btn-danger-text">Chặn học viên</button>
+  </form>
+  {% endif %}
+</header>
+
+<div class="chat-shell">
+  <div id="chatMessages" class="chat-messages"
+       data-partner-id="{{ partner_id }}"
+       data-current-user-id="{{ current_user.id }}"
+       data-last-id="{{ last_id }}"
+       data-since-url="{{ url_for('messages.since_json', partner_id=partner_id) }}">
+    {% if history %}
+      {% for msg in history %}
+      <div class="msg {{ 'msg-out' if msg.sender_id == current_user.id else 'msg-in' }}" data-id="{{ msg.id }}">
+        <div class="msg-bubble">{{ msg.content }}</div>
+        <div class="msg-time">{{ msg.created_at|format_date('%H:%M %d/%m') }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state chat-empty">
+        {% if current_user.is_student %}
+        <p>Chưa có tin nhắn nào. Gửi tin đầu tiên bên dưới để tạo yêu cầu nhắn tin tới {{ partner_name }}.</p>
+        {% else %}
+        <p>Chưa có tin nhắn nào. Nhắn trước cho {{ partner_name }} — hội thoại sẽ tự mở, không cần chờ chấp nhận.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <form method="post"
+        action="{{ url_for('messages.send', partner_id=partner_id, name=partner_name, role=partner_role) }}"
+        class="composer">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="content" maxlength="{{ max_content_length }}" rows="2"
+              placeholder="Nhập tin nhắn..." required></textarea>
+    <button type="submit" class="btn btn-primary">Gửi</button>
+  </form>
+
+  {% if current_user.is_student and not history and partner_role in ('ss_team', 'admin') %}
+  <form method="post"
+        action="{{ url_for('messages.cancel', partner_id=partner_id, name=partner_name, role=partner_role) }}"
+        class="cancel-request-form"
+        onsubmit="return confirm('Huỷ yêu cầu nhắn tin đang chờ tới {{ partner_name }}?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-text">Đã gửi nhầm? Huỷ yêu cầu đang chờ (nếu có)</button>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

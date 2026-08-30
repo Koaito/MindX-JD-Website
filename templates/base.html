@@ -42,6 +42,14 @@
       <a href="{{ url_for('jobs.index') }}" class="{{ 'active' if request.endpoint in ['jobs.index','jobs.detail'] else '' }}" title="Danh sách job">
         <span class="nav-ic">▤</span> <span class="nav-text">Danh sách job</span>
       </a>
+      {% if current_user.is_authenticated %}
+      <span class="nav-label">Nhắn tin</span>
+      <a href="{{ url_for('messages.inbox') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('messages.') else '' }}" title="Tin nhắn">
+        <span class="nav-ic">✉</span> <span class="nav-text">Tin nhắn</span>
+        <span class="nav-badge" id="sidebarUnreadBadge" {{ 'hidden' if not unread_message_count }}>{{ unread_message_count if unread_message_count <= 99 else '99+' }}</span>
+      </a>
+      {% endif %}
+
       {% if current_user.is_authenticated and current_user.is_staff %}
       <a href="{{ url_for('jobs.add') }}" class="{{ 'active' if request.endpoint == 'jobs.add' else '' }}" title="Thêm job">
         <span class="nav-ic">＋</span> <span class="nav-text">Thêm job</span>

@@ -118,6 +118,26 @@ def inject_saved_job_ids():
 
 
 @app.context_processor
+def inject_unread_message_count():
+    """Số tin nhắn chưa đọc hiện ngay ở badge sidebar (base.html) lúc
+    tải trang lần đầu — public/app.js sẽ tự poll (20-30s) để cập nhật
+    tiếp sau đó mà không cần tải lại trang, xem
+    blueprints/messages.py::unread_count_json(). Cùng pattern
+    inject_saved_job_ids() ngay trên: chỉ gọi API khi đã đăng nhập,
+    nuốt lỗi (không flash) để 1 lượt gọi backend chập chờn không kéo
+    theo lỗi hiển thị ở MỌI trang (badge chỉ là phụ trợ, không phải nội
+    dung chính của trang đang xem)."""
+    if current_user.is_authenticated:
+        access_token, _ = _auth_tokens_from_session()
+        if access_token:
+            try:
+                return {"unread_message_count": backend_auth.get_unread_count(access_token)}
+            except BackendAuthError:
+                pass
+    return {"unread_message_count": 0}
+
+
+@app.context_processor
 def inject_email_templates():
     """Nạp danh sách mẫu email ra MỌI trang có nút "✉ Mẫu email"
     (contacts.html, company_detail.html — popup dùng chung, markup nằm
@@ -156,6 +176,7 @@ from blueprints.crawl import crawl_bp
 from blueprints.dashboard import dashboard_bp
 from blueprints.data_management import data_mgmt_bp
 from blueprints.jobs import jobs_bp
+from blueprints.messages import messages_bp
 from blueprints.my_stuff import my_stuff_bp
 from blueprints.profile import profile_bp
 from blueprints.staff import staff_bp
@@ -163,6 +184,7 @@ from blueprints.staff_activity import staff_activity_bp
 from blueprints.students import students_bp
 
 app.register_blueprint(auth_bp)
+app.register_blueprint(messages_bp)
 app.register_blueprint(my_stuff_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(jobs_bp)

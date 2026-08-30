@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Tin nhắn — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Nhắn tin</span>
+    <h1>Tin nhắn</h1>
+    <p class="lede">
+      {% if current_user.is_staff %}
+        Hội thoại với học viên và team SS khác. Yêu cầu nhắn tin mới từ học viên sẽ hiện ở mục riêng bên dưới.
+      {% else %}
+        Hội thoại với team SS. Gửi yêu cầu nhắn tin mới nếu chưa từng liên hệ với ai đó.
+      {% endif %}
+    </p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('messages.new_message') }}">✎ Nhắn tin mới</a>
+</header>
+
+{% if current_user.is_staff and pending_requests %}
+<section class="msg-section">
+  <h2 class="msg-section-title">Yêu cầu đang chờ ({{ pending_requests|length }})</h2>
+  <div class="pending-list">
+    {% for req in pending_requests %}
+    <div class="pending-row">
+      <div class="pending-info">
+        <strong>{{ req.student_name }}</strong>
+        <span class="muted">Gửi lúc {{ req.requested_at|format_date('%d/%m/%Y %H:%M') }}</span>
+      </div>
+      <div class="pending-actions">
+        <form method="post" action="{{ url_for('messages.accept_request_route', relationship_id=req.relationship_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-primary">Chấp nhận</button>
+        </form>
+        <form method="post" action="{{ url_for('messages.decline_request_route', relationship_id=req.relationship_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-ghost">Từ chối</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="msg-section">
+  {% if current_user.is_staff and pending_requests %}
+  <h2 class="msg-section-title">Hội thoại</h2>
+  {% endif %}
+
+  {% if conversations %}
+  <div class="conversation-list">
+    {% for conv in conversations %}
+    <div class="conversation-item">
+      <a class="conversation-row {{ 'unread' if conv.unread_count }}"
+         href="{{ url_for('messages.thread', partner_id=conv.partner_id, name=conv.partner_name, role=conv.partner_role) }}">
+        <div class="conversation-avatar">{{ conv.partner_name[0]|upper }}</div>
+        <div class="conversation-main">
+          <div class="conversation-top">
+            <strong>{{ conv.partner_name }}</strong>
+            <span class="role-chip">{{ role_labels.get(conv.partner_role, conv.partner_role) }}</span>
+            {% if conv.relationship_status and conv.relationship_status != 'accepted' %}
+              <span class="status-chip status-{{ conv.relationship_status }}">
+                {{ {'pending': 'Đang chờ', 'declined': 'Đã từ chối', 'blocked': 'Đã chặn'}.get(conv.relationship_status, conv.relationship_status) }}
+              </span>
+            {% endif %}
+          </div>
+          <p class="conversation-preview">{{ conv.last_message_preview or '—' }}</p>
+        </div>
+        <div class="conversation-side">
+          <span class="conversation-time">{{ conv.last_message_at|format_date('%d/%m %H:%M') if conv.last_message_at else '' }}</span>
+          {% if conv.unread_count %}
+            <span class="conversation-unread">{{ conv.unread_count if conv.unread_count <= 99 else '99+' }}</span>
+          {% endif %}
+        </div>
+      </a>
+      {% if current_user.is_staff and conv.partner_role == 'user' and conv.relationship_status != 'blocked' %}
+      <form method="post" action="{{ url_for('messages.block_student', student_id=conv.partner_id) }}"
+            class="conversation-block-form"
+            onsubmit="return confirm('Chặn {{ conv.partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-text btn-danger-text">Chặn</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% elif not (current_user.is_staff and pending_requests) %}
+  <div class="empty-state">
+    <p>Chưa có hội thoại nào.</p>
+    <a class="btn btn-primary" href="{{ url_for('messages.new_message') }}">Bắt đầu nhắn tin mới</a>
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}

@@ -1,0 +1,265 @@
+/* Used by: /messages (inbox), /messages/new (tìm người), /messages/<id>
+   (khung chat) — templates/messages.html, messages_new.html,
+   messages_thread.html — và badge unread ở sidebar (base.html, #sidebarUnreadBadge).
+
+   Tái dùng: .status-chip (base font-size/padding đã khai báo ở
+   04-job-cards.css, border-radius/white-space dùng chung ở 00-tokens.css
+   — file này CHỈ thêm màu riêng cho 3 trạng thái pending/declined/
+   blocked), .role-chip (05-contact-table.css), .btn-*/.page-head/.back-link
+   (03-layout.css), .empty-state (09-misc-toasts.css). KHÔNG định nghĩa
+   lại các class đó ở đây. */
+
+/* ---------------- Badge unread ở sidebar ---------------- */
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.nav-badge[hidden] { display: none; }
+
+/* ---------------- Trang inbox ---------------- */
+
+.msg-section { margin-bottom: 32px; }
+
+.msg-section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.pending-list, .conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+
+.pending-info { display: flex; flex-direction: column; gap: 3px; }
+.pending-info .muted { font-size: 12.5px; color: var(--ink-soft); }
+
+.pending-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.pending-actions form { margin: 0; }
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-row:hover { background: var(--bg); }
+
+.conversation-row.unread .conversation-preview,
+.conversation-row.unread strong { color: var(--ink); font-weight: 700; }
+
+.conversation-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.conversation-main { min-width: 0; flex: 1; }
+
+.conversation-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.conversation-preview {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.conversation-time { font-size: 11.5px; color: var(--muted); }
+
+.conversation-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.conversation-block-form {
+  flex-shrink: 0;
+  margin: 0 14px 0 0;
+}
+
+.status-pending { background: var(--amber-soft); color: var(--amber); }
+.status-declined { background: #F1EDF0; color: #8A6E80; }
+.status-blocked { background: #FBE7E4; color: #B23A22; }
+
+/* ---------------- Trang tìm người (/messages/new) ---------------- */
+
+.people-search-form {
+  display: flex;
+  gap: 10px;
+  max-width: 480px;
+  margin-bottom: 22px;
+}
+
+.people-search-form input[type="text"] {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.people-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.people-result-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+}
+
+.people-result-row:hover { border-color: var(--ink); }
+.people-result-row .conversation-main { display: flex; align-items: center; gap: 8px; }
+.people-result-cta { margin-left: auto; font-size: 13px; color: var(--accent); font-weight: 600; }
+
+/* ---------------- Khung chat (/messages/<id>) ---------------- */
+
+.chat-head h1 { display: flex; align-items: center; gap: 10px; }
+.chat-head form { margin: 0; }
+
+.chat-shell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  /* Chiều cao cố định + scroll riêng khung chat, không cuộn cả trang —
+     bù zoom giống các khối full-height khác, xem giải thích ở
+     00-tokens.css `html { zoom }`. */
+  height: calc(56vh / var(--zoom-scale));
+  overflow-y: auto;
+}
+
+.chat-empty { border: none; padding: 40px 0; }
+
+.msg { display: flex; flex-direction: column; max-width: 62%; }
+.msg-in { align-self: flex-start; align-items: flex-start; }
+.msg-out { align-self: flex-end; align-items: flex-end; }
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.msg-in .msg-bubble { background: var(--bg); color: var(--ink); border-bottom-left-radius: 4px; }
+.msg-out .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+
+.msg-time { font-size: 10.5px; color: var(--muted); margin-top: 3px; padding: 0 4px; }
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  background: var(--surface);
+}
+
+.cancel-request-form {
+  padding: 0 18px 16px;
+  margin: 0;
+}
+.cancel-request-form .btn-text { padding: 4px 0; font-size: 12.5px; }
+
+@media (max-width: 900px) {
+  .msg { max-width: 82%; }
+  .chat-messages { height: calc(48vh / var(--zoom-scale)); }
+}

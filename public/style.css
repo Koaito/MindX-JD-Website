@@ -32,3 +32,4 @@
 @import url('css/15-crawl.css');                 /* /crawl: trang crawl dữ liệu (chỉ admin) */
 @import url('css/16-email-template-manager.css'); /* /contacts?tab=quan-ly: quản lý mẫu email (list + form CRUD) */
 @import url('css/17-error-pages.css');           /* Trang lỗi tuỳ chỉnh (400/403/404/500) — xem @app.errorhandler trong app.py */
+@import url('css/18-messages.css');              /* /messages: inbox + khung chat + badge unread sidebar (thêm 08/2026) */

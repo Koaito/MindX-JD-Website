@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Nhắn tin mới — MindX Career Hub{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Nhắn tin</span>
+    <h1>Nhắn tin mới</h1>
+    <p class="lede">
+      {% if current_user.is_student %}
+        Tìm 1 SS/admin để gửi yêu cầu nhắn tin. Bạn cần được SS chấp nhận trước khi nhắn tiếp.
+      {% else %}
+        Tìm học viên hoặc SS/admin khác để bắt đầu hội thoại.
+      {% endif %}
+    </p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('messages.inbox') }}">← Quay lại tin nhắn</a>
+</header>
+
+<form method="get" action="{{ url_for('messages.new_message') }}" class="people-search-form">
+  <input type="text" name="q" value="{{ q }}" placeholder="Nhập tên..." autofocus autocomplete="off">
+  <button type="submit" class="btn btn-primary">Tìm</button>
+</form>
+
+{% if q %}
+  {% if results %}
+  <div class="people-result-list">
+    {% for person in results %}
+    <a class="people-result-row" href="{{ url_for('messages.thread', partner_id=person.id, name=person.full_name, role=person.role) }}">
+      <div class="conversation-avatar">{{ person.full_name[0]|upper }}</div>
+      <div class="conversation-main">
+        <strong>{{ person.full_name }}</strong>
+        <span class="role-chip">{{ role_labels.get(person.role, person.role) }}</span>
+      </div>
+      <span class="people-result-cta">Nhắn tin →</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>Không tìm thấy ai khớp với "{{ q }}".</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+{% endblock %}
