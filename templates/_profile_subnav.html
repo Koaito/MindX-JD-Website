@@ -1,12 +1,14 @@
 {# Sub-nav ngang cho khu vực "Trang cá nhân" (/profile/...) — thêm
    08/2026. Include ở đầu MỌI template thuộc blueprint profile (xem
-   blueprints/profile.py), truyền biến `active` = 'overview' | 'security'
-   để tô mục đang đứng.
+   blueprints/profile.py) VÀ 2 trang saved_jobs.html/my_applications.html
+   (vẫn thuộc blueprint my_stuff.py nhưng nay nằm dưới path /profile/...
+   — xem blueprints/my_stuff.py), truyền biến `active` =
+   'overview' | 'security' | 'saved-jobs' | 'applications' để tô mục
+   đang đứng.
 
-   Chỉ 2 mục hiện có (Thông tin chung, Bảo mật) — CHỖ TRỐNG có chủ đích
-   cho 2 mục sẽ thêm sau (Job đã lưu, Đã ứng tuyển — dời từ
-   my_stuff.py, chỉ hiện với is_student, xem thảo luận trang cá nhân)
-   để không phải đổi cấu trúc file này lần nữa, chỉ thêm 1 <a> mới. #}
+   Job đã lưu / Đã ứng tuyển chỉ hiện với học viên (is_student) — 2
+   mục này vô nghĩa với team SS/admin, giống điều kiện is_staff chặn
+   trực tiếp trong my_stuff.py. #}
 <nav class="profile-subnav">
   <a href="{{ url_for('profile.index') }}" class="{{ 'active' if active == 'overview' else '' }}">
     Thông tin chung
@@ -14,4 +16,12 @@
   <a href="{{ url_for('profile.security') }}" class="{{ 'active' if active == 'security' else '' }}">
     Bảo mật
   </a>
+  {% if current_user.is_student %}
+  <a href="{{ url_for('my_stuff.saved_jobs') }}" class="{{ 'active' if active == 'saved-jobs' else '' }}">
+    Job đã lưu
+  </a>
+  <a href="{{ url_for('my_stuff.my_applications') }}" class="{{ 'active' if active == 'applications' else '' }}">
+    Đã ứng tuyển
+  </a>
+  {% endif %}
 </nav>

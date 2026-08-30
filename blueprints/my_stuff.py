@@ -65,7 +65,7 @@ def job_toggle_save_json(job_id):
         return jsonify(ok=False, message=str(exc)), 400
 
 
-@my_stuff_bp.route("/saved-jobs")
+@my_stuff_bp.route("/profile/saved-jobs")
 @login_required
 def saved_jobs():
     if current_user.is_staff:
@@ -87,6 +87,16 @@ def saved_jobs():
         if job:
             jobs.append(job)
     return render_template("saved_jobs.html", jobs=jobs)
+
+
+@my_stuff_bp.route("/saved-jobs")
+@login_required
+def saved_jobs_legacy():
+    """08/2026 — URL cũ trước khi dời vào sub-nav trang cá nhân. Giữ
+    lại để không vỡ bookmark/link cũ đang trỏ /saved-jobs (endpoint
+    name my_stuff.saved_jobs không đổi, chỉ path đổi sang
+    /profile/saved-jobs — xem _profile_subnav.html)."""
+    return redirect(url_for("my_stuff.saved_jobs"))
 
 
 @my_stuff_bp.route("/jobs/<string:job_id>/apply", methods=["POST"])
@@ -147,7 +157,7 @@ def job_withdraw(job_id):
     return redirect(request.referrer or url_for("my_stuff.my_applications"))
 
 
-@my_stuff_bp.route("/my-applications")
+@my_stuff_bp.route("/profile/applications")
 @login_required
 def my_applications():
     if current_user.is_staff:
@@ -159,3 +169,13 @@ def my_applications():
         flash(str(exc), "error")
         applications = []
     return render_template("my_applications.html", applications=applications)
+
+
+@my_stuff_bp.route("/my-applications")
+@login_required
+def my_applications_legacy():
+    """08/2026 — URL cũ trước khi dời vào sub-nav trang cá nhân. Giữ
+    lại để không vỡ bookmark/link cũ đang trỏ /my-applications (endpoint
+    name my_stuff.my_applications không đổi, chỉ path đổi sang
+    /profile/applications — xem _profile_subnav.html)."""
+    return redirect(url_for("my_stuff.my_applications"))

@@ -10,6 +10,9 @@
   </div>
 </header>
 
+{% set active = 'applications' %}
+{% include "_profile_subnav.html" with context %}
+
 {% if applications %}
 <div class="job-grid">
   {% for a in applications %}

@@ -15,12 +15,16 @@ Route trong blueprint này:
                                  bookmark/link cũ đang trỏ tới
                                  /change-password).
 
-Kế hoạch mở rộng (chưa làm ở đợt này, xem thảo luận trang cá nhân):
-  GET /profile/saved-jobs      — dời từ my_stuff.saved_jobs.
-  GET /profile/applications     — dời từ my_stuff.my_applications.
-Cả 2 sẽ chỉ hiện với học viên (is_staff=False), giống hệt điều kiện
-đang áp dụng ở my_stuff.py hiện tại — CHƯA đụng tới trong đợt này để
-giữ phạm vi thay đổi gọn (chỉ "đổi tên + đổi mật khẩu" trước).
+2 mục còn lại của sub-nav — GET /profile/saved-jobs và
+GET /profile/applications — KHÔNG nằm trong blueprint này. Logic
+nghiệp vụ save/apply/withdraw vẫn thuộc "my stuff" nên 2 route đó vẫn
+định nghĩa trong blueprints/my_stuff.py (hàm saved_jobs/my_applications),
+chỉ đổi path sang dưới /profile/... và include cùng
+_profile_subnav.html để nằm chung sub-nav với 2 trang overview/security
+ở đây. URL cũ /saved-jobs, /my-applications vẫn còn, redirect sang URL
+mới (xem my_stuff.py) — cùng pattern với auth.change_password ở trên.
+Cả 2 chỉ hiện trong sub-nav với học viên (is_student), staff/admin
+không thấy.
 
 Sub-nav hiển thị mục nào tuỳ role — xem templates/_profile_subnav.html.
 """
