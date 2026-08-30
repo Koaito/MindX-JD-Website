@@ -30,6 +30,7 @@ html.sidebar-collapsed .sidebar {
 /* Text that disappears when the sidebar is collapsed — icons stay. */
 html.sidebar-collapsed .nav-label,
 html.sidebar-collapsed .nav-text,
+html.sidebar-collapsed .nav-note,
 html.sidebar-collapsed .brand-text,
 html.sidebar-collapsed .auth-info,
 html.sidebar-collapsed .sidebar-foot .btn-block .btn-text-label,
@@ -141,6 +142,17 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
 
 .nav-label:first-child { margin-top: 0; }
 
+.nav-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 10px 12px;
+  padding: 0 2px;
+}
+
+.nav-note a { color: inherit; text-decoration: underline; }
+.nav-note a:hover { color: var(--text, #fff); }
+
 .nav a {
   display: flex;
   align-items: center;
@@ -182,21 +194,6 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
-}
-
-/* 08/2026 — .auth-box giờ là <a href="/profile"> (trước là <div> tĩnh,
-   xem templates/base.html) để bấm avatar/tên vào thẳng trang cá nhân,
-   pattern quen thuộc ở hầu hết app (Gmail, GitHub...). Reset lại style
-   <a> mặc định (màu xanh + gạch chân khi hover) để trông vẫn y hệt
-   block tĩnh cũ, chỉ thêm hiệu ứng hover nhẹ làm rõ đây là bấm được. */
-.auth-box,
-.auth-box:hover {
-  color: inherit;
-  text-decoration: none;
-}
-
-.auth-box:hover {
-  opacity: 0.85;
 }
 
 .auth-avatar {

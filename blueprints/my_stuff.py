@@ -16,7 +16,7 @@ import backend_auth
 import crawler_client as db_data
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session
+from helpers import _auth_tokens_from_session, _io_pool as _pool
 
 my_stuff_bp = Blueprint("my_stuff", __name__)
 
@@ -78,10 +78,20 @@ def saved_jobs():
         flash(str(exc), "error")
         saved = []
 
+    # Song song hoá N lệnh get_job() ĐỘC LẬP NHAU (1 job/lệnh) — trước
+    # đây gọi TUẦN TỰ trong vòng for (thêm 08/2026, xem lịch sử trao đổi
+    # "load /saved-jobs 8.94s" — N+1 query kinh điển: 1 lệnh
+    # list_my_saved_jobs() + N lệnh get_job() nối đuôi nhau, N càng
+    # nhiều (càng lưu nhiều job) càng chậm tuyến tính, không có gì giới
+    # hạn N). Mỗi get_job() không phụ thuộc kết quả của lệnh khác — bắn
+    # cùng lúc bằng _io_pool (pool dùng chung toàn app, xem helpers.py)
+    # thay vì đợi lần lượt, tổng thời gian ≈ round-trip CHẬM NHẤT trong
+    # N lệnh thay vì TỔNG N round-trip.
+    futures = [_pool.submit(db_data.get_job, s["job_id"]) for s in saved]
     jobs = []
-    for s in saved:
+    for future in futures:
         try:
-            job = db_data.get_job(s["job_id"])
+            job = future.result()
         except CrawlerAPIError:
             job = None
         if job:

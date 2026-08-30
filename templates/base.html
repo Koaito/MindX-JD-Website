@@ -99,12 +99,10 @@
 
       {% if current_user.is_authenticated and not current_user.is_staff %}
       <span class="nav-label">Học viên</span>
-      <a href="{{ url_for('my_stuff.saved_jobs') }}" class="{{ 'active' if request.endpoint == 'my_stuff.saved_jobs' else '' }}" title="Job đã lưu">
-        <span class="nav-ic">🔖</span> <span class="nav-text">Job đã lưu</span>
-      </a>
-      <a href="{{ url_for('my_stuff.my_applications') }}" class="{{ 'active' if request.endpoint == 'my_stuff.my_applications' else '' }}" title="Đã ứng tuyển">
-        <span class="nav-ic">📨</span> <span class="nav-text">Đã ứng tuyển</span>
-      </a>
+      <p class="nav-note muted">
+        Xem "Job đã lưu" / "Đã ứng tuyển" trong
+        <a href="{{ url_for('profile.index') }}">Trang cá nhân</a>.
+      </p>
       {% endif %}
     </nav>
 
