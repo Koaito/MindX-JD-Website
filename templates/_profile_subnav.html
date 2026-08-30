@@ -1,14 +1,21 @@
 {# Sub-nav ngang cho khu vực "Trang cá nhân" (/profile/...) — thêm
    08/2026. Include ở đầu MỌI template thuộc blueprint profile (xem
-   blueprints/profile.py) VÀ 2 trang saved_jobs.html/my_applications.html
-   (vẫn thuộc blueprint my_stuff.py nhưng nay nằm dưới path /profile/...
-   — xem blueprints/my_stuff.py), truyền biến `active` =
-   'overview' | 'security' | 'saved-jobs' | 'applications' để tô mục
-   đang đứng.
+   blueprints/profile.py) VÀ saved_jobs.html/my_applications.html (vẫn
+   thuộc blueprint my_stuff.py nhưng nay nằm dưới path /profile/... —
+   xem blueprints/my_stuff.py), truyền biến `active` =
+   'overview' | 'security' | 'saved-jobs' | 'applications' | 'activity'
+   để tô mục đang đứng.
 
    Job đã lưu / Đã ứng tuyển chỉ hiện với học viên (is_student) — 2
    mục này vô nghĩa với team SS/admin, giống điều kiện is_staff chặn
-   trực tiếp trong my_stuff.py. #}
+   trực tiếp trong my_stuff.py.
+
+   Hoạt động chỉ hiện với team SS/admin (is_staff) — xem job/công ty/
+   contact CHÍNH MÌNH đã tự thêm tay + contact đang phụ trách (dữ liệu
+   giống /staff-activity/<id> nhưng CHỈ xem được của bản thân — xem
+   profile.activity trong blueprints/profile.py, và ghi chú trong
+   blueprints/staff_activity.py giải thích vì sao route admin đó chặn
+   không cho xem chính mình, bắt redirect về đây thay vào đó). #}
 <nav class="profile-subnav">
   <a href="{{ url_for('profile.index') }}" class="{{ 'active' if active == 'overview' else '' }}">
     Thông tin chung
@@ -22,6 +29,11 @@
   </a>
   <a href="{{ url_for('my_stuff.my_applications') }}" class="{{ 'active' if active == 'applications' else '' }}">
     Đã ứng tuyển
+  </a>
+  {% endif %}
+  {% if current_user.is_staff %}
+  <a href="{{ url_for('profile.activity') }}" class="{{ 'active' if active == 'activity' else '' }}">
+    Hoạt động
   </a>
   {% endif %}
 </nav>

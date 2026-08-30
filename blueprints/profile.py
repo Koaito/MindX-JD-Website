@@ -14,6 +14,19 @@ Route trong blueprint này:
                                  blueprints/auth.py — để không vỡ
                                  bookmark/link cũ đang trỏ tới
                                  /change-password).
+  GET /profile/activity        — CHỈ team SS/admin (is_staff, chặn bằng
+                                 @staff_required). Job/công ty/contact
+                                 CHÍNH MÌNH đã tự thêm tay + contact
+                                 đang được giao phụ trách — cùng dữ
+                                 liệu/logic với staff_activity.detail()
+                                 (blueprints/staff_activity.py, trang
+                                 "Hoạt động team SS" dành cho admin xem
+                                 người khác) nhưng CHỈ xem được của bản
+                                 thân. staff_activity.detail() chặn
+                                 không cho xem chính mình qua đường đó
+                                 nữa (redirect sang đây) — tránh 2 nơi
+                                 cùng hiển thị 1 dữ liệu, xem comment ở
+                                 đó.
 
 2 mục còn lại của sub-nav — GET /profile/saved-jobs và
 GET /profile/applications — KHÔNG nằm trong blueprint này. Logic
@@ -29,15 +42,27 @@ không thấy.
 Sub-nav hiển thị mục nào tuỳ role — xem templates/_profile_subnav.html.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, logout_user
 
 import backend_auth
+import crawler_client as db_data
 from backend_auth import BackendAuthError
 from constants import INDUSTRIES
+from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _clear_auth_tokens
+from utils.decorators import staff_required
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/profile")
+
+# Dùng riêng cho profile.activity() bên dưới — song song hoá 4 lệnh gọi
+# backend độc lập nhau (jobs/companies/contacts-created/contacts-assigned
+# của CHÍNH current_user), cùng pattern với _pool trong
+# blueprints/staff_activity.py (không import chung pool đó qua module
+# khác — 2 blueprint độc lập, mỗi bên tự có pool riêng của mình).
+_activity_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="profile-activity-io")
 
 
 @profile_bp.route("", methods=["GET", "POST"])
@@ -127,3 +152,68 @@ def security():
         return redirect(url_for("auth.login"))
 
     return render_template("profile_security.html")
+
+
+@profile_bp.route("/activity")
+@staff_required
+def activity():
+    """Hoạt động CHÍNH BẠN đã tạo — job/công ty/contact tự thêm tay +
+    contact đang được giao phụ trách. @staff_required (không phải
+    @login_required như 2 route trên) vì học viên không tạo job/công
+    ty/contact, mục "Hoạt động" cũng không hiện với họ trong sub-nav.
+
+    Cùng 4 lệnh gọi backend + cách song song hoá bằng ThreadPoolExecutor
+    như staff_activity.detail() (blueprints/staff_activity.py) — chỉ
+    khác created_by/assigned_ss_user luôn là current_user.id, không
+    nhận tham số ss_user_id từ URL."""
+    access_token, _ = _auth_tokens_from_session()
+    ss_user_id = current_user.id
+
+    try:
+        all_users = backend_auth.list_users(access_token)
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+        all_users = []
+    staff_members = [u for u in all_users if u.get("role") in ("ss_team", "admin")]
+    staff_by_id = {u["ss_user_id"]: u for u in all_users}
+
+    jobs_future = _activity_pool.submit(db_data.list_all_jobs, created_by=ss_user_id)
+    companies_future = _activity_pool.submit(db_data.list_all_companies, created_by=ss_user_id)
+    contacts_created_future = _activity_pool.submit(
+        db_data.list_all_contacts, access_token, created_by=ss_user_id,
+    )
+    contacts_assigned_future = _activity_pool.submit(
+        db_data.list_all_contacts, access_token, assigned_ss_user=ss_user_id,
+    )
+
+    try:
+        jobs_created = jobs_future.result()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        jobs_created = []
+
+    try:
+        companies_created = companies_future.result()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        companies_created = []
+
+    try:
+        contacts_created = contacts_created_future.result()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        contacts_created = []
+
+    try:
+        contacts_assigned = contacts_assigned_future.result()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        contacts_assigned = []
+
+    return render_template(
+        "profile_activity.html",
+        jobs_created=jobs_created, companies_created=companies_created,
+        contacts_created=contacts_created, contacts_assigned=contacts_assigned,
+        staff_members=staff_members, staff_by_id=staff_by_id,
+        next_url=request.path,
+    )

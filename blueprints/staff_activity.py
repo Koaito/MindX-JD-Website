@@ -2,7 +2,8 @@
 
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Blueprint, abort, flash, render_template
+from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask_login import current_user
 
 import backend_auth
 import crawler_client as db_data
@@ -39,7 +40,18 @@ def index():
 @staff_activity_bp.route("/staff-activity/<string:ss_user_id>")
 @staff_required
 def detail(ss_user_id):
-    """Detail view of one staff member's activities"""
+    """Detail view of one staff member's activities.
+
+    08/2026: xem hoạt động CHÍNH MÌNH qua khu vực quản trị này đã bị
+    chặn — dữ liệu giờ chỉ xem qua profile.activity (trang cá nhân),
+    tránh 2 nơi cùng hiển thị 1 dữ liệu và khớp UX "xem của bản thân
+    thì vào trang cá nhân, xem của người khác mới cần khu Quản trị
+    này". Chặn ở tầng route (không chỉ ẩn link trong
+    templates/staff_activity.html) để gõ thẳng URL cũng không vào
+    được."""
+    if ss_user_id == current_user.id:
+        return redirect(url_for("profile.activity"))
+
     access_token, _ = _auth_tokens_from_session()
 
     staff_member = None

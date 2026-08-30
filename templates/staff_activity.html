@@ -10,6 +10,7 @@
     <p class="lede">
       Chọn 1 thành viên để xem job/công ty/contact họ đã tự thêm tay, và contact
       đang được giao cho họ phụ trách — dùng để nắm ai đang làm việc gì.
+      Xem hoạt động của chính bạn? Vào <a href="{{ url_for('profile.activity') }}">Trang cá nhân</a>.
     </p>
   </div>
 </header>
@@ -44,9 +45,13 @@
         <td><span class="role-chip">{{ role_labels.get(s.role, s.role) }}</span></td>
         <td class="muted">{{ s.created_at|format_date }}</td>
         <td>
+          {% if current_user.is_authenticated and s.ss_user_id == current_user.id %}
+          <a class="btn btn-text" href="{{ url_for('profile.activity') }}">Xem tại Trang cá nhân →</a>
+          {% else %}
           <a class="btn btn-text" href="{{ url_for('staff_activity.detail', ss_user_id=s.ss_user_id) }}">
             Xem hoạt động →
           </a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
