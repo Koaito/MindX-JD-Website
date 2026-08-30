@@ -1,7 +1,5 @@
 """Contacts blueprint - company contact person management"""
 
-from concurrent.futures import ThreadPoolExecutor
-
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 import backend_auth
@@ -9,17 +7,10 @@ import crawler_client as db_data
 from backend_auth import BackendAuthError
 from constants import CONTACT_STATUSES
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session, _call_authed
+from helpers import _auth_tokens_from_session, _call_authed, _io_pool as _pool
 from utils.decorators import staff_required
 
 contacts_bp = Blueprint("contacts", __name__)
-
-# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
-# (index() bên dưới, tab "danh-sach") — max_workers=3 KHỚP ĐÚNG số lệnh
-# gọi độc lập tối đa cần chạy cùng lúc ở đây (contacts/companies/staff).
-# Tạo 1 lần ở module-level (KHÔNG tạo mới mỗi request), giống pattern
-# đã áp dụng ở companies.py.
-_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="contacts-io")
 
 
 @contacts_bp.route("/contacts")

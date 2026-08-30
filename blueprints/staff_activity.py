@@ -1,7 +1,5 @@
 """Staff Activity blueprint - monitor team SS member activities"""
 
-from concurrent.futures import ThreadPoolExecutor
-
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 from flask_login import current_user
 
@@ -10,17 +8,10 @@ import crawler_client as db_data
 from backend_auth import BackendAuthError
 from constants import CONTACT_STATUSES
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session
+from helpers import _auth_tokens_from_session, _io_pool as _pool
 from utils.decorators import staff_required
 
 staff_activity_bp = Blueprint("staff_activity", __name__)
-
-# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
-# (detail() bên dưới) — max_workers=4 KHỚP ĐÚNG số lệnh gọi độc lập tối
-# đa cần chạy cùng lúc ở đây (jobs/companies/contacts-created/contacts-
-# assigned). Tạo 1 lần ở module-level (KHÔNG tạo mới mỗi request),
-# giống pattern đã áp dụng ở companies.py.
-_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="staff-activity-io")
 
 
 @staff_activity_bp.route("/staff-activity")

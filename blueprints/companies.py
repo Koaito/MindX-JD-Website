@@ -1,7 +1,6 @@
 """Companies blueprint - company listing and CRUD operations"""
 
 import math
-from concurrent.futures import ThreadPoolExecutor
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
@@ -9,18 +8,10 @@ import crawler_client as db_data
 from crawler_client import CrawlerAPIError
 from utils.decorators import staff_required
 from constants import COMPANIES_PER_PAGE, PARTNERSHIP_POTENTIALS, CITIES_VN, CONTACT_STATUSES
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _io_pool as _pool
 from potential_score import suggest_partnership_potential, suggest_partnership_potential_from_signals
 
 companies_bp = Blueprint("companies", __name__)
-
-# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
-# (index() bên dưới) — max_workers=3 KHỚP ĐÚNG số lệnh gọi độc lập tối
-# đa cần chạy cùng lúc ở đây (cities/count/list), không cần hơn. Tạo 1
-# lần ở module-level (KHÔNG tạo mới mỗi request) — ThreadPoolExecutor
-# giữ sẵn thread, tránh chi phí spawn/destroy thread lặp lại mỗi lần
-# load trang /companies.
-_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="companies-io")
 
 
 @companies_bp.route("/companies")

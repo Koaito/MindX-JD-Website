@@ -1,7 +1,6 @@
 """Activity Logs blueprint - system-wide activity tracking"""
 
 import math
-from concurrent.futures import ThreadPoolExecutor
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
@@ -9,17 +8,10 @@ import backend_auth
 import crawler_client as db_data
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _io_pool as _pool
 from utils.decorators import staff_required
 
 activity_logs_bp = Blueprint("activity_logs", __name__)
-
-# Dùng CHUNG 1 pool nhỏ cho mọi lượt song song hoá trong blueprint này
-# (logs() bên dưới) — max_workers=3 KHỚP ĐÚNG số lệnh gọi độc lập tối
-# đa cần chạy cùng lúc ở đây (audit logs/companies dropdown/staff
-# dropdown). Tạo 1 lần ở module-level (KHÔNG tạo mới mỗi request),
-# giống pattern đã áp dụng ở companies.py.
-_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="activity-logs-io")
 
 
 def _list_all_companies():

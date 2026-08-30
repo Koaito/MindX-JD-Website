@@ -17,6 +17,7 @@ toàn bộ app.
 """
 
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from zoneinfo import ZoneInfo
 
 from flask import request, session
@@ -25,6 +26,36 @@ from markupsafe import Markup, escape
 import backend_auth
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
+
+# ---------------------------------------------------------------------------
+# Pool IO dùng CHUNG cho TOÀN APP (thêm 08/2026, xem lịch sử trao đổi "rà
+# codebase — độ linh hoạt/mở rộng")
+# ---------------------------------------------------------------------------
+# TRƯỚC ĐÂY: mỗi blueprint cần song song hoá (contacts.py/activity_logs.py/
+# staff_activity.py/companies.py/dashboard.py/crawl.py) tự tạo 1
+# ThreadPoolExecutor RIÊNG, max_workers hạch toán TAY khớp đúng số lệnh
+# độc lập lúc viết route đó. Rủi ro đã XẢY RA THẬT: crawl.py phải sửa tay
+# max_workers 4->6 khi thêm 2 lệnh gọi mới (list_crawl_runs/list_users) —
+# nếu quên sửa, pool KHÔNG crash, KHÔNG báo lỗi gì, chỉ âm thầm mất bớt lợi
+# ích song song (task thừa xếp hàng chờ slot trống thay vì chạy đồng thời
+# cùng lúc) — cực khó phát hiện nếu không tự đo lại thời gian tải trang.
+#
+# GIỜ: 1 pool DUY NHẤT dùng chung toàn app — mỗi blueprint chỉ
+# `from helpers import _io_pool as _pool` (hoặc gọi thẳng `_io_pool`),
+# KHÔNG cần tự tính max_workers theo route riêng nữa. max_workers=20 —
+# đủ rộng cho tổng số lệnh độc lập tối đa hiện có ở MỌI route cộng lại
+# (3+3+4+3+6+~6 ở 6 blueprint hiện tại ≈ 25, nhưng các route này HIẾM KHI
+# tất cả cùng đụng pool tại chính xác 1 thời điểm — 20 là mức đủ dùng
+# thực tế, không phải worst-case lý thuyết). ThreadPoolExecutor không tốn
+# tài nguyên đáng kể khi thread rảnh (chỉ tốn khi có task chạy) nên đặt
+# rộng hơn nhu cầu hiện tại không có hại — ngược lại, đặt max_workers=20
+# CỐ ĐỊNH nghĩa là thêm route mới cần song song hoá trong tương lai
+# KHÔNG PHẢI sửa số này nữa (trừ khi tổng nhu cầu vượt hẳn 20 — lúc đó
+# nên rà lại 1 lần, không phải sửa mỗi lần thêm 1-2 lệnh gọi như trước).
+#
+# Vẫn CHUNG 1 tư tưởng với lý do file helpers.py này tồn tại (xem
+# docstring đầu file) — gom 1 chỗ, sửa 1 nơi có hiệu lực toàn app.
+_io_pool = ThreadPoolExecutor(max_workers=20, thread_name_prefix="app-io")
 
 # ---------------------------------------------------------------------------
 # Giờ Việt Nam (thêm 08/2026 — báo lỗi "giờ trên web bị lệch")

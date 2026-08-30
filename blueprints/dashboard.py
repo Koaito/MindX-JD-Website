@@ -1,6 +1,5 @@
 """Dashboard blueprint - team SS homepage with insights"""
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from flask import Blueprint, flash, render_template, request
@@ -10,17 +9,10 @@ import crawler_client as db_data
 from backend_auth import BackendAuthError
 from constants import INDUSTRIES, JOB_STATUSES
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session, _jobs_by_month, _parse_any_date, now_vn
+from helpers import _auth_tokens_from_session, _jobs_by_month, _parse_any_date, now_vn, _io_pool as _pool
 from utils.decorators import staff_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
-
-# Dùng CHUNG 1 pool nhỏ cho index() bên dưới — max_workers=6 KHỚP ĐÚNG
-# số lệnh gọi backend độc lập tối đa cần chạy cùng lúc ở đây (jobs/
-# companies/users/stats/engagement/contacts). Tạo 1 lần ở module-level
-# (KHÔNG tạo mới mỗi request), giống pattern đã áp dụng ở companies.py/
-# contacts.py/activity_logs.py/staff_activity.py.
-_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="dashboard-io")
 
 
 # Dashboard helper functions (đặc thù riêng cho dashboard — không dùng ở

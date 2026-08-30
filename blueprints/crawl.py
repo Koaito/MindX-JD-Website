@@ -28,8 +28,6 @@ cũ, sống bền qua restart server."""
 
 import math
 
-from concurrent.futures import ThreadPoolExecutor
-
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
 import backend_auth
@@ -42,7 +40,7 @@ from backend_auth import BackendAuthError
 # cần import ngược crawl_bp, xem docstring cuối file này).
 from blueprints.crawl_status import _status_tab_context
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _store_auth_tokens
+from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _store_auth_tokens, _io_pool as _pool
 from utils.decorators import admin_required
 
 crawl_bp = Blueprint("crawl", __name__)
@@ -60,24 +58,15 @@ crawl_bp = Blueprint("crawl", __name__)
 # đủ để card CareerViet xuất hiện.
 _SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks", "careerviet": "CareerViet"}
 
-# Pool dùng chung cho CẢ 2 việc ở index() bên dưới (thêm 08/2026):
-# (1) vòng lặp per-source poll trạng thái đang chạy (_source_active_state,
-# có từ trước — "/crawl chậm 4.69s vì gọi tuần tự từng nguồn"), (2) 2
-# stage tuần tự bị BỎ SÓT ở đợt sửa trước — list_crawl_runs() (lịch sử)
-# và backend_auth.list_users() (dropdown "người bấm") từng chạy NỐI TIẾP
-# sau khi per-source poll xong dù hoàn toàn độc lập với nó lẫn với nhau
-# (xem lịch sử trao đổi "làm cái crawl" — đo thực tế /crawl 3.42s,
-# 4 bước tuần tự nối tiếp: get_sources -> poll nguồn -> list_crawl_runs
-# -> list_users, chỉ bước 2 từng được song song hoá).
-#
-# max_workers=6 — TĂNG từ 4 (đủ 3 nguồn hiện có, dư 1 để thêm nguồn sau
-# này không cần sửa ngay) lên 6 để chứa được thời điểm bận nhất: TỐI ĐA
-# 4 nguồn (dư 1 so với 3 hiện có, xem _SOURCE_LABELS) + list_crawl_runs +
-# list_users cùng chạy song song 1 lúc (get_sources() không tính vào
-# đỉnh này — future của nó luôn resolve/nhả slot trước khi per-source
-# poll bắt đầu, vì per-source poll CẦN biết `sources` mới lặp được, xem
-# index() bên dưới). Rà lại số này nếu số nguồn tăng nhiều hơn nữa.
-_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="crawl-io")
+# _pool bên dưới ĐÃ dùng chung 1 ThreadPoolExecutor toàn app (_io_pool ở
+# helpers.py, import đổi tên thành _pool ở đầu file) — KHÔNG còn tự tạo
+# pool riêng ở đây nữa (SỬA 08/2026, xem lịch sử trao đổi "rà codebase —
+# độ linh hoạt/mở rộng"). Trước đây tự tính tay max_workers=6 — vừa phải
+# sửa tay 4->6 khi thêm 2 stage mới (list_crawl_runs/list_users, xem
+# lịch sử trao đổi "làm cái crawl") — giờ dùng chung pool app-wide,
+# không cần rà lại số này mỗi khi thêm nguồn crawl hay thêm lệnh gọi độc
+# lập mới ở route nào đó nữa. Xem docstring _io_pool (helpers.py) để
+# biết lý do gộp.
 
 
 def _active_run_for_source(source):
