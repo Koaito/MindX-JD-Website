@@ -1,35 +1,4439 @@
 /* ==========================================================================
-   MindX Career Hub — stylesheet entry point
+   MindX Career Hub — stylesheet (FILE BUILD RA — KHÔNG SỬA TRỰC TIẾP)
    ==========================================================================
-   Split into one file per UI area (public/css/*.css) so a change scoped to
-   one page/component (e.g. job cards) can't accidentally touch another
-   (e.g. the contact table or forms) just because they used to share one
-   giant file. @import order below is IMPORTANT and mirrors the original
-   single-file order exactly — CSS cascades top-to-bottom, so keeping the
-   same order guarantees identical rendering to before the split.
+   File này được sinh tự động bởi build_css.py, nối public/css/*.css lại
+   thành 1 request CSS duy nhất (thay vì 19 request @import tuần tự —
+   xem docstring build_css.py để biết lý do).
 
-   Adding a new area? Add a new css/NN-name.css file and an @import line
-   for it here, in the position that matches where it logically sits
-   (e.g. a new "reports" page style goes near 08-dashboard.css). Don't
-   dump new rules into an unrelated existing file.
+   MUỐN SỬA CSS? Sửa đúng file nguồn trong public/css/NN-ten-file.css,
+   rồi chạy `python build_css.py` lại (hoặc để build tự chạy lúc deploy —
+   xem vercel.json). Sửa trực tiếp vào file này sẽ MẤT khi build lại.
+
+   DEBUG: mỗi khối bên dưới có comment ranh giới ghi rõ file nguồn +
+   dòng bắt đầu trong file đó — dùng để tra ngược khi DevTools chỉ ra
+   lỗi ở 1 dòng cụ thể trong file này.
    ========================================================================== */
 
-@import url('css/00-tokens.css');              /* CSS variables, reset, body, .shell */
-@import url('css/01-sidebar.css');              /* Left nav sidebar (all pages) */
-@import url('css/02-auth.css');                 /* Login/register/forgot/verify pages */
-@import url('css/03-layout.css');                /* .content wrapper, page header, buttons, filter bar */
-@import url('css/04-job-cards.css');             /* Job "ticket" cards + grid (index/saved/my-applications) */
-@import url('css/05-contact-table.css');         /* Companies/contacts table */
-@import url('css/06-detail-page.css');           /* Job/company detail page layout */
-@import url('css/07-forms.css');                 /* Add/edit job/company/contact forms */
-@import url('css/08-dashboard.css');             /* /bao-cao dashboard: KPI cards + charts */
-@import url('css/09-misc-toasts.css');           /* Empty states, flash messages, toasts */
-@import url('css/10-pagination-responsive.css'); /* Pagination + the shared @media breakpoint */
-@import url('css/11-student-activity.css');      /* /student-activity: theo dõi học viên lưu/ứng tuyển JD */
-@import url('css/12-activity-logs.css');         /* /activity-logs: lịch sử thao tác audit log */
-@import url('css/13-data-management.css');       /* /data-management: xuất/nhập hàng loạt Job/Company/Contact */
-@import url('css/14-email-templates.css');       /* Popup chọn/soạn mẫu email liên hệ doanh nghiệp (nút "Mẫu email" ở bảng contact) */
-@import url('css/15-crawl.css');                 /* /crawl: trang crawl dữ liệu (chỉ admin) */
-@import url('css/16-email-template-manager.css'); /* /contacts?tab=quan-ly: quản lý mẫu email (list + form CRUD) */
-@import url('css/17-error-pages.css');           /* Trang lỗi tuỳ chỉnh (400/403/404/500) — xem @app.errorhandler trong app.py */
-@import url('css/18-messages.css');              /* /messages: inbox + khung chat + badge unread sidebar (thêm 08/2026) */
+/* ==== css/00-tokens.css ==== */
+/* CSS variables, reset, body, .shell */
+/* Used by: every page (base.html). Only global CSS variables, the CSS
+   reset, <body>, <a>, and the top-level .shell grid live here — nothing
+   page-specific. Change a --variable and it affects the whole site by
+   design; don't add component-specific rules to this file. */
+
+/* ============================================================
+   CHECKLIST NGẮN (08/2026, refactor #4) — đọc trước khi thêm CSS mới
+   liên quan tới kích thước/khoảng cách, tránh lặp lại các lỗi đã gặp:
+
+   1. Thêm đơn vị vh/vw mới? PHẢI chia cho var(--zoom-scale) — vd
+      `calc(100vh / var(--zoom-scale))`, KHÔNG dùng `100vh` trần. Lý
+      do: xem khối `html { zoom }` ở dưới, đây là lỗi đã gặp 2 lần.
+
+   2. Thêm 1 grid (form, card list...) nằm BÊN TRONG 1 card/container
+      có thể đổi bề rộng (không phải full viewport — vd trong sidebar,
+      trong 2 card cạnh nhau)? Dùng `container-type: inline-size` trên
+      phần tử CHA + `@container` cho số cột — xem ví dụ .form-card/
+      .form-grid ở 07-forms.css. KHÔNG dùng `@media (max-width)` để
+      đổi số cột của grid loại này — @media đo theo màn hình, không
+      đo theo bề rộng thật của card chứa nó (đây chính là gốc rễ bug
+      .form-grid ở .crawl-source-card từng gặp).
+
+   3. Padding/gap/bề rộng bạn sắp viết tay đã có ở thang đo bên dưới
+      chưa (--space-*, --card-pad-*, --card-gap, --card-min-w...)? Nếu
+      con số đó sẽ dùng LẶP LẠI ở nhiều chỗ với CÙNG ý nghĩa, thêm vào
+      thang đo và tham chiếu var() thay vì viết số mới. Số chỉ dùng
+      đúng 1 chỗ thì cứ viết tay, không ép vào token cho có.
+
+   4. 1 class cần dùng cho nhiều biến thể layout khác nhau (vd cùng
+      ".crawl-sources" nhưng tab Crawl xếp auto-fit, tab Bảo trì xếp cố
+      định 2 cột)? Đặt tên tường minh theo biến thể — class gốc +
+      modifier dạng `--ten-bien-the` (vd `.crawl-sources--fixed-2col`)
+      — viết compound selector `.crawl-sources.crawl-sources--...` để
+      thắng bằng ĐỘ ƯU TIÊN CSS thật sự, không phải chồng 2 class rời
+      rồi để cascade tự phân xử theo thứ tự dòng trong file (nhìn HTML
+      không đoán được cái nào thắng nếu làm vậy — xem 15-crawl.css để
+      thấy ví dụ thật).
+   ============================================================ */
+:root {
+  --bg: #EEF2F0;
+  --surface: #FFFFFF;
+  --ink: #101E1A;
+  --ink-soft: #52625C;
+  --muted: #8A968F;
+  --border: #DCE4DF;
+  --accent: #FF5A36;
+  --accent-soft: #FFE6DC;
+  --teal: #0F766E;
+  --teal-soft: #D9F0EB;
+  --amber: #B9790A;
+  --amber-soft: #FBEBD0;
+  --blue: #2454B8;
+  --blue-soft: #E1E9FA;
+  --radius: 14px;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --sidebar-width: 248px;
+  /* 08/2026: cùng 1 số dùng cho `html { zoom }` bên dưới VÀ để bù lại
+     mọi chỗ dùng đơn vị `vh` (xem 01-sidebar.css .sidebar, .shell bên
+     dưới) — lý do bắt buộc phải có biến này, xem giải thích chi tiết
+     ngay tại `html { zoom }`. Đổi tỉ lệ zoom chỉ cần sửa DUY NHẤT số
+     này, không phải sửa từng nơi dùng vh riêng lẻ. */
+  --zoom-scale: 0.9;
+
+  /* ---- Thang đo khoảng cách/bề rộng (thêm 08/2026, refactor #2) ----
+     Trước đây KHÔNG có "sổ tay" kích thước dùng chung — mọi padding/
+     gap/bề rộng card là số px viết tay rải rác 17 file, cùng 1 con số
+     (vd 440px) xuất hiện ở nhiều chỗ với Ý NGHĨA KHÁC NHAU nên không
+     ai dám sửa 1 chỗ vì sợ ảnh hưởng chỗ khác, mà sửa đúng chỗ cần thì
+     lại phải lục từng file tìm.
+     Quy ước: số nào LẶP LẠI nhiều nơi với CÙNG một ý nghĩa mới đưa vào
+     đây; số chỉ dùng đúng 1 chỗ thì cứ để viết tay, không ép vào token
+     cho có. Khai báo dưới đây giữ NGUYÊN giá trị hiện đang dùng (không
+     đổi bất kỳ hành vi/giao diện nào) — mục đích chỉ là gom 1 chỗ để
+     lần sau đổi kích thước không phải lục nhiều file. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 18px;
+  --space-7: 24px;
+  --space-8: 28px;
+
+  /* Padding mặc định (desktop) của các "card" chứa form/nội dung chính
+     — .form-card (07-forms.css), .dm-export-card (13-data-management),
+     .crawl-source-card dùng riêng số khác (29/31px) nên KHÔNG gộp vào
+     đây, xem ghi chú tại chỗ khai báo. */
+  --card-pad-y: 26px;
+  --card-pad-x: 28px;
+
+  /* Khoảng cách card-với-card khi nhiều card xếp cạnh nhau dạng grid
+     (.crawl-sources--auto-fit, .crawl-sources--fixed-2col...). */
+  --card-gap: 18px;
+
+  /* Bề rộng tối thiểu 1 "card nguồn" trước khi auto-fit tự xuống hàng
+     mới — hiện chỉ .crawl-sources dùng, nhưng khai báo tường minh ở
+     đây để lần sau cần đổi (vd "mở rộng card ~30%" đã từng làm) chỉ
+     sửa 1 dòng, không cần dò trong 15-crawl.css. */
+  --card-min-w: 900px; 
+
+  /* Gap của .form-grid (07-forms.css): hàng/cột không đều nhau nên
+     tách riêng 2 biến thay vì gộp vào --space-*. */
+  --form-grid-gap-row: 14px;
+  --form-grid-gap-col: 18px;
+}
+
+/* Set by the anti-FOUC script in base.html (before first paint) when the
+   user's last choice, read from localStorage, was "collapsed" — keeps
+   the sidebar from flashing wide then snapping narrow on reload. */
+html.sidebar-collapsed {
+  --sidebar-width: 76px;
+}
+
+/* 08/2026: rule --sidebar-width giảm 90% khi có #et-manager-form trong
+   DOM ĐÃ BỊ XOÁ (từng ở đây) — hồi đó dùng để nhường không gian ngang
+   cho .et-manager-form lúc nó còn set width:150% (tràn khỏi khu nội
+   dung). Sau khi đổi cách làm to card mẫu email (bỏ % ép buộc, cho
+   .et-manager-grid tự "nở" bằng minmax(560px,1fr) — xem 16-email-
+   template-manager.css) thì form không còn tràn nữa, nhưng rule thu
+   nhỏ sidebar bị bỏ quên không xoá theo -> sidebar bị ép hẹp lại
+   (248px -> 223px) không lý do mỗi khi mở tab "Quản lý mẫu email",
+   khiến chữ trong menu (vd "Hoạt động học viên") bị xuống dòng. Xoá
+   hẳn rule, sidebar giữ nguyên --sidebar-width mặc định như mọi trang
+   khác. */
+
+* { box-sizing: border-box; }
+
+/* 08/2026 (theo yêu cầu thảo luận: "100% giống hệt 90% hiện tại")
+   -- CSS `zoom` là cách TRUNG THỰC nhất để mô phỏng đúng ý browser
+   zoom thật: nó scale MỌI THỨ đồng nhất (px, border, khoảng cách,
+   input/select, scrollbar...) và cập nhật lại media query giống hệt
+   như người dùng tự bấm Ctrl+- 90% trong trình duyệt -- khác với
+   cách đổi `html { font-size: ... }` (chỉ ảnh hưởng đơn vị rem/em,
+   mà toàn bộ codebase này dùng px thuần cho hầu hết padding/width/
+   font-size nên sẽ KHÔNG khớp đúng tỉ lệ) hay `transform: scale()`
+   (không reflow layout, gây tràn/scroll sai). Hỗ trợ: Chrome/Edge/
+   Safari 15.4+ từ lâu, Firefox 126+ (2024) -- đã đủ an toàn cho
+   nội bộ Career Hub tháng 08/2026. Muốn tắt/đổi tỉ lệ khác chỉ cần
+   sửa 1 dòng này, không đụng tới component nào khác. */
+/* BUG 08/2026 (sidebar bị hụt, không chạm đáy màn hình): `zoom` scale
+   TOÀN BỘ box xuống 90% SAU khi trình duyệt đã tính layout xong — còn
+   đơn vị `vh` thì luôn được tính theo viewport THẬT (chưa zoom), không
+   tự bù theo `zoom`. Hệ quả: 1 element cao `100vh` (như .sidebar,
+   .shell ở dưới) chỉ LẤP ĐƯỢC 90% chiều cao màn hình thật sau khi bị
+   zoom co lại — thừa ra đúng 10% khoảng trắng ở đáy. Đây không phải
+   lỗi cũ của sidebar, mà là tác dụng phụ của chính dòng zoom:90% này.
+   Fix: mọi chỗ cần cao đúng-bằng-viewport phải dùng
+   `calc(100vh / var(--zoom-scale))` thay vì `100vh` trần — xem
+   .shell (ngay dưới) và .sidebar/.sidebar { height } trong
+   01-sidebar.css. */
+html {
+  zoom: var(--zoom-scale);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ============================================================
+   PILL/BADGE DÙNG CHUNG (thêm 08/2026) — trước đây border-radius:999px
+   (hình viên thuốc) + white-space:nowrap được khai báo LẶP LẠI riêng lẻ
+   ở ~16 class chip/badge/tag rải rác 8 file CSS khác nhau (04, 05, 07,
+   08, 13, 14, 15). Hậu quả THẬT ĐÃ XẢY RA 2 LẦN trong cùng 1 đợt sửa:
+   sửa .ticket-industry (badge ngành ở job card) bị xuống dòng, tưởng
+   xong, hôm sau .fit-chip (chip "Chưa đánh giá" ở bảng công ty) bị y
+   hệt lỗi đó — vì đây là 2 khai báo ĐỘC LẬP, sửa 1 chỗ không tự sửa
+   chỗ kia.
+
+   Gom về đây: MỌI class chip/badge/tag hình viên thuốc liệt kê chung 1
+   selector list, dùng chung border-radius + white-space + font-weight.
+   Từng file CSS domain (04/05/07/08/13/14/15) CHỈ còn giữ lại phần đặc
+   thù của mình (màu nền/chữ, font-size, padding — vì các chip to nhỏ
+   khác nhau tuỳ chỗ dùng). Thêm 1 chip/badge MỚI ở đâu đó trong tương
+   lai? Thêm tên class vào danh sách dưới đây (1 dòng), KHÔNG viết lại
+   3 dòng border-radius/white-space/font-weight ở file domain riêng —
+   nếu quên thêm vào đây thì chip mới vẫn có nguy cơ bị xuống dòng y
+   hệt 2 lần trước, nên đây là nơi DUY NHẤT cần nhớ khi thêm chip mới. */
+.ticket-industry,
+.ticket-level,
+.status-chip,
+.fit-chip,
+.role-chip,
+.you-badge,
+.potential-suggestion,
+.pct-badge,
+.reason-tag,
+.dm-entity-tab,
+.dm-tag,
+.dm-modal-suggestion-score,
+.et-suggested-tag,
+.crawl-live-widget-count,
+.error-chip {
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  /* bù zoom — xem giải thích ở `html { zoom }` phía trên */
+  min-height: calc(100vh / var(--zoom-scale));
+  transition: grid-template-columns 0.18s ease;
+}
+
+/* CẢNH BÁO cho code sau này (08/2026, rút kinh nghiệm từ lỗi ".content
+   bị co nhỏ theo nội dung" — xem comment chi tiết tại .content ở
+   03-layout.css): .shell hiện chỉ có đúng 2 con trực tiếp: .sidebar
+   (width cố định — an toàn) và .content (margin auto để canh giữa —
+   PHẢI có width: 100% đi kèm max-width, đã fix). Nếu sau này thêm 1
+   phần tử MỚI làm con trực tiếp của .shell và dùng margin auto để
+   canh giữa nó, PHẢI kèm width: 100% (hoặc width cố định) — nếu chỉ
+   có margin auto + max-width mà thiếu width, trình duyệt sẽ co phần
+   tử đó lại theo đúng nội dung bên trong (shrink-to-fit) thay vì lấp
+   đầy cột Grid, gây lại đúng lỗi cũ dù CSS bên trong không sai gì. */
+
+/* ==== css/01-sidebar.css ==== */
+/* Left nav sidebar (all pages) */
+/* ---------------- Sidebar ---------------- */
+/* Used by: every page (base.html renders .sidebar in the shell). Safe to
+   edit for nav/branding changes; won't affect page content areas. */
+
+.sidebar {
+  background: var(--ink);
+  color: #EAF2EF;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  /* GỐC RỄ (08/2026): `html { zoom: var(--zoom-scale) }` (00-tokens.css)
+     scale toàn trang xuống 90% SAU khi layout đã tính `100vh` theo
+     viewport thật — nên sidebar cao "100vh" chỉ phủ được 90% chiều cao
+     màn hình thật, hụt 10% ở đáy. Không liên quan gì tới khoảng cách/
+     scrollbar đã chỉnh trước đó. Bù lại bằng cách chia ngược cho chính
+     tỉ lệ zoom đang dùng: 100vh / 0.9 ≈ 111.1vh, sau khi bị zoom 90%
+     scale xuống thì đúng bằng 100% viewport thật. */
+  height: calc(100vh / var(--zoom-scale));
+  overflow: hidden;
+  transition: padding 0.18s ease;
+}
+
+html.sidebar-collapsed .sidebar {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Text that disappears when the sidebar is collapsed — icons stay. */
+html.sidebar-collapsed .nav-label,
+html.sidebar-collapsed .nav-text,
+html.sidebar-collapsed .nav-note,
+html.sidebar-collapsed .brand-text,
+html.sidebar-collapsed .auth-info,
+html.sidebar-collapsed .sidebar-foot .btn-block .btn-text-label,
+html.sidebar-collapsed .auth-box-guest p {
+  display: none;
+}
+
+html.sidebar-collapsed .nav a { justify-content: center; }
+html.sidebar-collapsed .brand { justify-content: center; }
+html.sidebar-collapsed .auth-box { justify-content: center; }
+html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-left: 6px; padding-right: 6px; }
+
+/* Toggle button (« / ») pinned to the top of the sidebar, right below
+   the MX brand mark — always inside the sidebar's visible viewport-height
+   area, unlike the bottom of .sidebar-foot which can get clipped by
+   `.sidebar { overflow: hidden }` once a longer (logged-in) nav list
+   pushes total content past 100vh. */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 26px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: #9FB0AA;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover { background: rgba(255,255,255,0.06); color: #EAF2EF; }
+.sidebar-toggle-ic { font-size: 13px; line-height: 1; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-shrink: 0;
+}
+
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #10120C;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.brand-text strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.brand-text span {
+  font-size: 12px;
+  color: #9FB0AA;
+}
+
+/* flex: 1 lets .nav claim exactly the leftover space between the fixed
+   top block (brand + toggle) and the fixed bottom block (.sidebar-foot),
+   and overflow-y: auto scrolls ONLY the nav list when it doesn't fit —
+   instead of the whole flex column overflowing past .sidebar's 100vh and
+   getting silently clipped by `overflow: hidden` (which is what made the
+   toggle button, and then the logout button, "disappear" after login).
+   This also future-proofs the sidebar: any new nav links or footer
+   buttons added later just extend the scrollable middle section — they
+   can never overlap or push .sidebar-foot off-screen again. */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.18) transparent;
+}
+
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+
+.nav-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7C8D87;
+  margin: 18px 10px 6px;
+}
+
+.nav-label:first-child { margin-top: 0; }
+
+.nav-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 10px 12px;
+  padding: 0 2px;
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  color: #C9D6D1;
+}
+
+.nav a:hover { background: rgba(255,255,255,0.06); }
+
+.nav a.active {
+  background: var(--accent);
+  color: #14150F;
+  font-weight: 600;
+}
+
+.nav-ic { width: 18px; text-align: center; opacity: 0.85; }
+
+/* Đặt SAU `.nav a` (cùng độ ưu tiên CSS 0,0,1,1) để thắng cascade —
+   nav-note.a phải là link trong câu văn (inline), không phải khối
+   display:flex như link menu thật. Từng bị `.nav a` đè mất vì khai
+   báo trước đó (xem lỗi hiển thị "Trang cá nhân" bị vỡ layout, đợt
+   thêm ghi chú thay 2 link "Job đã lưu"/"Đã ứng tuyển" ở sidebar). */
+.nav-note a { display: inline; color: inherit; text-decoration: underline; }
+.nav-note a:hover { color: var(--text, #fff); }
+
+/* Badge số tin nhắn chưa đọc, cạnh "Tin nhắn" (base.html). Trước đây
+   không có style gì — hiện ra như số trần khó nhìn giữa dòng chữ.
+   Dùng --accent (cam) để nổi bật như 1 chỉ báo thông báo thật. */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #14150F;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.nav a.active .nav-badge {
+  background: #14150F;
+  color: var(--accent);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+
+.sidebar-foot p {
+  font-size: 12px;
+  color: #8A9C95;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+
+.stat-pill { display: none; }
+
+.auth-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #16130E;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.auth-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.auth-info strong { font-size: 13px; color: #EAF2EF; }
+.auth-info span { font-size: 11px; color: #8FA29B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth-box-guest p {
+  font-size: 12.5px;
+  color: #9FB0AA;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.btn-block { display: block; width: 100%; text-align: center; margin-bottom: 8px; }
+.btn-block:last-child { margin-bottom: 0; }
+
+/* ==== css/02-auth.css ==== */
+/* Login/register/forgot/verify pages */
+/* ---------------- Auth pages ---------------- */
+/* Used by: login.html, register.html, forgot_password.html,
+   reset_password.html, verify_email.html, profile_overview.html,
+   profile_security.html (2 trang cuối thay cho change_password.html cũ
+   đã xoá 08/2026 — xem blueprints/profile.py). .save-btn /
+   .applicant-list / .access-note here are also reused on job/company
+   detail and saved-jobs pages — check 04/05/06 before renaming any of
+   those three. */
+
+.auth-shell {
+  max-width: 420px;
+  margin: 40px auto;
+}
+
+/* profile_overview.html/profile_security.html dùng .auth-shell.
+   profile-card (thêm class thứ 2 trên CHÍNH .auth-card, không đổi
+   .auth-shell dùng chung) để rộng hơn login/register — 2 trang cá
+   nhân có thêm sub-nav + info-grid, 420px quá chật, còn login/register
+   (chỉ 1 form dọc đơn giản) vẫn giữ nguyên 420px như cũ. */
+.auth-shell:has(.profile-card) {
+  max-width: 620px;
+}
+
+/* Sub-nav ngang trong khu vực trang cá nhân (templates/_profile_subnav.html)
+   — 2 mục hiện có (Thông tin chung/Bảo mật), chỗ trống cho Job đã lưu/
+   Đã ứng tuyển sau này (xem kế hoạch trang cá nhân). Đặt NGAY dưới
+   .lede, TRÊN info-grid/form — đúng vị trí "chọn mục trước khi xem nội
+   dung mục đó" quen thuộc của pattern tab. */
+.profile-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-subnav a {
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.profile-subnav a:hover { color: var(--ink); }
+
+.profile-subnav a.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Khối thông tin tĩnh (email/vai trò/ngày tham gia) ở đầu
+   profile_overview.html — trước form đổi tên. */
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-info-label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
+}
+
+.profile-info-value {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+}
+
+.auth-card h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0 0 6px;
+}
+
+.auth-card .lede { margin-bottom: 22px; }
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.auth-card input, .auth-card select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+}
+
+.auth-card .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Grid tracks default to min-width:auto, so a wide input/select can
+   overflow its own 1fr column and visually stick out past the card edge. */
+.auth-card .two-col > label { min-width: 0; }
+.auth-card input, .auth-card select { width: 100%; }
+
+.auth-foot {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.auth-foot a { color: var(--accent); font-weight: 600; }
+
+/* Trang /verify-email (templates/verify_email.html) — cùng khung
+   .auth-card như login/register/forgot-password, chỉ thêm 1 icon tròn
+   báo trạng thái. Màu dùng lại đúng 3 token đã có sẵn cho status-chip
+   (teal=tốt, amber=cảnh báo, accent=lỗi), không thêm màu mới. */
+.verify-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.verify-icon-success { background: var(--teal-soft); color: var(--teal); }
+.verify-icon-warn { background: var(--amber-soft); color: var(--amber); }
+.verify-icon-error { background: var(--accent-soft); color: #C4401F; }
+
+.demo-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  background: #F5F7F5;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+}
+
+.save-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.save-btn.saved {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #C4401F;
+  font-weight: 600;
+}
+
+.applicant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.applicant-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.applicant-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.applicant-list .muted { font-size: 12px; color: var(--muted); }
+
+.access-note {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  color: var(--ink-soft);
+}
+
+/* ==== css/03-layout.css ==== */
+/* .content wrapper, page header, buttons, filter bar */
+/* ---------------- Content ---------------- */
+/* Used by: every page — the .content wrapper, .page-head header, .btn-*
+   button variants, and .filter-bar. Shared building blocks: a button
+   style change here affects buttons everywhere. For a page-specific
+   button/filter tweak, add a scoped modifier class instead of editing
+   the base .btn/.filter-bar rules. */
+
+.content {
+  /* Giảm horizontal padding từ 56px → 40px mỗi bên
+     - Tăng usable width: 1800px - 80px = 1720px (tăng từ 1520px)
+     - Vẫn đủ breathing room, không sát mép
+     - Tối ưu cho form 4 cột và job detail sidebar rộng hơn */
+  padding: 40px 40px 64px;
+  max-width: 1800px;
+  margin: 0 auto;
+
+  /* FIX 08/2026 (báo lỗi ảnh chụp: card "Sửa mẫu email" bị thu nhỏ lại
+     so với lúc chỉ xem danh sách). .content là 1 ô trong .shell
+     (display:grid, xem 00-tokens.css). Ô lưới có margin:auto 2 bên +
+     KHÔNG có width tường minh (mặc định width:auto) sẽ bị trình duyệt
+     bỏ hành vi "kéo giãn lấp đầy cột" (stretch) mặc định, chuyển sang
+     "co theo đúng nội dung" (shrink-to-fit) — DÙ ĐÃ có max-width:1800px.
+     Hệ quả: bề rộng thật của .content phụ thuộc vào dòng nào bên trong
+     nó "đòi" nhiều chỗ nhất tại thời điểm đó, không cố định. Trang có
+     nhiều card/bảng rộng thì tình cờ trông full-width (đủ nội dung để
+     "đòi" hết chỗ), còn khung nào ít nội dung hơn (như form Sửa mẫu
+     email) thì bị co lại theo — dù CSS của form/card đó không sai gì
+     cả. Thêm width: 100% để LUÔN lấp đầy cột lưới trước, sau đó mới bị
+     max-width giới hạn lại như thiết kế ban đầu — không còn phụ thuộc
+     nội dung bên trong nữa, nhất quán trên mọi trang. (Đã verify bằng
+     Chromium headless: không có width:100% thì .content co xuống chỉ
+     ~400-900px dù max-width 1800px, kể cả ở trang khác không phải
+     riêng form mẫu email — chỉ là các trang đó tình cờ đủ nội dung
+     rộng để che mất triệu chứng.) */
+  width: 100%;
+}
+
+/* Opt-in per page via {% block content_class %}content-full{% endblock %}
+   (see base.html) — for pages made almost entirely of grids (job cards,
+   KPI/report cards) rather than paragraph text, capping width doesn't
+   help readability, so these are allowed to fill the entire available
+   space next to the sidebar instead of stopping at 1600px. */
+.content.content-full {
+  max-width: none;
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.page-head h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  margin: 8px 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  color: var(--ink-soft);
+  max-width: 640px;
+  margin: 0;
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+
+.back-link:hover { color: var(--accent); }
+
+/* ---------------- Buttons ---------------- */
+
+.btn {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary { background: var(--accent); color: #16130E; }
+.btn-primary:hover { background: #E64D28; }
+
+.btn-ghost { background: var(--surface); border-color: var(--border); color: var(--ink); }
+.btn-ghost:hover { border-color: var(--ink); }
+
+.btn-text { background: none; color: var(--ink-soft); padding: 10px 6px; }
+.btn-text:hover { color: var(--accent); }
+
+.btn-danger { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
+.btn-danger-text { color: #B23A22; }
+
+/* ---------------- Filter bar ---------------- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px;
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+
+.filter-bar input[type="text"] {
+  flex: 1 1 220px;
+}
+
+.filter-bar input, .filter-bar select {
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.result-count {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 8px 2px 20px;
+}
+
+/* Ghi chú hướng dẫn "bấm vào tên job để xem chi tiết & ứng tuyển"
+   (index.html, thêm 08/2026) — cố tình đặt NGAY TRÊN lưới job (thay vì
+   chung dòng với .result-count) để không bị đọc lướt qua như 1 dòng
+   thống kê thuần, đồng thời không cần thêm badge/note lặp lại trên
+   từng .ticket (66 job/trang) gây rối mắt. */
+.list-hint {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  background: var(--teal-soft);
+  border: 1px solid #BFE5DD;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: -10px 2px 20px;
+}
+
+/* ==== css/04-job-cards.css ==== */
+/* Job "ticket" cards + grid (index/saved/my-applications) */
+/* ---------------- Job ticket cards ---------------- */
+/* Used by: templates/index.html, my_applications.html, saved_jobs.html
+   (all three render `<div class="job-grid">...<article class="ticket">`).
+   The base .job-grid rule stays untouched on purpose so those two other
+   pages keep their original wrapping behavior. Layout changes meant for
+   ONLY the main /viec-lam listing (index.html) belong in the scoped
+   .job-grid-3col modifier below, not in the shared .job-grid rule. */
+
+/* Flexbox, not CSS Grid — deliberately. With `flex-wrap: wrap` and each
+   card `flex: 1 1 <basis>`, every row (INCLUDING a short trailing row)
+   independently divides its own leftover space among the cards actually
+   on it. A grid's `auto-fit`/`minmax()` can't do this: the number of
+   tracks is fixed for the whole grid from the widest row, so a shorter
+   last row (e.g. 2 cards left over on a grid that fits 4 per row) leaves
+   genuine empty cells on the right — that's what previously required a
+   JS pass (fillLastJobGridRow) to fix by measuring the resolved column
+   count and manually stretching the short row's cards with
+   grid-column-end. Flexbox needs none of that: no JS, no resize
+   listener, no risk of a layout flash before JS runs. Cards are not
+   guaranteed pixel-perfect column alignment across rows the way grid
+   tracks are, but with uniform card content that's not visually
+   noticeable and the tradeoff is worth the simplicity. */
+.job-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.job-grid > * {
+  flex: 1 1 320px;
+}
+
+/* /viec-lam listing (templates/index.html) only — same mechanism as
+   .job-grid above, just a smaller basis so more cards fit per row. */
+.job-grid.job-grid-3col > * {
+  flex-basis: 300px;
+}
+
+.ticket {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.ticket:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(16,32,26,0.08); }
+
+.ticket-stub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px dashed var(--border);
+  background: #FAFBFA;
+}
+
+.ticket-code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.ticket-industry {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Màu badge ngành — CỐ ĐỊNH theo tên ngành (xem helpers.industry_class()
+   ở backend Flask, mindx-jobs/helpers.py), KHÔNG còn xoay vòng theo vị
+   trí card như trước (ind-0/1/2 cũ). Mỗi ngành trong 6 ngành chuẩn
+   (constants.INDUSTRIES, khớp matching_industry ở Scrap JD/config.py)
+   có đúng 1 màu duy nhất, dùng xuyên suốt mọi trang/mọi lần load —
+   người dùng học màu 1 lần là nhận diện được mãi. Bảng màu đối chiếu ở
+   chú thích .industry-legend bên dưới. */
+.ind-code { background: var(--accent-soft); color: var(--accent); }
+.ind-business-analysis { background: var(--blue-soft); color: var(--blue); }
+.ind-data-analysis { background: var(--teal-soft); color: var(--teal); }
+.ind-data-engineer { background: #EDE6FB; color: #7C3AED; }
+.ind-data-scientist { background: var(--amber-soft); color: var(--amber); }
+.ind-ui-ux-design { background: #FBE3EE; color: #C22B7A; }
+
+/* Fallback cho industry lạ ngoài 6 giá trị chuẩn (dữ liệu cũ/nhập tay
+   lệch chính tả) — xám trung tính, không mượn nhầm màu của ngành khác. */
+.ind-other { background: #EDEFEC; color: var(--muted); }
+
+/* ---------------- Chú thích màu ngành (industry legend) ---------------- */
+/* Dải nhỏ phía trên job-grid (templates/index.html) giải thích mỗi màu
+   badge .ticket-industry tương ứng ngành nào — thêm 08/2026 cùng lúc với
+   việc đổi màu badge từ "xoay vòng theo vị trí" sang "cố định theo
+   ngành" (xem comment ở .ind-code trở lên), vì đổi màu cố định chỉ có
+   tác dụng nếu người dùng có nơi tra cứu màu nào ứng với ngành nào. */
+.industry-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.industry-legend-label {
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 2px;
+}
+
+.industry-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ô vuông 10x10 trong chú thích: mượn LUÔN class .ind-* (background +
+   color) của chính badge thật để không phải khai báo lại 6 mã màu lần
+   thứ 2 ở đây — nhưng nền nhạt (--*-soft) của .ind-* khó thấy ở ô bé
+   xíu 10x10px nên đảo ngược: swatch dùng chính `color` (màu đậm) của
+   .ind-* LÀM NỀN, còn text ngành đứng ngoài span này (xem index.html)
+   nên không bị ảnh hưởng. */
+.industry-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+.ticket-level {
+  font-size: 11px;
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+
+.ticket-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+.ticket-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+
+.ticket-top h3 { font-family: var(--font-display); font-size: 16.5px; margin: 0; line-height: 1.3; }
+.ticket-top h3 a:hover { color: var(--accent); }
+
+.ticket-company { margin: 0; color: var(--ink-soft); font-size: 13.5px; }
+
+.skill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.skill-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: #F1F4F2;
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Khối nút "Xem JD gốc" + "Lưu job" dưới mỗi ticket (templates/index.html,
+   templates/saved_jobs.html) — trước đây KHÔNG có rule nào cho
+   .ticket-actions nên 2 phần tử con (<a> và <form><button>) dồn cục theo
+   layout mặc định của trình duyệt (nằm sát nhau/không đều hàng), đúng
+   như đã thấy trên UI thật (08/2026). Bọc lại thành hàng ngang, cách đều,
+   tự xuống dòng khi chật (flex-wrap) để không tràn ra ngoài card ở màn
+   hẹp — và margin-top: auto để khối nút LUÔN dính đáy ticket dù nội dung
+   phía trên (mô tả/skill) dài ngắn khác nhau giữa các job. */
+.ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.ticket-actions form { margin: 0; }
+
+.status-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+}
+
+.status-Đang-tuyển { background: var(--teal-soft); color: var(--teal); }
+.status-Đã-đóng { background: #EDEFEC; color: var(--muted); }
+.status-Chưa-xác-minh { background: var(--amber-soft); color: var(--amber); }
+.status-Đã-gửi-cho-học-viên { background: var(--blue-soft); color: var(--blue); }
+
+.potential-Cao { background: var(--teal-soft); color: var(--teal); }
+.potential-Trung-bình { background: var(--amber-soft); color: var(--amber); }
+.potential-Thấp { background: #F1EDF0; color: #8A6E80; }
+.potential-Chưa-đánh-giá { background: #EDEFEC; color: var(--muted); }
+
+/* ==== css/05-contact-table.css ==== */
+/* Companies/contacts table */
+/* ---------------- Contact table ---------------- */
+/* Used by: templates/contacts.html, company_detail.html (applicant/CRM
+   tables). Independent of the job-cards grid in 04 — safe to restyle
+   the table without touching job listing pages. */
+
+.contact-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.contact-table { width: 100%; border-collapse: collapse; }
+
+.contact-table th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 12px 14px;
+  background: #FAFBFA;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.contact-table tr:last-child td { border-bottom: none; }
+
+/* Standalone cell values (e.g. <td class="muted">) keep the table's normal font size,
+   so they line up with sibling cells regardless of content length ("—" vs long text). */
+.contact-table td.muted,
+.contact-table td span.muted:only-child { color: var(--muted); }
+
+/* A muted line stacked under a heading (e.g. company name + industry) stays small/blocky. */
+.contact-table td strong + .muted { display: block; font-size: 11.5px; color: var(--muted); }
+
+.note-row td {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  background: #FBFCFB;
+  padding: 8px 14px 12px;
+}
+
+.fit-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  display: inline-block;
+}
+
+/* Give the "Tiềm năng" column enough room for its widest chip
+   (Chưa đánh giá) so it never has to wrap and get clipped. */
+.col-potential { min-width: 130px; }
+
+/* Tooltip tiêu chí gợi ý ngay trên danh sách công ty (thêm 08/2026) —
+   để ss_team xem được lý do gợi ý mà KHÔNG cần bấm vào Sửa. Bọc chip
+   .fit-chip có sẵn trong 1 wrap để định vị tooltip, tái dùng nguyên
+   box .potential-suggestion-tooltip đã có ở 07-forms.css (trang Sửa
+   công ty) — tránh lặp lại CSS cho cùng 1 kiểu tooltip.
+   tabindex="0" trên wrap để bàn phím (Tab) cũng mở được tooltip qua
+   :focus, không chỉ hover chuột. */
+.fit-chip-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+
+/* Sửa nhanh "Tiềm năng" ngay tại bảng (thêm 08/2026) — .fit-chip-wrap
+   giờ nằm trong <summary> (xem templates/companies.html) nên bấm được
+   để mở popover đổi mức, không chỉ hover xem gợi ý như trước. Bỏ tam
+   giác mặc định của <summary> vì đã có chip đóng vai trò nút bấm rồi,
+   tam giác thêm vào chỉ thừa/rối mắt. */
+.potential-edit {
+  position: relative;
+}
+.potential-edit > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.potential-edit > summary::-webkit-details-marker { display: none; }
+.potential-edit > summary .fit-chip-wrap { cursor: pointer; }
+
+.potential-edit-form {
+  position: absolute;
+  z-index: 20;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  box-shadow: 0 10px 24px rgba(16,32,26,0.12);
+}
+.potential-edit-form textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+}
+.fit-chip-wrap:hover .potential-suggestion-tooltip,
+.fit-chip-wrap:focus .potential-suggestion-tooltip,
+.fit-chip-wrap:focus-within .potential-suggestion-tooltip {
+  display: block;
+}
+/* Danh sách công ty là bảng dài, chip nằm giữa cột — căn tooltip theo
+   giữa chip (không phải left:0 như ở form Sửa) để đỡ tràn ra ngoài
+   bảng khi chip ở gần mép trái. */
+.fit-chip-wrap .potential-suggestion-tooltip {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Role chip (staff_activity.html "Vai trò" column) + "Bạn" badge next to
+   your own name in the same table — small, neutral, reuses .fit-chip's
+   sizing but its own color (not tied to partnership-potential meaning). */
+.role-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.you-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+
+
+.status-inline select {
+  font-size: 12.5px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  box-sizing: border-box;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+/* ==== css/06-detail-page.css ==== */
+/* Job/company detail page layout */
+/* ---------------- Detail page ---------------- */
+/* Used by: templates/job_detail.html, company_detail.html — the two-column
+   detail layout (.detail-grid), the generic .card panel (also reused
+   inside 08-dashboard.css for chart panels — check both before renaming
+   .card), and the JD bullet list. */
+
+/* Detail page layout - job_detail.html, company_detail.html */
+.detail-grid {
+  display: grid;
+  /* Sidebar cố định bên phải 380px
+     - Desktop (>1200px): Main content bên trái, sidebar 380px bên phải
+     - Tablet/Mobile: Stack xuống dưới (xem @media breakpoints) */
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.detail-main {
+  min-width: 0; /* Prevent grid blowout with long text */
+}
+
+.detail-side {
+  position: sticky;
+  top: 20px;
+  /* bù zoom — cùng bug với .sidebar (01-sidebar.css), xem giải thích ở
+     `html { zoom }` trong 00-tokens.css. Chỉ phần `vh` cần chia lại
+     cho --zoom-scale, phần `- 40px` giữ nguyên vì px đã tự ăn theo
+     zoom cùng lúc với mọi thứ khác rồi, không cần đụng vào. */
+  max-height: calc(100vh / var(--zoom-scale) - 40px);
+  overflow-y: auto;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.card h4 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.card p { margin: 0; color: var(--ink-soft); white-space: pre-line; }
+
+/* Placeholder text cho sections trống */
+.empty-placeholder {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; }
+.kv dt { font-size: 12px; color: var(--muted); }
+.kv dd { margin: 0; font-size: 13px; text-align: right; }
+.kv dd a { color: var(--accent); }
+
+.inline-form { display: flex; gap: 8px; margin-bottom: 10px; }
+
+.action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.action-row .btn { width: 100%; text-align: center; }
+.action-row form { margin: 0; }
+.inline-form select { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
+
+.jd-bullets {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+}
+.jd-bullets li { margin-bottom: 6px; line-height: 1.5; }
+.jd-bullets li:last-child { margin-bottom: 0; }
+
+/* Responsive breakpoints */
+@media (max-width: 1200px) {
+  /* Tablet (768-1200px): Stack sidebar xuống dưới
+     - Main content quá hẹp nếu giữ 2 cột ở màn nhỏ hơn 1200px
+     - Sidebar mất sticky, hiện như phần content bình thường */
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .detail-side {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Mobile: smaller card padding */
+  .card {
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  
+  .inline-form {
+    flex-direction: column;
+  }
+  
+  .action-row .btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
+/* ==== css/07-forms.css ==== */
+/* Add/edit job/company/contact forms */
+/* ---------------- Forms ---------------- */
+/* Used by: templates/add_job.html, add_company.html, add_contact.html,
+   staff_account_add.html (any page rendering .form-card). Independent
+   of 02-auth.css even though both style <input>/<select> — auth pages
+   use .auth-card, these use .form-card, so the two never collide. */
+
+/* Form card wrapper - add_job.html, add_company.html, add_contact.html */
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-pad-y) var(--card-pad-x);
+  /* BỎ max-width - để form fill hết chiều rộng .content (đã có max 1600px) */
+
+  /* 08/2026 (refactor #1, xem chi tiết tại khối "@container" bên dưới
+     phần .form-grid): biến .form-card thành 1 "query container" theo
+     bề rộng thật của chính nó — để .form-grid con có thể đổi số cột
+     dựa vào bề rộng CARD đang chứa nó, thay vì dựa vào bề rộng cả màn
+     hình (@media). Chỉ set containment kiểu inline-size (theo chiều
+     ngang) nên không ảnh hưởng chiều cao/nội dung bên trong — an toàn,
+     không đổi giao diện hiện tại của bất kỳ trang nào. */
+  container-type: inline-size;
+}
+
+.form-section {
+  font-family: var(--font-display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin: 22px 0 12px;
+}
+.form-section:first-child { margin-top: 0; }
+
+/* Badge "Gợi ý: …" cạnh dropdown "Tiềm năng hợp tác" (add_company.html)
+   — chỉ hiển thị ở trang SỬA công ty, tính bởi potential_score.py.
+   Màu theo mức gợi ý, dùng chung bảng màu --teal/--amber/--accent đã có
+   sẵn trong 00-tokens.css thay vì thêm biến màu mới.
+
+   Tooltip chi tiết (thêm 08/2026): trước đây dùng thuộc tính title=
+   (tooltip mặc định trình duyệt) — đổi sang tooltip HTML tự vẽ vì title=
+   chỉ hiện được text thuần, không xuống dòng/format được thành checklist
+   rõ ràng. .potential-suggestion-wrap là vùng hover (bao cả badge), box
+   .potential-suggestion-tooltip ẩn mặc định, hiện khi hover/focus vào
+   wrap — thuần CSS, không cần JS. */
+.potential-suggestion-wrap {
+  position: relative;
+  display: inline-block;
+  margin-top: 8px;
+}
+.potential-suggestion {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: default;
+}
+.potential-suggestion-high   { color: var(--teal); background: var(--teal-soft); }
+.potential-suggestion-medium { color: var(--amber); background: var(--amber-soft); }
+.potential-suggestion-low    { color: var(--accent); background: var(--accent-soft); }
+
+.potential-suggestion-tooltip {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink);
+  white-space: normal;
+}
+.potential-suggestion-wrap:hover .potential-suggestion-tooltip,
+.potential-suggestion-wrap:focus-within .potential-suggestion-tooltip {
+  display: block;
+}
+
+/* Lật lên trên khi gần đáy viewport (thêm 08/2026, báo lỗi ảnh chụp:
+   tooltip mở xuống dưới đè lên dòng kế tiếp / khuất sau thanh phân
+   trang). Class này do JS (initTooltipAutoFlip, app.js) gắn/gỡ động
+   lúc hover/focus — không thể xử lý thuần CSS vì bảng phân trang phía
+   client (ẩn/hiện bằng display), "dòng cuối" hiển thị thay đổi theo
+   trang trong khi DOM order cố định, :last-child không phản ánh đúng. */
+.potential-suggestion-tooltip.tooltip-flip-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+.potential-suggestion-tooltip strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.potential-suggestion-tooltip ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.potential-suggestion-tooltip li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+.potential-suggestion-tooltip li .tick {
+  flex: none;
+  font-weight: 700;
+}
+.potential-suggestion-tooltip li.is-met { color: var(--ink); }
+.potential-suggestion-tooltip li.is-met .tick { color: var(--teal); }
+.potential-suggestion-tooltip li.is-unmet { color: var(--muted); }
+.potential-suggestion-tooltip li.is-unmet .tick { color: var(--muted); }
+
+/* Danh sách job title trong tooltip "Job mới nhất" (dashboard, khu
+   "Đang mở rộng tuyển dụng") — KHÁC checklist tiêu chí gợi ý ở trên
+   (dùng icon .tick riêng nên tắt list-style: none). Danh sách job chỉ
+   là text thuần, không có icon -> phải tự bật lại dấu gạch đầu dòng,
+   tách class riêng (.tooltip-plain-list) để không ảnh hưởng checklist
+   ở add_company.html/companies.html đang dùng chung .potential-
+   suggestion-tooltip ul/li. 08/2026 (báo lỗi ảnh chụp: nhìn phẳng lì,
+   không phân biệt được từng dòng job). */
+.potential-suggestion-tooltip ul.tooltip-plain-list {
+  list-style: disc;
+  padding-left: 18px;
+}
+.potential-suggestion-tooltip ul.tooltip-plain-list li {
+  display: list-item;
+  padding: 2px 0;
+}
+
+/* Ghi chú nhỏ cuối tooltip — giải thích tooltip chỉ show tối đa N job
+   mới nhất (không phải TẤT CẢ job công ty đó đang tuyển), để người
+   dùng không hiểu lầm đây là danh sách đầy đủ. */
+.tooltip-footnote {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.potential-suggestion-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Form grid - 4 columns với manual span control */
+.form-grid {
+  display: grid;
+  /* Desktop: 4 cột bằng nhau
+     - Mỗi field có thể chiếm 1-4 cột tuỳ độ dài nội dung
+     - Dùng .span-1, .span-2, .span-3, .span-4 classes để control
+     - Responsive: 4→3→2→1 cột theo breakpoints */
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--form-grid-gap-row) var(--form-grid-gap-col);
+}
+
+/* Span classes - control số cột mỗi field chiếm */
+.form-grid > label.span-1 { grid-column: span 1; } /* 25% - Level, Địa điểm */
+.form-grid > label.span-2 { grid-column: span 2; } /* 50% - Ngành, Công ty */
+.form-grid > label.span-3 { grid-column: span 3; } /* 75% */
+.form-grid > label.span-4 { grid-column: span 4; } /* 100% - Mô tả, Yêu cầu */
+
+/* Same overflow fix as .two-col above: a <select> with a long option
+   (company name) can overflow its 1fr column and stick out past the
+   card edge instead of wrapping/truncating within it. */
+.form-grid > label { min-width: 0; }
+.form-card input, .form-card select, .form-card textarea { width: 100%; }
+
+.form-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.form-card label.full { grid-column: 1 / -1; margin-top: 14px; }
+.form-card label.checkbox-label { flex-direction: row; align-items: center; gap: 8px; }
+
+/* 08/2026 (báo lỗi ảnh chụp): ".form-card input { width: 100% }" bên
+   dưới áp lên MỌI input, kể cả checkbox/radio nằm trong
+   .checkbox-label -> ô tick bị kéo giãn thành khối vô hình rộng bằng
+   cả hàng (chỉ vẽ tick nhỏ ở góc trái), đẩy chữ nhãn dạt hẳn sang phải
+   trông như "nút bị trôi/center lung tung". Trước đây chỉ tab Crawl
+   (ngành nghề) có riêng 1 dòng reset cho .crawl-category-item, còn mọi
+   .checkbox-label khác (vd 2 checkbox dry-run/check-deadline ở tab Bảo
+   trì) đều dính lỗi này -> sửa CHUNG tại nguồn ở đây để không phải vá
+   riêng từng chỗ dùng .checkbox-label mới sau này. */
+.form-card label.checkbox-label input[type="checkbox"],
+.form-card label.checkbox-label input[type="radio"] {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+
+.form-card input, .form-card select, .form-card textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+}
+
+.form-card textarea { resize: vertical; }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Company combobox (search + scroll) ----------------------------- */
+/* Dùng ở add_job.html / add_contact.html thay cho <select> công ty dài.
+   Xem templates/_company_combobox.html (markup) + public/app.js
+   (initCompanyCombobox, hành vi gõ-lọc/scroll/phím mũi tên). */
+
+.cbx { position: relative; }
+
+.cbx-input {
+  /* Kế thừa style input chung từ .form-card input ở trên (font, padding,
+     border, bg) — chỉ thêm cursor để gợi ý đây là ô có thể bấm mở list. */
+  cursor: text;
+}
+
+.cbx.cbx-open .cbx-input {
+  border-color: var(--accent);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cbx-panel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 24px rgba(16, 30, 26, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cbx-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.cbx-opt {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cbx-opt-sub { color: var(--muted); font-size: 13px; }
+
+.cbx-opt.cbx-active,
+.cbx-opt:hover {
+  background: var(--accent-soft);
+}
+
+.cbx-opt-new {
+  color: var(--accent);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+.cbx-opt-new.cbx-active,
+.cbx-opt-new:hover { background: var(--accent-soft); border-radius: 6px; }
+
+.cbx-empty {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cbx-error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #C0392B;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1200px) {
+  /* Large tablet: 3 cột */
+  .form-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  /* Điều chỉnh span classes cho 3 cột */
+  .form-grid > label.span-1 { grid-column: span 1; } /* 33% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 66% */
+  .form-grid > label.span-3 { grid-column: span 3; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 3; } /* 100% */
+  
+  .form-card {
+    padding: 22px 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Tablet: 2 cột */
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  /* Điều chỉnh span classes cho 2 cột */
+  .form-grid > label.span-1 { grid-column: span 1; } /* 50% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-3 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 2; } /* 100% */
+}
+
+@media (max-width: 768px) {
+  /* Mobile: 1 cột */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Tất cả fields chiếm full width */
+  .form-grid > label.span-1,
+  .form-grid > label.span-2,
+  .form-grid > label.span-3,
+  .form-grid > label.span-4 {
+    grid-column: span 1;
+  }
+  
+  .form-card {
+    padding: 18px 20px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .form-card input,
+  .form-card select,
+  .form-card textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+}
+
+/* ============================================================
+   08/2026 (refactor #1 — xem tóm tắt "4 nguyên nhân gốc" đã thảo
+   luận): 3 khối @media phía trên đổi số cột .form-grid theo BỀ RỘNG
+   MÀN HÌNH, không theo bề rộng THẬT của .form-card đang chứa nó — đây
+   chính là gốc rễ khiến .crawl-source-card .form-grid (15-crawl.css)
+   phải viết tay 1 rule đè riêng (ép cứng 2 cột) thay vì tự đúng.
+
+   CỐ TÌNH KHÔNG XOÁ 3 khối @media ở trên — giữ nguyên làm lưới an
+   toàn (fallback) cho trình duyệt cũ chưa hỗ trợ Container Queries,
+   và vì chúng đặt TRƯỚC khối này trong file nên khi cả 2 loại điều
+   kiện (@media lẫn @container) cùng đúng, khối @container dưới đây
+   (đứng SAU, cùng độ ưu tiên) sẽ thắng theo cascade — tức về đúng bề
+   rộng thật của card, không cần sửa gì thêm ở 3 khối cũ.
+
+   Cách dùng cho code mới: đặt `container-type: inline-size` lên phần
+   tử CHA của .form-grid (như .form-card ở trên đã làm) — không cần
+   động vào khối này. Ngưỡng chọn dưới đây tương đương đúng 3 mốc
+   1200/900/768px cũ nhưng đo trên bề rộng CARD ở layout mặc định
+   (sidebar mở, .content max 1800px, padding 40px) — không phải bề
+   rộng màn hình, nên card đặt trong container hẹp hơn (sidebar,
+   crawl...) giờ tự đổi cột đúng mà không cần rule đè riêng nào nữa. */
+@container (max-width: 860px) {
+  .form-grid { grid-template-columns: repeat(3, 1fr); }
+  .form-grid > label.span-1 { grid-column: span 1; } /* 33% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 66% */
+  .form-grid > label.span-3 { grid-column: span 3; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 3; } /* 100% */
+}
+
+@container (max-width: 620px) {
+  .form-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-grid > label.span-1 { grid-column: span 1; } /* 50% */
+  .form-grid > label.span-2 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-3 { grid-column: span 2; } /* 100% */
+  .form-grid > label.span-4 { grid-column: span 2; } /* 100% */
+}
+
+@container (max-width: 440px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid > label.span-1,
+  .form-grid > label.span-2,
+  .form-grid > label.span-3,
+  .form-grid > label.span-4 {
+    grid-column: span 1;
+  }
+}
+
+/* ==== css/08-dashboard.css ==== */
+/* /bao-cao dashboard: KPI cards + charts */
+/* ---------------- Dashboard ---------------- */
+/* Used by: templates/dashboard.html — .kpi-row (the 5 top stat cards)
+   and .chart-grid/.bar-row (the "Job theo ngành/level/địa điểm/trạng
+   thái" panels). .bar-row/.bar-track/.bar-fill (+ modifier
+   .bar-row--wide-value, xem comment riêng bên dưới) cũng được
+   templates/_status_tab.html (tab "Tình trạng dữ liệu" ở /crawl) tái
+   dùng từ 08/2026 — 2 trang này KHÔNG có gì xung đột (khác trang,
+   khác context) nên dùng chung an toàn. Safe to change the KPI card
+   column count or chart layout here — chỉ .bar-row/.bar-track/
+   .bar-fill/.bar-row--wide-value là dùng ở >1 trang, đổi 4 class đó
+   thì kiểm tra cả _status_tab.html. Note: .kpi-row's own responsive
+   column count is also set in the shared @media block in
+   10-pagination-responsive.css — check there too if changing behavior
+   below ~900px. */
+
+/* Flexbox, not CSS Grid — same reasoning as .job-grid in public/css/04-
+   job-cards.css. With 6 cards, a grid's auto-fit could resolve to e.g.
+   4 tracks on typical screens: row 1 fills all 4, row 2 only has the
+   remaining 2 cards but is still divided into those same 4 fixed
+   tracks, leaving 2 empty cells on the right (the "KPI row 2 stops
+   halfway" gap). Flexbox sizes each row's leftover space independently,
+   so a short second row of 2 cards still splits 100% of the row width
+   between just those 2 — no JS needed to detect/fix a short trailing
+   row. 170px basis (not larger) keeps all 6 cards on one row down to
+   ~1280px-wide screens after sidebar+padding; a bigger basis would
+   start wrapping to 2 rows on common laptop widths (1280–1440px). */
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.kpi-row > * {
+  flex: 1 1 170px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-num {
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: var(--accent);
+}
+
+.kpi-label { font-size: 12.5px; color: var(--ink-soft); }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+}
+
+.bar-label { color: var(--ink-soft); }
+
+.bar-track {
+  height: 9px;
+  background: #EFF2F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.bar-fill-alt { background: var(--teal); }
+
+.bar-value { font-family: var(--font-mono); text-align: right; color: var(--muted); }
+
+/* Biến thể cột giá trị RỘNG HƠN — dùng cho tab "Tình trạng dữ liệu"
+   (_status_tab.html), nơi bar-value hiển thị "340/1200 (28%)" dài hơn
+   hẳn số 1-3 chữ số ("42") mà .bar-row gốc (dashboard.html) đang có.
+   Cột đầu (nhãn field) cũng rộng hơn 130px vì có label dài như
+   "Mã số thuế"/"LinkedIn" cần chỗ thoáng hơn ngành/level ngắn gọn ở
+   dashboard. Compound selector .bar-row.bar-row--wide-value thắng
+   .bar-row gốc bằng độ ưu tiên CSS thật (2 class > 1 class), không
+   phụ thuộc thứ tự khai báo — cùng nguyên tắc compound modifier đã
+   dùng ở .crawl-sources--fixed-2col (15-crawl.css).  */
+.bar-row.bar-row--wide-value {
+  grid-template-columns: 150px 1fr 130px;
+}
+
+/* ---------------- Tab bar ---------------- */
+/* Thêm 08/2026 cùng lúc với việc chia dashboard thành 4 tab nội bộ
+   (Tổng quan/Gợi ý học viên/Doanh nghiệp/Báo cáo tháng) — không thêm
+   mục sidebar mới (sidebar chỉ có 1 mục "Dashboard"), chỉ 1 thanh tab
+   ngay dưới tiêu đề trang. Cố ý viết riêng .tab-bar thay vì tái dùng
+   .filter-bar — .filter-bar là 1 hàng input/select có viền + nền
+   trắng (control), còn tab-bar là điều hướng (nav) nên cần trạng thái
+   active rõ ràng hơn 1 input thường có. */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px;
+  margin-bottom: 22px;
+}
+
+.tab-bar button {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.tab-bar button:hover { color: var(--ink); }
+
+.tab-bar button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tab-bar .tab-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-left: 6px;
+  opacity: 0.75;
+}
+
+.dashboard-tab { display: none; }
+.dashboard-tab.active { display: block; }
+
+/* ---------------- Recap / insight cards (3 tab mới) ---------------- */
+
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.pct-badge {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  margin-left: 6px;
+}
+
+.pct-up { background: var(--teal-soft); color: var(--teal); }
+.pct-down { background: #F1EDF0; color: #8A6E80; }
+.pct-flat { background: #EDEFEC; color: var(--muted); }
+
+.empty-note {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 14px 2px;
+}
+
+.reason-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* ---------------- Phân trang client-side (app.js: initClientListPagination) ---------------- */
+/* .pagination/.page-btn/.page-status gốc (10-pagination-responsive.css)
+   được thiết kế cho cuối trang list (companies.html, index.html) — viền
+   trên đậm + margin 28px hợp lý khi đứng riêng 1 mình cuối trang. Ở đây
+   panel nằm LỒNG trong .card cùng nhiều panel khác trong 1 tab, nên thu
+   nhỏ margin/padding và canh giữa cho gọn, đỡ chiếm chỗ. Element chỉ có
+   class này khi JS thực sự thêm nav (danh sách ngắn thì bỏ qua, xem
+   app.js) nên không cần lo item rỗng đứng chình ình khi không cần phân
+   trang. */
+.pagination-list-nav.pagination {
+  margin-top: 14px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
+/* ---------------- Bảng phân trang client-side: khoá layout cột ---------------- */
+/* .contact-table mặc định KHÔNG set table-layout (xem 05-contact-table.css) nên
+   trình duyệt tự auto-size cột dựa trên các <tr> đang HIỂN THỊ — dòng bị ẩn bởi
+   phân trang client-side (display:none, xem app.js initClientListPagination)
+   không tính vào phép đo đó, nên mỗi lần đổi trang là 1 tập dòng khác -> cột
+   auto-size lại -> bảng bị "nhảy" kích thước.
+   .dash-table-fixed (gắn kèm .contact-table, chỉ dùng ở dashboard.html) khoá layout
+   bằng table-layout: fixed + <colgroup> % cố định khai báo riêng theo từng bảng
+   trong template (số cột/ý nghĩa mỗi bảng khác nhau nên không dùng 1 bộ % chung).
+   Scope theo class thay vì sửa thẳng .contact-table để KHÔNG ảnh hưởng contacts.html
+   và company_detail.html — hai trang đó dùng chung .contact-table nhưng phân trang
+   phía server (không có tình trạng ẩn/hiện dòng qua display) nên không cần fix này. */
+.dash-table-fixed { table-layout: fixed; }
+.dash-table-fixed td, .dash-table-fixed th { overflow-wrap: break-word; }
+
+/* ==== css/09-misc-toasts.css ==== */
+/* Empty states, flash messages, toasts */
+/* ---------------- Misc ---------------- */
+/* Used by: every page — .empty-state ("no results" panels), .flash-*
+   (server-rendered flash messages), and .toast-* (async JS feedback
+   from public/app.js after save/unsave actions). */
+
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.flash-stack { margin-bottom: 16px; }
+
+.flash {
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+  /* Thêm 08/2026: crawler_client.py::_format_import_errors_detail() giờ
+     nối nhiều dòng lỗi import bằng "\n" (mỗi dòng 1 lỗi validate) — mặc
+     định white-space:normal (browser default) gộp \n thành khoảng trắng,
+     khiến nhiều lỗi dính thành 1 câu dài không đọc nổi. pre-line giữ
+     xuống dòng thật nhưng vẫn gộp khoảng trắng thừa/wrap dài — không
+     ảnh hưởng các flash message 1 dòng hiện có (success/error thường). */
+  white-space: pre-line;
+}
+
+.flash-success { background: var(--teal-soft); color: var(--teal); border: 1px solid #BFE5DD; }
+
+/* Was previously missing entirely — error flashes (e.g. "Team SS
+   accounts can't save jobs") had no styling and blended in unstyled. */
+.flash-error { background: #FBE7E4; color: #B23A22; border: 1px solid #F2C9C1; }
+
+/* ---------------- Toasts (async save/unsave feedback, see app.js) ---------------- */
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+  max-width: 320px;
+}
+
+.toast {
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(16, 30, 26, 0.14);
+  border: 1px solid transparent;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast-success { background: var(--teal-soft); color: var(--teal); border-color: #BFE5DD; }
+.toast-error { background: #FBE7E4; color: #B23A22; border-color: #F2C9C1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==== css/10-pagination-responsive.css ==== */
+/* Pagination + the shared @media breakpoint */
+/* ---------------- Phân trang (templates/_pagination.html) ---------------- */
+/* Used by: any page that {% include "_pagination.html" %} (job listing,
+   contacts, etc). The @media (max-width: 900px) block at the bottom of
+   this file is SHARED/GLOBAL — it also collapses the sidebar, detail
+   grid, form grid, kpi-row and chart-grid for small screens. It's kept
+   here (not duplicated per-file) so there's one single source of truth
+   for the mobile breakpoint; if you add a new grid elsewhere that also
+   needs to collapse on mobile, add its rule to THIS block rather than
+   creating a second @media (max-width: 900px) in another file. */
+/* Trước đây KHÔNG có rule nào cho toàn bộ nhóm class .pagination/.page-*
+   -> các link/span/input/button con render theo layout mặc định của
+   trình duyệt, dính sát nhau trên 1 dòng, ô nhập "Tới trang" bé xíu theo
+   kích thước mặc định của <input type="number"> — đúng lỗi đã thấy trên
+   UI thật (08/2026). */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page-btn:hover { border-color: var(--ink); }
+
+.page-btn.is-disabled {
+  color: var(--muted);
+  cursor: default;
+  background: #F5F7F5;
+}
+.page-btn.is-disabled:hover { border-color: var(--border); }
+
+.page-status {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+}
+
+.page-jump-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.page-jump-input {
+  width: 56px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.page-jump-btn {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .content { padding: 24px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  /* .kpi-row is flexbox (public/css/08-dashboard.css) — force 2-per-row
+     on mobile by giving each card a basis just over half the row width,
+     since flex-basis (not grid-template-columns) is what controls its
+     column count now. */
+  .kpi-row > * { flex-basis: 45%; }
+  .chart-grid { grid-template-columns: 1fr; }
+  /* Sidebar collapse doesn't apply once .shell drops to a single column —
+     always show full nav text/labels below the breakpoint. */
+  html.sidebar-collapsed .nav-label,
+  html.sidebar-collapsed .nav-text,
+  html.sidebar-collapsed .brand-text,
+  html.sidebar-collapsed .auth-info,
+  html.sidebar-collapsed .auth-box-guest p {
+    display: initial;
+  }
+  html.sidebar-collapsed .nav a,
+  html.sidebar-collapsed .brand,
+  html.sidebar-collapsed .auth-box { justify-content: flex-start; }
+  /* .error-code (17-error-pages.css) at 108px wraps/overflows the
+     narrower mobile .content padding (24px above) — scale it down
+     rather than let 3 digits fight for space under ~400px. */
+  .error-code { font-size: 72px; }
+}
+
+/* ==== css/11-student-activity.css ==== */
+/* /student-activity: theo dõi học viên lưu/ứng tuyển JD */
+/* ---------------- Student activity (Quản trị / Hoạt động học viên) ---------------- */
+/* Used by: templates/student_activity.html (danh sách học viên,
+   /student-activity), templates/student_activity_detail.html (chi tiết
+   1 học viên, /student-activity/<id>) — thêm 08/2026 để SS team/admin
+   theo dõi học viên đang lưu/ứng tuyển JD nào (trước đây không có màn
+   hình nào cho việc này, xem lịch sử trao đổi).
+
+   Reuse tối đa component đã có (bảng dùng .contact-table, thẻ dùng
+   .card, ticket job dùng .job-grid/.ticket của 04-job-cards.css) — file
+   này CHỈ chứa phần thật sự mới: heading 2 khối trên trang chi tiết và
+   khối tóm tắt học viên ở đầu trang chi tiết. Không đụng vào các file
+   css khác để tránh ảnh hưởng ngược lên trang khác. */
+
+.activity-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 28px 0 12px;
+}
+
+.activity-section-head:first-of-type { margin-top: 0; }
+
+.activity-section-head h2 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  margin: 0;
+}
+
+.activity-section-head .muted { font-size: 12.5px; }
+
+.student-summary-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.student-summary-card .kv { min-width: 220px; }
+
+/* ==== css/12-activity-logs.css ==== */
+/* /activity-logs: lịch sử thao tác audit log */
+/* Activity Logs Page — full-width layout + custom table styling */
+
+/* Tab navigation */
+.tab-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab-nav a {
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab-nav a:hover {
+  color: var(--text-primary);
+}
+
+.tab-nav a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Activity table specific styling */
+.activity-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.activity-table thead {
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.activity-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.activity-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.activity-table td a {
+  word-break: break-word;
+}
+
+.activity-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.activity-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.activity-table .note-text {
+  max-width: 400px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.activity-table .actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.activity-table .highlight-required {
+  background-color: rgba(255, 193, 7, 0.08);
+}
+
+.activity-table .highlight-required:hover {
+  background-color: rgba(255, 193, 7, 0.12);
+}
+
+/* Badge styling */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #2E7D32;
+}
+
+.badge-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #F57C00;
+}
+
+.badge-danger {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #C62828;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+  padding: 1.5rem;
+}
+
+.page-link {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.page-link:hover {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.page-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .activity-table {
+    font-size: 0.85rem;
+  }
+  
+  .activity-table th,
+  .activity-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .activity-table-wrap {
+    border-radius: 0;
+    margin: 0 -16px;
+  }
+  
+  .activity-table {
+    font-size: 0.8rem;
+  }
+  
+  .activity-table th,
+  .activity-table td {
+    padding: 8px 10px;
+  }
+  
+  /* Stack table cho mobile - ẩn bớt cột */
+  .activity-table th:nth-child(5),
+  .activity-table td:nth-child(5) {
+    display: none; /* Ẩn cột "Công ty" trên mobile */
+  }
+}
+
+/* Modal "Sửa ghi chú" (thay window.prompt() cũ, 08/2026) — cố ý dùng
+   ĐÚNG bộ design token thật của app (var(--surface)/var(--radius)/
+   var(--ink)/var(--border)/var(--accent)...), KHÔNG dùng var(--primary)/
+   var(--text-secondary)/var(--bg-secondary) như phần còn lại của file
+   này — 3 biến đó KHÔNG được khai báo ở đâu trong 00-tokens.css (file
+   này viết TRƯỚC khi hệ thống token hiện tại chuẩn hoá, chưa từng được
+   dọn lại), css trình duyệt coi property tương ứng là invalid nên rơi về
+   giá trị mặc định/kế thừa — khiến tab-nav/badge ở trang này lệch màu
+   nhẹ so với phần còn lại của app dù không lỗi rõ ràng. Modal MỚI này
+   theo đúng token thật, khớp visual với .dm-modal (data-management) và
+   .et-modal (mẫu email) đang dùng ở nơi khác trong app. */
+.note-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.note-modal-overlay[hidden] { display: none; }
+
+.note-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 12px 40px rgba(16, 30, 26, 0.2);
+}
+
+.note-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.note-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.note-modal-close:hover { background: var(--bg); color: var(--ink); }
+
+#note-modal-form { padding: 16px 20px 20px; }
+
+#note-modal-textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  resize: vertical;
+}
+
+#note-modal-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.note-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* ==== css/13-data-management.css ==== */
+/* /data-management: xuất/nhập hàng loạt Job/Company/Contact */
+/* Data Management page (/data-management) — Export/Import Job/Company/Contact.
+   Reuses .tab-nav (12-activity-logs.css), .btn/.filter-bar/.page-head
+   (03-layout.css), .form-card-ish inputs (07-forms.css tokens), .pagination
+   (10-pagination-responsive.css). Only page-specific pieces live here. */
+
+/* ---- Entity switch (Job / Company / Contact) ---- */
+.dm-entity-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.dm-entity-tab {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dm-entity-tab:hover { border-color: var(--ink); color: var(--ink); }
+
+.dm-entity-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #16130E;
+}
+
+.dm-panel { margin-top: 6px; }
+
+/* ---- Export tab ---- */
+.dm-export-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  /* Rộng hơn bản cũ (640px, chỉ 2 nút tải) — thêm 08/2026: form filter +
+     bảng preview cần nhiều chỗ hơn nhiều, .dm-table-wrap tự cuộn ngang
+     nếu entity có nhiều cột (vd job) nên không cần giới hạn quá chặt. */
+  max-width: 960px;
+}
+
+.dm-export-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
+
+/* Filter export (thêm 08/2026) — dùng lại .form-grid (07-forms.css, chia
+   cột span-1/span-2...) cho đồng bộ layout với form khác trong app.
+   RIÊNG style input/select/label KHÔNG tự có (07-forms.css scope các rule
+   đó dưới .form-card, còn khối filter export nằm trong .dm-export-card —
+   tên khác nên không tự khớp selector) -> khai lại 1 bản tương đương ở
+   đây, scope theo .dm-export-filters, tránh phải bọc thêm 1 lớp .form-card
+   lồng trong .dm-export-card (2 lớp card border/padding chồng nhau xấu). */
+.dm-export-filters { margin-bottom: 18px; }
+.dm-export-filters .form-grid { margin-bottom: 4px; }
+.dm-export-filters .form-actions { margin-top: 14px; padding-top: 0; border-top: none; }
+
+.dm-export-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  min-width: 0;
+}
+
+.dm-export-filters input,
+.dm-export-filters select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  width: 100%;
+}
+
+#dm-export-preview-area { margin-bottom: 18px; }
+
+.dm-hint { color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
+.dm-hint-muted { margin-top: 14px; margin-bottom: 0; font-size: 12.5px; }
+
+/* Danh sách giải thích nhãn trạng thái (thay cho 1 đoạn văn dài, thêm
+   08/2026) — mỗi trạng thái 1 dòng riêng, nhãn màu đặt ở đầu dòng để
+   staff quét mắt là khớp được ngay với tag đang thấy trên bảng, không
+   phải đọc hết 1 đoạn văn dài để tìm đúng câu giải thích cho tag mình
+   đang thắc mắc. */
+.dm-hint-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dm-hint-list li {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.dm-hint-list .dm-tag {
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.dm-export-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- Import tab: upload step ---- */
+.dm-import-upload-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  max-width: 640px;
+}
+
+.dm-import-upload-card h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 20px; }
+
+.dm-file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.dm-file-label input[type="file"] {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+}
+
+/* ---- Import tab: preview step ---- */
+.dm-preview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dm-stat {
+  flex: 1 1 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.dm-stat strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.dm-stat span { font-size: 12px; color: var(--ink-soft); }
+
+.dm-stat-new strong { color: #2E8B57; }
+.dm-stat-conflict strong { color: #B58000; }
+.dm-stat-inactive strong { color: #B23A22; }
+.dm-stat-resolve strong { color: #3A6FB0; }
+.dm-stat-level-resolve strong { color: #6B3FA0; }
+.dm-stat-fix strong { color: #B23A22; }
+
+.dm-tag {
+  display: inline-block;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.dm-tag-new { background: #E4F3E9; color: #2E8B57; }
+.dm-tag-conflict { background: #FCF1D8; color: #B58000; }
+.dm-tag-inactive { background: #FBE7E4; color: #B23A22; }
+/* Thêm cho conflict_status="pending_company_resolution" — trạng thái
+   thật trả về từ backend (preview_manager.py) không có tag trước đó vì
+   bản cũ statusTag() trong _dm_import.html chưa từng xử lý case này. */
+.dm-tag-resolve { background: #E3ECFB; color: #3A6FB0; }
+.dm-tag-level { background: #F1E6FB; color: #6B3FA0; }
+/* dm-tag-level-ok: badge thay thế dm-tag-level SAU khi staff đã chọn xong
+   level ở dropdown (xem statusTag() JS) — xanh nhạt để phân biệt rõ với
+   tím "còn phải làm gì đó", tránh badge đứng yên gây hiểu nhầm đã xong
+   hay chưa (bug báo 08/2026). */
+.dm-tag-level-ok { background: #E3F3E9; color: #2E8B57; }
+/* needs_field_fix (08/2026) — cùng tông đỏ với dm-tag-inactive/dm-resolve-pending
+   để nhất quán "cần chú ý, chưa xử lý xong" trong hệ màu sẵn có của trang. */
+.dm-tag-fix { background: #FBE7E4; color: #B23A22; }
+/* dm-tag-dup-warn (08/2026, xem preview_manager.py::apply_field_fix()
+   backend) — badge phụ cộng thêm khi verify-field phát hiện nghi ngờ
+   trùng contact ngay sau khi staff sửa 1 ô, tách màu cam đậm khác hẳn
+   dm-tag-conflict (vàng nhạt) để nổi bật hơn — đây là cảnh báo MỚI PHÁT
+   SINH ngay lúc đó, cần staff chú ý hơn 1 conflict đã biết từ đầu. */
+.dm-tag-dup-warn { background: #FCE4D6; color: #C2410C; }
+
+/* dm-dup-detail (08/2026, xem _dm_import.html::dupDetailLine()) — dòng
+   chi tiết dưới dm-tag-dup-warn, hiện tên/công ty người bị nghi trùng +
+   field khớp + thông tin liên hệ hiện có, cùng tông màu cam đậm với badge
+   để rõ đây là phần mở rộng của cùng 1 cảnh báo. */
+.dm-dup-detail {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #C2410C;
+}
+
+.dm-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  margin-bottom: 8px;
+}
+
+.dm-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dm-preview-table thead {
+  background: var(--bg-secondary, #F4F6F4);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.dm-preview-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.dm-preview-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  max-width: 260px;
+  overflow-wrap: break-word;
+}
+
+.dm-preview-table tbody tr:last-child td { border-bottom: none; }
+.dm-preview-table tbody tr.dm-row-flag { background: #FFFCF6; }
+
+.dm-row-errors {
+  color: #B23A22;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.dm-action-fixed { color: var(--ink-soft); font-size: 12.5px; }
+
+.dm-action-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dm-radio-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.dm-inactive-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dm-inactive-warn {
+  font-size: 12px;
+  color: #B23A22;
+  font-weight: 500;
+}
+
+.dm-inactive-btns { display: flex; gap: 6px; }
+
+.dm-inactive-btns .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.dm-inactive-btns .btn.active {
+  background: var(--accent);
+  color: #16130E;
+  border-color: var(--accent);
+}
+
+.dm-resolve-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.dm-resolve-current {
+  font-size: 12.5px;
+  padding: 3px 0;
+}
+
+.dm-resolve-pending { color: #B23A22; font-weight: 500; }
+.dm-resolve-ok { color: #2E8B57; font-weight: 500; }
+
+.dm-btn-choose-company { padding: 4px 0; font-size: 12.5px; align-self: flex-start; }
+
+.dm-resolve-raw {
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.dm-level-select {
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 140px;
+  max-width: 200px;
+}
+
+/* ---- Sửa tại chỗ cho ô dữ liệu lỗi (needs_field_fix, 08/2026) ---- */
+
+/* Ô <td> chứa field lỗi — nền nhạt để staff quét mắt thấy ngay dòng nào
+   còn ô cần sửa mà không phải đọc hết badge trạng thái ở cột đầu. */
+.dm-cell-field-fix {
+  background: #FFF7F5;
+}
+
+.dm-field-fix {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* dm-field-fix-row (08/2026) — bọc widget (input/select) + nút "Xác nhận"
+   trên cùng 1 hàng, nút luôn nằm sát cạnh ô đang sửa để staff không phải
+   rời mắt đi tìm nút submit chung cuối trang. */
+.dm-field-fix-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dm-field-fix-row .dm-field-input,
+.dm-field-fix-row .dm-field-select {
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.dm-btn-verify-field {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #B23A22;
+  background: var(--surface);
+  color: #B23A22;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dm-btn-verify-field:hover:not(:disabled) {
+  background: #FBE7E4;
+}
+
+.dm-btn-verify-field:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* dm-field-verify-note (08/2026) — thông báo riêng cho kết quả nút "Xác
+   nhận" tại ô (lỗi format sau khi sửa, hoặc lỗi mạng/máy chủ) — tách
+   khỏi .dm-field-error-note (vốn luôn hiện lỗi GỐC từ lúc build preview,
+   không đổi cho tới khi renderPage() chạy lại với dữ liệu mới). Rỗng thì
+   không chiếm chỗ (:empty), tránh khoảng trắng thừa dưới mỗi ô bình
+   thường chưa bấm Xác nhận lần nào. */
+.dm-field-verify-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.dm-field-verify-note:empty {
+  display: none;
+}
+.dm-field-verify-note.dm-field-verify-error {
+  color: #B23A22;
+}
+
+.dm-field-input,
+.dm-field-select {
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #E0958A;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 140px;
+  max-width: 220px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ô lỗi field-fix nằm trong td của bảng nhiều cột — nếu không ép min-width
+   cho chính <td>, table layout auto sẽ co cột này lại theo nội dung ngắn
+   nhất trong cột (badge/text ở dòng khác), khiến input bên trong bị nén
+   nhỏ hơn cả min-width khai báo dù CSS input đã đúng (phát hiện qua staff
+   report ô field-fix nhỏ tới mức không gõ được, 08/2026). */
+.dm-cell-field-fix {
+  min-width: 160px;
+}
+
+.dm-field-input:focus,
+.dm-field-select:focus {
+  outline: none;
+  border-color: #B23A22;
+  box-shadow: 0 0 0 2px rgba(178, 58, 34, 0.15);
+}
+
+.dm-field-error-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: #B23A22;
+  line-height: 1.35;
+}
+
+.dm-pagination { margin-top: 8px; margin-bottom: 20px; }
+
+/* ---- Confirm form (note + submit) ---- */
+#dm-confirm-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  max-width: 720px;
+}
+
+.dm-note-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.dm-note-label textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #FBFCFB;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.dm-required { color: #B23A22; }
+
+#dm-confirm-blocked-hint {
+  color: #B23A22;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .dm-preview-summary { gap: 8px; }
+  .dm-stat { flex: 1 1 100px; padding: 10px 12px; }
+  .dm-preview-table td, .dm-preview-table th { padding: 8px 10px; }
+}
+
+/* ---- Modal chọn công ty gợi ý (thay window.prompt()/alert() cũ) ---- */
+.dm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+/* BUG FIX (08/2026): [hidden] (UA stylesheet, display:none) và
+   .dm-modal-overlay (display:flex, rule ở trên) có cùng specificity
+   (0,0,1,0) — rule custom nạp SAU UA stylesheet nên luôn thắng, khiến
+   modal HIỆN NGAY LÚC VỪA RENDER PREVIEW (JS chỉ set hidden=true lúc
+   khởi tạo, nhưng display:flex đè lên, modal vẫn che kín màn hình dù
+   chưa ai bấm "Chọn công ty…"). Rule dưới đây có specificity cao hơn
+   (0,0,2,0 nhờ kết hợp .dm-modal-overlay[hidden]) để đảm bảo ẩn đúng
+   khi có thuộc tính hidden, bất kể thứ tự cascade phía trên đổi sao. */
+.dm-modal-overlay[hidden] {
+  display: none;
+}
+
+.dm-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 460px;
+  /* bù zoom cho phần vh — 560px giữ nguyên vì đã là px cố định, không
+     bị bug vh; xem giải thích ở `html { zoom }` trong 00-tokens.css */
+  max-height: min(560px, calc(85vh / var(--zoom-scale)));
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 48px rgba(16, 30, 26, 0.22);
+}
+
+.dm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dm-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.dm-modal-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.dm-modal-close:hover { background: var(--bg); color: var(--ink); }
+
+.dm-modal-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+
+.dm-modal-hint { color: var(--ink-soft); font-size: 13px; margin: 0 0 12px; }
+.dm-modal-loading { color: var(--ink-soft); font-size: 13.5px; }
+.dm-modal-error { color: #B23A22; font-size: 13.5px; }
+
+.dm-modal-suggestion-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dm-modal-suggestion {
+  width: 100%;
+  text-align: left;
+  background: #FBFCFB;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--font-body);
+}
+
+.dm-modal-suggestion:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dm-modal-suggestion-name {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13.5px;
+  flex: 1 1 auto;
+}
+
+.dm-modal-suggestion-tax { color: var(--ink-soft); font-size: 12px; }
+
+.dm-modal-suggestion-score {
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--teal-soft);
+  padding: 2px 8px;
+}
+
+.dm-modal-create-new {
+  width: 100%;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.dm-modal-create-new:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ==== css/14-email-templates.css ==== */
+/* Popup chọn/soạn mẫu email liên hệ doanh nghiệp (nút "Mẫu email" ở bảng contact) */
+/* Used by: nút "✉ Mẫu email" ở bảng contact (company_detail.html,
+   contacts.html) + popup chọn/soạn mẫu email (markup nằm trong
+   base.html vì popup dùng chung cho mọi trang, không riêng 1 template).
+   2 bước: danh sách mẫu (et-list-view) -> nội dung mẫu đã chọn, sửa
+   được, không ảnh hưởng bản gốc (et-detail-view). */
+
+.btn-email-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.et-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.et-modal-content {
+  background: var(--surface);
+  border-radius: var(--radius);
+  max-width: 640px;
+  width: 100%;
+  /* bù zoom — xem giải thích ở `html { zoom }` trong 00-tokens.css */
+  max-height: calc(86vh / var(--zoom-scale));
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 12px 40px rgba(16, 30, 26, 0.2);
+}
+
+.et-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.et-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.et-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  padding: 4px;
+}
+
+.et-modal-close:hover { color: var(--ink); }
+
+.et-modal-sub {
+  color: var(--ink-soft);
+  margin: 4px 0 16px;
+  font-size: 14px;
+}
+
+.et-template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.et-template-item {
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.et-template-item:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.et-template-item strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.et-template-item span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.et-template-item .et-suggested-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--teal);
+  background: var(--teal-soft);
+  padding: 2px 8px;
+}
+
+.et-detail-title {
+  margin: 12px 0 10px;
+}
+
+.et-modal-body-textarea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.et-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.et-modal-actions .muted {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Danh sách mẫu rỗng (chưa có mẫu nào trong DB, hoặc JSON server-render
+   lỗi/không đọc được) — thay vì popup trống trơn không rõ lý do. */
+.et-template-empty {
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 16px 14px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ==== css/15-crawl.css ==== */
+/* /crawl: trang crawl dữ liệu (chỉ admin) */
+/* Trang /crawl (Crawl dữ liệu, chỉ admin) — 08/2026.
+   Tận dụng lại .dm-export-card, .dm-preview-summary/.dm-stat
+   (13-data-management.css), .form-grid/.form-actions (07-forms.css),
+   .activity-table*, .badge*, .pagination (12-activity-logs.css) —
+   file này CHỈ thêm phần crawl KHÔNG có sẵn: 2 card nguồn cạnh nhau,
+   badge-info (còn thiếu, badge cũ chỉ có success/warning/danger dành
+   cho action log Thêm/Sửa/Xoá), spinner cho trạng thái đang chạy. */
+
+/* 08/2026 (refactor #3 — xem "4 nguyên nhân gốc" đã thảo luận, điểm 3):
+   TRƯỚC ĐÂY .crawl-sources (base, dùng ở tab Crawl) và .maint-job-grid
+   (modifier đứng RIÊNG, không compound, dùng ở tab Bảo trì) có CÙNG độ
+   ưu tiên CSS trên property grid-template-columns — ai đứng SAU trong
+   file thắng, nhìn HTML (class="crawl-sources maint-job-grid") không
+   ai đoán được. Refactor: .crawl-sources giờ CHỈ giữ phần DÙNG CHUNG
+   cho cả 2 tab (display/gap/margin) — số cột tách hẳn ra 2 class biến
+   thể compound bên dưới (.crawl-sources--auto-fit /
+   .crawl-sources--fixed-2col), thắng bằng ĐỘ ƯU TIÊN CSS thật (2 class
+   > 1 class) chứ không phụ thuộc thứ tự khai báo nữa — đổi thứ tự 2
+   khối bên dưới cho nhau cũng KHÔNG đổi kết quả render. */
+.crawl-sources {
+  display: grid;
+  gap: var(--card-gap);
+  margin-bottom: 28px;
+}
+
+/* Biến thể "auto-fit" — tab Crawl (_crawl_tab.html, <div class=
+   "crawl-sources crawl-sources--auto-fit">): số card/hàng TỰ co giãn
+   theo bề rộng màn hình, mỗi card tối thiểu --card-min-w.
+   (08/2026, yêu cầu "mở rộng card ~30%": 340px -> 440px (~+30%),
+   padding 22/24 -> 29/31, tiêu đề 18px -> 23px. Card rộng hơn nên trên
+   màn hình thường sẽ tự co từ 3 xuống 2 card/hàng (đúng ý "to ra" thay
+   vì nhồi nhiều card nhỏ/hàng) — vẫn auto-fit nên màn hình hẹp hơn tự
+   xuống 1 card/hàng, không vỡ layout.
+   (08/2026, revert theo yêu cầu: bản "1 cột cố định + tràn padding"
+   thử trước đó không cho hiệu quả như mong đợi trên thực tế, quay lại
+   đúng bản auto-fit/minmax này — chỉ giữ lại phần bù zoom 90% ở
+   .crawl-live-widget bên dưới, không liên quan tới đoạn này.)
+   08/2026 (refactor #2): 440px giờ tham chiếu --card-min-w ở
+   00-tokens.css thay vì viết tay — GIÁ TRỊ giữ nguyên, không đổi giao
+   diện; đổi bề rộng card lần sau chỉ cần sửa 1 dòng ở 00-tokens.css,
+   không phải dò lại file này. */
+.crawl-sources.crawl-sources--auto-fit {
+  grid-template-columns: repeat(auto-fit, minmax(var(--card-min-w), 1fr));
+}
+
+.crawl-source-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 29px 31px;
+}
+
+.crawl-source-card h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 23px;
+}
+
+.crawl-source-card .crawl-source-sub {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.crawl-source-card.is-busy {
+  opacity: 0.7;
+}
+
+/* Form trong .crawl-source-card cần thêm class .form-card (07-forms.css)
+   để kế thừa style label (flex-column, xuống dòng đúng) + input/select
+   (width 100%, padding, border) — thiếu class này là lý do label/input
+   không co giãn đúng (lỗi 08/2026). Nhưng .form-card tự có
+   background/border/padding riêng, trùng với .crawl-source-card đã có
+   sẵn 2 thứ đó -> override về 0/transparent để tránh viền đôi lồng nhau. */
+.crawl-source-card .form-card {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* LỖI 08/2026 (ảnh chụp báo lỗi): 2 ô "Số trang"/"Tối đa job" bị bóp
+   nhỏ dị dạng, lệch hàng so với "Ngành" ngay khi trang tải xong (không
+   cần bấm gì). Nguyên nhân: .form-grid (07-forms.css) đổi số cột theo
+   BỀ RỘNG MÀN HÌNH (@media max-width: 1200px/900px/768px), không theo
+   bề rộng THẬT của card chứa nó. Ở trang /crawl, 2 card TopCV/
+   VietnamWorks đứng CẠNH NHAU trong .crawl-sources (mỗi card chỉ ~45-
+   48% màn hình) — nếu màn hình rộng hơn 1200px, .form-grid vẫn dùng
+   layout "desktop 4 cột" (thiết kế cho card full-width như add_job.html)
+   dù bề ngang thật của card lúc này chỉ đủ chỗ cho ~2 cột thoải mái ->
+   2 field span-1 cuối hàng bị ép rất hẹp.
+
+   Sửa: ép RIÊNG layout của .form-grid bên trong .crawl-source-card về
+   2 cột cố định (không đổi theo breakpoint viewport nữa) — khớp đúng
+   bề rộng thật của card (~340-600px, xem .crawl-sources ở trên): hàng 1
+   "Ngành" full-width, hàng 2 "Số trang" + "Tối đa job" chia đôi bằng
+   nhau. Đặt SAU khối @media của 07-forms.css trong thứ tự nạp CSS
+   (15-crawl.css nạp sau) nên tự nhiên thắng độ ưu tiên, không cần
+   !important.
+
+   CẬP NHẬT 08/2026 (refactor #1): 07-forms.css giờ đã có Container
+   Queries cho .form-grid (đo theo bề rộng CARD thật, không phải màn
+   hình) — với bề rộng .crawl-source-card hiện tại (~440-600px) thì
+   Container Query đó tự ra đúng 2 cột, nên về lý thuyết rule ép cứng
+   dưới đây không còn thật sự cần nữa. VẪN GIỮ NGUYÊN rule này (không
+   xoá) để không đổi hành vi trang /crawl đang chạy ổn định — coi đây
+   là "chốt an toàn" tường minh, phòng trường hợp sau này ai đó đổi lại
+   --card-min-w nhỏ hơn khiến card hẹp đi ngoài ý muốn. */
+.crawl-source-card .form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.crawl-source-card .form-grid > label.span-2 { grid-column: 1 / -1; }
+.crawl-source-card .form-grid > label.span-1 { grid-column: span 1; }
+.crawl-source-card .form-actions.span-4 { grid-column: 1 / -1; }
+
+/* 08/2026: khối checkbox dry-run/check-deadline (tab Bảo trì) là
+   <div class="span-2 maint-checkbox-col">, KHÔNG phải <label> nên 3
+   rule .span-* ngay trên (chỉ khớp tag label) bỏ sót nó -> div này rơi
+   về auto-placement, chỉ chiếm 1/2 cột thay vì full-width như ý đồ
+   "span-2" ban đầu, để trống hẳn nửa hàng bên cạnh. */
+.crawl-source-card .form-grid > .maint-checkbox-col.span-2 { grid-column: 1 / -1; }
+
+/* Khu A (08/2026) — khối checkbox nhiều category thay cho <select> đơn.
+   CỐ TÌNH không dùng class .span-* có sẵn (span-2 ở override 2-cột
+   ngay trên đã bị gán nghĩa "full-width", span-4 gốc của 07-forms.css
+   thì chưa được .crawl-source-card .form-grid nhận diện lại — thêm
+   1 class riêng ở đây đỡ phải đụng vào 2 hệ thống span đang lệch nghĩa
+   nhau đó, tự set grid-column: 1 / -1 thẳng cho div này). */
+.crawl-category-field {
+  grid-column: 1 / -1;
+}
+
+.crawl-category-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.crawl-category-actions .btn-text {
+  padding: 2px 6px;
+  font-size: 12.5px;
+}
+
+.crawl-category-actions .btn-text:disabled {
+  color: var(--ink-soft);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.crawl-category-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* Khớp đúng nền input/select/textarea của .form-card (07-forms.css)
+     thay vì 1 tông xám riêng — tránh cảm giác "hộp xám trong card
+     trắng" lạc quẻ so với phần còn lại của form. */
+  background: #FBFCFB;
+}
+
+/* .checkbox-label (07-forms.css) đã lo layout hàng ngang (flex-direction:
+   row, align-items:center, gap:8px) — class này CHỈ thêm phần riêng của
+   crawl: cỡ chữ nhỏ hơn label thường (13px, khớp text ngành trong ô) +
+   accent-color cam để tick khớp màu CTA "Bắt đầu crawl" của trang, thay
+   vì checkbox đen mặc định trình duyệt trông lạc tông. */
+.crawl-category-item {
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.crawl-category-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.crawl-category-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.crawl-category-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #C62828;  /* khớp .crawl-error-text ở dưới, không có token --danger riêng */
+  min-height: 15px;
+}
+
+/* Khu B (08/2026) — checklist trạng thái từng category trong 1 batch,
+   thay cho .crawl-progress (1 dòng "fetched/inserted") khi card này
+   đang chạy 1 batch nhiều category thay vì 1 run đơn lẻ. */
+.crawl-batch-checklist {
+  list-style: none;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.crawl-batch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.crawl-batch-item-label {
+  color: var(--ink);
+}
+
+/* Badge trạng thái 'queued'/'running' — action log cũ (12-activity-logs.css)
+   chỉ có success/warning/danger, không có màu trung tính cho "đang diễn
+   ra" (khác hẳn ý nghĩa "Sửa" của warning). */
+.badge-info {
+  background-color: rgba(58, 111, 176, 0.1);
+  color: #3A6FB0;
+}
+
+.badge-info .crawl-spinner {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: crawl-pulse 1.1s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes crawl-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Khu B — card "đang chạy", tối đa 2 (1/nguồn). Dùng lại .dm-export-card
+   làm khung ngoài (xem crawl.html), phần này chỉ style riêng nội dung
+   bên trong khi ở trạng thái running (chưa có .dm-stat để hiện). */
+.crawl-running-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.crawl-running-meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.crawl-running-meta strong { color: var(--ink); }
+
+/* Khu B — 08/2026 x2: đợt trước tách "đang chạy" + "Log live" thành 2
+   cột cố định (260-340px + 720px) nằm CHUNG 1 hàng trong luồng trang.
+   Đợt này (theo yêu cầu thảo luận "khó theo dõi khi nằm ở đáy trang")
+   bỏ hẳn layout 2 cột đó: "Đang chạy" dời sang widget NỔI góc dưới-phải
+   (.crawl-live-widget, cuối file này), không còn chiếm chỗ trong luồng
+   trang -> Log live đứng ĐỘC LẬP, full-width (xem .crawl-log-card-standalone
+   ngay dưới) thay vì bị ép cố định 720px cạnh cột kia nữa. Rule
+   .crawl-running-log-row cũ đã XOÁ (không còn template nào dùng). */
+.crawl-log-card-standalone {
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.crawl-running-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.crawl-running-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  font-size: 13.5px;
+}
+
+.crawl-running-card-wrap { display: flex; flex-direction: column; }
+
+/* Tiến độ real-time (heartbeat, 08/2026) — hiện trong CHÍNH card trạng
+   thái, ngay dưới badge/meta đã có, không tách card riêng để không
+   chiếm thêm chỗ dọc. */
+.crawl-progress {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.crawl-progress-line {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.crawl-progress-updated {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+/* Khung "Log live" — cố tình style GIỐNG terminal thật (nền tối, font
+   monospace) để dễ phân biệt trực quan với phần còn lại của trang (nền
+   sáng) — đúng yêu cầu "xem log như log trong cmd khi crawl ở backend".
+   LUÔN HIỆN, chiều rộng CỐ ĐỊNH (xem .crawl-running-log-row ở trên) —
+   không co giãn theo nội dung 2 bên, tránh "nhảy" khi card trạng thái
+   bên trái đổi kích thước. */
+.crawl-log-card {
+  display: flex;
+  flex-direction: column;
+  background: #14171A;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  height: 340px;
+}
+
+.crawl-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #C8CDD2;
+  background: #1D2125;
+  border-bottom: 1px solid #2A2F34;
+  flex: none;
+}
+
+.crawl-log-autoscroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  color: #9BA3AB;
+  cursor: pointer;
+}
+
+.crawl-log-body {
+  margin: 0;
+  padding: 12px 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #D7DBDE;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crawl-log-line { display: block; }
+.crawl-log-line.is-warning { color: #E0B94C; }
+.crawl-log-line.is-error { color: #E5726A; }
+
+/* Khu C — cột "Kết quả" trong bảng lịch sử: gộp 8 chỉ số vào 1 ô nhỏ
+   gọn (không dùng .dm-stat to như card summary, chật bảng) — hiện số
+   chính (inserted) to, phần còn lại ẩn trong <details> để không chiếm
+   quá nhiều chỗ mỗi dòng. */
+.crawl-result-main {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.crawl-result-details {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.crawl-result-details summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.crawl-result-details dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 10px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+}
+
+.crawl-result-details dt { font-weight: 500; }
+.crawl-result-details dd { margin: 0; text-align: right; }
+
+.crawl-error-text {
+  color: #C62828;
+  font-size: 12.5px;
+  max-width: 320px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 08/2026 (refactor #3): gộp chung 2 khối @media 720px (trước đây tách
+   riêng cho .crawl-sources và .maint-job-grid, nội dung y hệt nhau) —
+   giờ target thẳng 2 class biến thể compound, cùng độ ưu tiên với 2
+   khối định nghĩa cột ở trên nên vẫn thắng đúng theo breakpoint, không
+   phụ thuộc thứ tự khai báo. */
+@media (max-width: 720px) {
+  .crawl-sources.crawl-sources--auto-fit,
+  .crawl-sources.crawl-sources--fixed-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Tab "Bảo trì dữ liệu" (08/2026, xem lịch sử trao đổi "phương án B —
+   generic runner dùng chung"). Tái dùng gần hết class ở trên
+   (.crawl-source-card, .crawl-running-card-wrap, .crawl-log-card...)
+   — chỉ thêm phần THẬT SỰ khác biệt: 5 card cố định (không cuộn
+   ngang như 2-3 nguồn crawl), badge "Tốn phí thật", cột checkbox
+   dry-run/check_deadline_only, và khung Log live THU NHỎ gắn ngay
+   trong từng card (khác khung Log live to, DUY NHẤT ở tab Crawl).
+   ============================================================ */
+
+/* Biến thể "cố định 2 cột" — tab Bảo trì (_maintenance_tab.html, <div
+   class="crawl-sources crawl-sources--fixed-2col">). Trước đây tên là
+   .maint-job-grid, đứng RIÊNG (không compound với .crawl-sources) nên
+   cùng độ ưu tiên với .crawl-sources gốc trên property
+   grid-template-columns — ai đứng SAU trong file thắng, nhìn HTML
+   không đoán được. Đổi tên + viết compound selector
+   (.crawl-sources.crawl-sources--fixed-2col) để thắng bằng ĐỘ ƯU TIÊN
+   thật (2 class > 1 class), không còn phụ thuộc thứ tự dòng nữa — xem
+   khối "refactor #3" ở đầu file.
+   08/2026 (báo lỗi ảnh chụp): auto-fit/minmax(320px,1fr) co card lại
+   theo bề rộng NỘI DUNG tối thiểu, không ép lấp đầy .content-full ->
+   trên màn hình rộng chỉ dựng đủ 2 card/hàng rồi để trống 2 bên rất
+   nhiều, kéo theo khung "Log live" (con của card, xem .maint-log-card
+   dưới) bị hẹp theo. Sửa: cố định LUÔN 2 cột chia đều 100% bề rộng
+   (không phụ thuộc minmax nữa) để 2 card/hàng lấp hết ngang trang. */
+.crawl-sources.crawl-sources--fixed-2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Card LẺ cuối cùng (ví dụ 5 job -> card #5 đứng 1 mình ở hàng 3) bị
+   ép chỉ rộng bằng 1 cột, để trống hẳn nửa hàng bên phải -> cho nó
+   chiếm luôn cả 2 cột (grid-column: 1 / -1) khi vừa là con cuối cùng
+   (:nth-last-child(1)) vừa đứng ở vị trí lẻ (:nth-child(odd), tức
+   không có "bạn cùng hàng"). Số chẵn card thì :nth-last-child(1) luôn
+   rơi vào vị trí chẵn -> selector không khớp, giữ nguyên 2 cột như
+   thường, tự đúng bất kể sau này thêm/bớt job (không hardcode số 5). */
+.crawl-sources--fixed-2col .crawl-source-card:nth-last-child(1):nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.maint-cost-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.maint-checkbox-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Log live thu nhỏ, gắn trong card (khác .crawl-log-card to ở Khu B
+   tab Crawl) — thấp hơn hẳn để 5 card vẫn gọn trên 1 màn hình.
+   FIX 08/2026 (báo lỗi ảnh chụp): .crawl-log-card có height:340px CỐ
+   ĐỊNH — trước đây chỉ giới hạn .maint-log-body xuống 140px mà QUÊN
+   override luôn height của card cha, nên card vẫn cao 340px trong khi
+   nội dung/scrollbar bên trong chỉ chiếm 140px -> để trống hẳn khoảng
+   dưới, thanh cuộn nhìn như "cụt" giữa chừng. Đặt lại height: auto để
+   card co theo đúng header + body 140px, không dư khoảng trống. */
+.maint-log-card {
+  height: auto;
+  margin-top: 14px;
+}
+
+.maint-log-body {
+  max-height: 140px;
+}
+
+/* ============================================================
+   Widget nổi "Đang chạy" (08/2026, theo yêu cầu thảo luận) — DÙNG
+   CHUNG cho cả 2 tab (#crawl-live-widget bên _crawl_tab.html,
+   #maint-live-widget bên _maintenance_tab.html): nổi cố định góc
+   dưới-phải, đi theo khi cuộn trang (position: fixed, không phải
+   sticky — sticky vẫn cuộn mất khi hết vùng cha, fixed mới "đi theo
+   người dùng" đúng nghĩa xuyên suốt cả trang dài). Mỗi tab CHỈ hiện
+   job của chính tab đó (đã chốt lúc thảo luận, đơn giản hơn gộp cả
+   2 nguồn dữ liệu) — không đụng vào layout 2 cột card hiện có (Khu A),
+   chỉ thêm 1 lớp nổi TRÊN CÙNG của trang. Card list bên trong tái
+   dùng NGUYÊN .crawl-running-list/.crawl-running-card-wrap cũ nên
+   toàn bộ JS polling/xoá-card-khi-xong không cần sửa gì. */
+.crawl-live-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 360px;
+  /* bù zoom cho cả 2 đơn vị vw/vh — xem giải thích ở `html { zoom }`
+     trong 00-tokens.css; phần "- 32px" giữ nguyên vì px đã tự ăn theo
+     zoom rồi, không cần chia lại */
+  max-width: calc(100vw / var(--zoom-scale) - 32px);
+  max-height: calc(60vh / var(--zoom-scale));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Bóng đậm hơn card thường trong trang — cần TÁCH RÕ khỏi nội dung
+     bên dưới nó (nổi đè lên, không phải 1 phần bố cục bình thường). */
+  box-shadow: 0 12px 32px rgba(15, 23, 30, 0.18);
+  z-index: 40;
+  overflow: hidden;
+}
+
+.crawl-live-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+  user-select: none;
+}
+
+.crawl-live-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.crawl-live-widget-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.crawl-live-widget-count[hidden] { display: none; }
+
+.crawl-live-widget-toggle {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: transform 0.2s;
+}
+
+/* Thu gọn: chỉ ẩn phần thân, GIỮ NGUYÊN phần đầu (tiêu đề + số đếm)
+   để vẫn biết đang có mấy job chạy mà không chiếm chỗ màn hình — mũi
+   tên xoay ngược lại làm dấu hiệu trực quan cho biết đang thu gọn. */
+.crawl-live-widget-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.crawl-live-widget.is-collapsed .crawl-live-widget-body { display: none; }
+.crawl-live-widget.is-collapsed .crawl-live-widget-toggle { transform: rotate(180deg); }
+
+/* Bên trong widget, .crawl-running-list vẫn dùng flex-column gốc —
+   chỉ bỏ margin/gap thừa vì giờ nó nằm gọn trong widget nhỏ, không
+   phải 1 khu to giữa trang như trước. */
+.crawl-live-widget .crawl-running-empty {
+  padding: 14px 16px;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .crawl-live-widget {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* Tab "Tình trạng dữ liệu" (_status_tab.html, 08/2026). Tiêu đề mỗi
+   khối ("Company/Job đang thiếu dữ liệu...") to GẤP ĐÔI mặc định
+   .card h4 (14px, xem 06-detail-page.css) — dùng class riêng thay vì
+   sửa .card h4 toàn cục vì .card h4 đang dùng chung ở nhiều trang khác
+   (job_detail.html, company_detail.html...), sửa thẳng sẽ ảnh hưởng
+   ngoài ý muốn tới các trang đó. */
+.status-card-title {
+  font-size: 28px;
+}
+
+/* ==== css/16-email-template-manager.css ==== */
+/* /contacts?tab=quan-ly: quản lý mẫu email (list + form CRUD) */
+/* Used by: _email_template_manager.html — tab "Quản lý mẫu email"
+   (/contacts?tab=quan-ly). Dùng chung tokens/màu với
+   14-email-templates.css (popup chọn mẫu) để 2 khu vực nhìn nhất quán,
+   nhưng tách file riêng vì đây là trang quản lý (list + form CRUD),
+   khác bản chất với popup chỉ đọc/copy. */
+
+.et-manager-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.et-manager-head .lede {
+  margin: 0;
+  max-width: 640px;
+}
+
+.et-manager-form {
+  margin-bottom: 24px;
+}
+
+/* 08/2026 (bản sửa cuối, sau lúc thử 150%/110% + cuộn ngang): BỎ hẳn
+   cách "phóng to % rồi cuộn ngang" — dùng width:>100% luôn tràn ra
+   ngoài khu vực nội dung, mà tràn bao nhiêu thì phải cuộn ngang bấy
+   nhiêu, không có cách nào né được nếu còn set width vượt 100% của
+   khu vực hiện có.
+
+   Ý muốn thực tế: form KHÔNG tràn/không cuộn ngang — chỉ cần "nở to"
+   tự nhiên bằng cách CHIẾM HẾT khoảng trống đang có sẵn (giống list
+   card #14-16 bên dưới đang xếp 2 cột sát nhau — còn form khi bấm Sửa/
+   Thêm thì tự nhiên 1 mình chiếm trọn cả hàng, rộng hơn hẳn mỗi ô card
+   trong list, dù cùng nằm trong 1 khu vực nội dung). Đây vốn dĩ ĐÃ
+   ĐÚNG hành vi mặc định của .form-card (không set % override) — chỉ
+   cần bỏ width/max-width ép buộc, không cần đụng gì tới sidebar. (Rule
+   --sidebar-width giảm 90% từng thêm kèm theo đây đã bị xoá ở
+   00-tokens.css — không còn lý do tồn tại, và gây lỗi sidebar bị ép
+   hẹp/chữ xuống dòng mỗi khi mở tab này.) */
+
+.et-manager-form h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+}
+
+.et-manager-body-textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* .form-grid > label.span-N (07-forms.css) chỉ nhắm <label> con trực
+   tiếp — khối checkbox trạng thái bên dưới dùng <div> (không phải
+   <label>, vì bên trong nó CHỨA nhiều <label> checkbox con), nên cần tự
+   khai lại grid-column ở đây cho riêng .et-manager-status-field. */
+.form-grid > div.span-4.et-manager-status-field { grid-column: span 4; }
+
+.et-manager-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.et-manager-status-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.et-manager-status-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.et-manager-status-check input[type="checkbox"] {
+  width: auto;
+}
+
+.et-placeholder-help {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+}
+
+.et-placeholder-help summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.et-placeholder-help dl {
+  margin: 10px 0 0;
+}
+
+.et-placeholder-help dt {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  color: var(--teal);
+  margin-top: 8px;
+}
+
+.et-placeholder-help dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.et-manager-grid {
+  display: grid;
+  /* 08/2026 (yêu cầu "mở rộng card mẫu email theo chiều ngang thêm
+     100%"): 280px -> 560px, gấp đôi bề rộng tối thiểu mỗi card. Card
+     tự co giãn theo 1fr như cũ, chỉ đổi ngưỡng auto-fill xuống ít cột
+     hơn trên cùng 1 bề rộng màn hình (vd 2 cột -> 1 cột ở màn hình
+     thường, xem 10-pagination-responsive.css nếu cần chỉnh breakpoint
+     kèm theo). */
+  grid-template-columns: repeat(auto-fill, minmax(560px, 1fr));
+  gap: 16px;
+}
+
+.et-manager-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.et-manager-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.et-manager-card-head strong {
+  font-family: var(--font-display);
+}
+
+.et-manager-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.et-manager-body-preview {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.et-manager-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* ==== css/17-error-pages.css ==== */
+/* Trang lỗi tuỳ chỉnh (400/403/404/500) — xem @app.errorhandler trong app.py */
+/* ---------------- Error pages ---------------- */
+/* Used by: templates/error.html — rendered by the @app.errorhandler(...)
+   handlers in app.py for 400/403/404/500 (kept as one shared template +
+   one shared stylesheet, not 4 separate pages, since the layout is
+   identical and only the number/copy/tone change — same reasoning as
+   .status-chip having 1 shared shape + per-status color, see
+   00-tokens.css pill list). Stays inside {% block content %} so the
+   sidebar/shell/flash stack from base.html render normally — a broken
+   link or a permission error shouldn't dump the user onto a stripped
+   page with no way back to nav. */
+
+.error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  /* Roughly centers within the visible viewport under the page's own
+     top padding, without pinning to a fixed px height that would look
+     off on short/tall windows. Divide by --zoom-scale for the same
+     reason .shell does (see 00-tokens.css html{zoom} comment) — vh is
+     measured pre-zoom. */
+  min-height: calc(60vh / var(--zoom-scale));
+  padding: 24px 20px 40px;
+  margin: 0 auto;
+  max-width: 520px;
+}
+
+.error-page .eyebrow { margin-bottom: 4px; }
+
+.error-code {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 108px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 4px 0 10px;
+}
+
+/* Tone = how serious the error is, not a fixed per-code color — a 404
+   is "nothing here", not a malfunction, so it stays quiet/muted rather
+   than alarming red like a real 500. */
+.error-code--muted { color: var(--muted); }
+.error-code--warn { color: var(--amber); }
+.error-code--danger { color: #B23A22; } /* matches .flash-error / .toast-error text */
+
+.error-page h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.error-page .lede {
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+.error-chip {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.error-chip--muted { background: #EDEFEC; color: var(--muted); }
+.error-chip--warn { background: var(--amber-soft); color: var(--amber); }
+.error-chip--danger { background: #FBE7E4; color: #B23A22; }
+
+.error-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* .btn-ghost used for "Quay lại" is a <button>, not an <a> (needs
+   history.back(), no URL exists for "wherever the user came from") —
+   .btn's base rule already covers both display: inline-block reads
+   fine on <button>, but reset the couple of <button>-only UA defaults
+   .btn-ghost/.btn don't already touch. */
+.error-actions button.btn {
+  font-family: var(--font-body);
+  line-height: 1.2;
+}
+
+/* ==== css/18-messages.css ==== */
+/* /messages: inbox + khung chat + badge unread sidebar (thêm 08/2026) */
+/* Used by: /messages (inbox), /messages/new (tìm người), /messages/<id>
+   (khung chat) — templates/messages.html, messages_new.html,
+   messages_thread.html — và badge unread ở sidebar (base.html, #sidebarUnreadBadge).
+
+   Tái dùng: .status-chip (base font-size/padding đã khai báo ở
+   04-job-cards.css, border-radius/white-space dùng chung ở 00-tokens.css
+   — file này CHỈ thêm màu riêng cho 3 trạng thái pending/declined/
+   blocked), .role-chip (05-contact-table.css), .btn-*/.page-head/.back-link
+   (03-layout.css), .empty-state (09-misc-toasts.css). KHÔNG định nghĩa
+   lại các class đó ở đây. */
+
+/* ---------------- Badge unread ở sidebar ---------------- */
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.nav-badge[hidden] { display: none; }
+
+/* ---------------- Trang inbox ---------------- */
+
+.msg-section { margin-bottom: 32px; }
+
+.msg-section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.pending-list, .conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+
+.pending-info { display: flex; flex-direction: column; gap: 3px; }
+.pending-info .muted { font-size: 12.5px; color: var(--ink-soft); }
+
+.pending-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.pending-actions form { margin: 0; }
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-row:hover { background: var(--bg); }
+
+.conversation-row.unread .conversation-preview,
+.conversation-row.unread strong { color: var(--ink); font-weight: 700; }
+
+.conversation-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.conversation-main { min-width: 0; flex: 1; }
+
+.conversation-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.conversation-preview {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.conversation-time { font-size: 11.5px; color: var(--muted); }
+
+.conversation-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.conversation-block-form {
+  flex-shrink: 0;
+  margin: 0 14px 0 0;
+}
+
+.status-pending { background: var(--amber-soft); color: var(--amber); }
+.status-declined { background: #F1EDF0; color: #8A6E80; }
+.status-blocked { background: #FBE7E4; color: #B23A22; }
+
+/* ---------------- Trang tìm người (/messages/new) ---------------- */
+
+.people-search-form {
+  display: flex;
+  gap: 10px;
+  max-width: 480px;
+  margin-bottom: 22px;
+}
+
+.people-search-form input[type="text"] {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.people-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.people-result-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+}
+
+.people-result-row:hover { border-color: var(--ink); }
+.people-result-row .conversation-main { display: flex; align-items: center; gap: 8px; }
+.people-result-cta { margin-left: auto; font-size: 13px; color: var(--accent); font-weight: 600; }
+
+/* ---------------- Khung chat (/messages/<id>) ---------------- */
+
+.chat-head h1 { display: flex; align-items: center; gap: 10px; }
+.chat-head form { margin: 0; }
+
+.chat-shell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  /* Chiều cao cố định + scroll riêng khung chat, không cuộn cả trang —
+     bù zoom giống các khối full-height khác, xem giải thích ở
+     00-tokens.css `html { zoom }`. */
+  height: calc(56vh / var(--zoom-scale));
+  overflow-y: auto;
+}
+
+.chat-empty { border: none; padding: 40px 0; }
+
+.msg { display: flex; flex-direction: column; max-width: 62%; }
+.msg-in { align-self: flex-start; align-items: flex-start; }
+.msg-out { align-self: flex-end; align-items: flex-end; }
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.msg-in .msg-bubble { background: var(--bg); color: var(--ink); border-bottom-left-radius: 4px; }
+.msg-out .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+
+.msg-time { font-size: 10.5px; color: var(--muted); margin-top: 3px; padding: 0 4px; }
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  background: var(--surface);
+}
+
+.cancel-request-form {
+  padding: 0 18px 16px;
+  margin: 0;
+}
+.cancel-request-form .btn-text { padding: 4px 0; font-size: 12.5px; }
+
+@media (max-width: 900px) {
+  .msg { max-width: 82%; }
+  .chat-messages { height: calc(48vh / var(--zoom-scale)); }
+}
+

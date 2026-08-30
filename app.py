@@ -48,24 +48,21 @@ login_manager.login_message_category = "error"
 # Cache-busting cho CSS/JS tĩnh
 # ---------------------------------------------------------------------------
 
+# TRƯỚC ĐÂY (khi style.css còn @import 19 file trong public/css/):
+# hàm này quét thêm cả public/css/*.css để tính mtime, vì style.css tự nó
+# không đổi khi sửa 1 file con — cần quét cả 19 file mới bắt được thay đổi.
+#
+# GIỜ (sau khi gộp bằng build_css.py — xem file đó để biết lý do): public/
+# style.css là file ĐÃ ĐƯỢC BUILD, nội dung nó tự thay đổi mỗi khi
+# build_css.py chạy lại (vì được ghi đè trực tiếp) — nên chỉ cần lấy mtime
+# của chính style.css là đủ, không cần quét public/css/ nữa. public/css/
+# giờ chỉ là mã nguồn để sửa, không phải thứ browser tải trực tiếp.
 def _asset_version(filename):
-    base_dir = app.static_folder
-    paths = [os.path.join(base_dir, filename)]
-    if filename == "style.css":
-        css_dir = os.path.join(base_dir, "css")
-        if os.path.isdir(css_dir):
-            paths += [
-                os.path.join(css_dir, f)
-                for f in os.listdir(css_dir)
-                if f.endswith(".css")
-            ]
-    mtimes = []
-    for p in paths:
-        try:
-            mtimes.append(os.path.getmtime(p))
-        except OSError:
-            pass
-    return str(int(max(mtimes))) if mtimes else "0"
+    path = os.path.join(app.static_folder, filename)
+    try:
+        return str(int(os.path.getmtime(path)))
+    except OSError:
+        return "0"
 
 
 app.jinja_env.globals["asset_version"] = _asset_version
