@@ -101,12 +101,24 @@ def thread(partner_id):
 
     partner_name = request.args.get("name", "").strip()
     partner_role = request.args.get("role", "").strip()
-    if not partner_name:
+    relationship_status = None
+    relationship_id = None
+    if not partner_name or current_user.is_staff:
+        # current_user.is_staff: LUÔN dò lại (kể cả khi đã có name/role
+        # từ query string) để lấy relationship_status/relationship_id
+        # mới nhất — cần 2 giá trị này để hiện đúng nút Chặn/Bỏ chặn ở
+        # đầu trang chat (xem messages_thread.html). Field này CHỈ có
+        # khi đã từng nhắn qua lại (list_conversations() suy từ bảng
+        # messages) — cặp mới toanh (0 tin, SS chặn trước khi từng
+        # chat) sẽ không có relationship_id ở đây, nút "Bỏ chặn" khi đó
+        # sẽ không hiện được (residual edge case, hiếm).
         try:
             for conv in backend_auth.list_conversations(access_token):
                 if conv.get("partner_id") == partner_id:
-                    partner_name = conv.get("partner_name", "")
-                    partner_role = conv.get("partner_role", "")
+                    partner_name = partner_name or conv.get("partner_name", "")
+                    partner_role = partner_role or conv.get("partner_role", "")
+                    relationship_status = conv.get("relationship_status")
+                    relationship_id = conv.get("relationship_id")
                     break
         except BackendAuthError:
             pass
@@ -122,6 +134,7 @@ def thread(partner_id):
     return render_template(
         "messages_thread.html",
         partner_id=partner_id, partner_name=partner_name, partner_role=partner_role,
+        relationship_status=relationship_status, relationship_id=relationship_id,
         history=history, last_id=last_id, max_content_length=MAX_CONTENT_LENGTH,
     )
 
@@ -241,16 +254,22 @@ def unread_count_json():
 
 
 # ============================================================
-# Quản lý quan hệ — accept / decline / block. CHỈ SS/admin (@staff_required
-# đã tự check is_authenticated + is_staff + must_change_password, xem
-# utils/decorators.py) — học viên không có nút này ở UI, chặn cả ở route
-# để gõ thẳng URL cũng không vào được. Form POST thường (không fetch),
-# redirect lại /messages theo đúng kế hoạch FE.
+# Quản lý quan hệ — accept / decline / block / unblock. CHỈ SS/admin
+# (@staff_required đã tự check is_authenticated + is_staff +
+# must_change_password, xem utils/decorators.py) — học viên không có
+# nút này ở UI, chặn cả ở route để gõ thẳng URL cũng không vào được.
+# Form POST thường (không fetch), redirect lại /messages hoặc về đúng
+# trang chat vừa đứng (unblock — xem route bên dưới).
 #
-# unblock CHƯA có route ở đây — cần relationship_id mà UI hiện không có
-# cách lấy cho 1 hội thoại đã accepted/blocked (xem docstring
-# backend_auth.unblock_message_relationship()). Đã báo lại việc này,
-# tạm thời SS muốn bỏ chặn phải nhờ chỉnh trực tiếp DB/qua kênh khác.
+# unblock cần relationship_id — backend đã bổ sung field này vào
+# GET /messages/conversations (ConversationOut.relationship_id, xem
+# Scrap_JD/api/schemas/messages.py) nên inbox() và thread() ở trên đều
+# tự dò được relationship_id qua backend_auth.list_conversations().
+# LƯU Ý: relationship_id CHỈ có khi đã từng nhắn qua lại (query đó suy
+# từ bảng messages) — SS chặn 1 học viên TRƯỚC KHI từng chat (0 tin)
+# thì nút "Bỏ chặn" sẽ không hiện được ở đây (residual edge case, hiếm
+# — SS cần nhắn ít nhất 1 tin hoặc chờ học viên nhắn trước để có
+# relationship_id).
 # ============================================================
 
 @messages_bp.route("/relationships/<string:relationship_id>/accept", methods=["POST"])
@@ -284,6 +303,23 @@ def block_student(student_id):
     try:
         backend_auth.block_student_in_chat(access_token, student_id)
         flash("Đã chặn học viên này — họ sẽ không nhắn tin được cho bạn nữa.", "success")
+    except BackendAuthError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("messages.inbox"))
+
+
+@messages_bp.route("/relationships/<string:relationship_id>/unblock", methods=["POST"])
+@staff_required
+def unblock_student(relationship_id):
+    """POST /messages/relationships/{id}/unblock — xem
+    backend_auth.unblock_message_relationship(). relationship_id lấy từ
+    ConversationOut.relationship_id (inbox()/thread() ở trên đã tự dò
+    qua list_conversations(), xem comment đầu nhóm route này) — CHỈ có
+    khi đã từng nhắn qua lại với học viên đó."""
+    access_token, _ = _auth_tokens_from_session()
+    try:
+        backend_auth.unblock_message_relationship(access_token, relationship_id)
+        flash("Đã bỏ chặn — học viên nhắn tin lại được với bạn.", "success")
     except BackendAuthError as exc:
         flash(str(exc), "error")
     return redirect(url_for("messages.inbox"))

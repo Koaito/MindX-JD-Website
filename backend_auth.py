@@ -536,20 +536,16 @@ def block_student_in_chat(access_token: str, student_id: str) -> dict:
 
 
 def unblock_message_relationship(access_token: str, relationship_id: str) -> dict:
-    """POST /messages/relationships/{id}/unblock — CẦN relationship_id.
+    """POST /messages/relationships/{id}/unblock — CẦN relationship_id,
+    lấy từ ConversationOut.relationship_id (GET /messages/conversations
+    — backend đã bổ sung field này 08/2026, xem
+    Scrap_JD/api/schemas/messages.py + db/messages.py::list_conversations,
+    trước đó ConversationOut không có field id nên FE không có cách lấy
+    được). Xem blueprints/messages.py::inbox()/thread() cho cách FE dò
+    relationship_id qua list_conversations().
 
-    LƯU Ý (08/2026, xem trao đổi lúc làm FE): hiện KHÔNG có route backend
-    nào trả relationship_id cho 1 cặp đã 'accepted'/'blocked' —
-    ConversationOut (GET /messages/conversations) KHÔNG có field id, chỉ
-    PendingRequestOut (GET /messages/pending-requests, dành cho request
-    CHƯA từng nhắn) mới có. Nghĩa là UI (blueprints/messages.py,
-    templates/messages.html) hiện KHÔNG có cách lấy relationship_id để
-    gọi hàm này sau khi đã rời khỏi phản hồi ngay lúc vừa block (response
-    của block_student_in_chat() ở trên CÓ trả id, nhưng chỉ dùng được
-    ngay tại thời điểm đó, không có nơi nào lưu lại cho lần sau).
-
-    Hàm này vẫn viết sẵn, gọi được ngay khi backend bổ sung 1 trong 2:
-    (a) thêm field relationship_id vào ConversationOut, hoặc
-    (b) thêm route POST /messages/unblock/{student_id} mirror đúng
-        block_student_in_chat() ở trên."""
+    LƯU Ý: relationship_id CHỈ có khi đã từng nhắn qua lại (query đó suy
+    từ bảng messages) — SS chặn 1 học viên TRƯỚC KHI từng chat (0 tin)
+    thì sẽ không có relationship_id để gọi hàm này (residual edge case,
+    hiếm)."""
     return _request("POST", f"/messages/relationships/{relationship_id}/unblock", access_token=access_token)

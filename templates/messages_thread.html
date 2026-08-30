@@ -10,11 +10,18 @@
     </h1>
   </div>
   {% if current_user.is_staff and partner_role == 'user' %}
-  <form method="post" action="{{ url_for('messages.block_student', student_id=partner_id) }}"
-        onsubmit="return confirm('Chặn {{ partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn btn-ghost btn-danger-text">Chặn học viên</button>
-  </form>
+    {% if relationship_status == 'blocked' and relationship_id %}
+    <form method="post" action="{{ url_for('messages.unblock_student', relationship_id=relationship_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost">Bỏ chặn học viên</button>
+    </form>
+    {% elif relationship_status != 'blocked' %}
+    <form method="post" action="{{ url_for('messages.block_student', student_id=partner_id) }}"
+          onsubmit="return confirm('Chặn {{ partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost btn-danger-text">Chặn học viên</button>
+    </form>
+    {% endif %}
   {% endif %}
 </header>
 

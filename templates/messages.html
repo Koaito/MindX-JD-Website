@@ -74,13 +74,21 @@
           {% endif %}
         </div>
       </a>
-      {% if current_user.is_staff and conv.partner_role == 'user' and conv.relationship_status != 'blocked' %}
-      <form method="post" action="{{ url_for('messages.block_student', student_id=conv.partner_id) }}"
-            class="conversation-block-form"
-            onsubmit="return confirm('Chặn {{ conv.partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-text btn-danger-text">Chặn</button>
-      </form>
+      {% if current_user.is_staff and conv.partner_role == 'user' %}
+        {% if conv.relationship_status == 'blocked' %}
+        <form method="post" action="{{ url_for('messages.unblock_student', relationship_id=conv.relationship_id) }}"
+              class="conversation-block-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-text">Bỏ chặn</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('messages.block_student', student_id=conv.partner_id) }}"
+              class="conversation-block-form"
+              onsubmit="return confirm('Chặn {{ conv.partner_name }}? Học viên này sẽ không nhắn tin được cho bạn nữa.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-text btn-danger-text">Chặn</button>
+        </form>
+        {% endif %}
       {% endif %}
     </div>
     {% endfor %}
