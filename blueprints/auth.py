@@ -82,7 +82,7 @@ def login():
 
         if user.is_staff and user.must_change_password:
             flash("Đây là lần đăng nhập đầu — vui lòng đặt mật khẩu mới.", "error")
-            return redirect(url_for("auth.change_password"))
+            return redirect(url_for("profile.security"))
 
         next_url = request.args.get("next")
         return redirect(next_url or (url_for("dashboard.index") if user.is_staff else url_for("jobs.index")))
@@ -171,37 +171,15 @@ def reset_password():
 @auth_bp.route("/change-password", methods=["GET", "POST"])
 @login_required
 def change_password():
-    if request.method == "POST":
-        old_password = request.form.get("old_password", "")
-        new_password = request.form.get("new_password", "")
-        new_password_confirm = request.form.get("new_password_confirm", "")
-
-        if len(new_password) < 8:
-            flash("Mật khẩu mới cần ít nhất 8 ký tự.", "error")
-            return render_template("change_password.html")
-        if new_password != new_password_confirm:
-            flash("Mật khẩu mới nhập lại không khớp.", "error")
-            return render_template("change_password.html")
-        if not current_user.must_change_password and not old_password:
-            flash("Vui lòng nhập mật khẩu hiện tại.", "error")
-            return render_template("change_password.html")
-
-        access_token, refresh_token = _auth_tokens_from_session()
-        try:
-            backend_auth.change_password(
-                access_token, new_password,
-                old_password=old_password or None,
-            )
-        except BackendAuthError as exc:
-            flash(str(exc), "error")
-            return render_template("change_password.html")
-
-        _clear_auth_tokens()
-        logout_user()
-        flash("Đã đổi mật khẩu. Vui lòng đăng nhập lại bằng mật khẩu mới.", "success")
-        return redirect(url_for("auth.login"))
-
-    return render_template("change_password.html")
+    """08/2026 — logic đổi mật khẩu THẬT đã dời sang profile.security
+    (blueprints/profile.py), là 1 phần của trang cá nhân mới. Route
+    này CHỈ còn redirect, giữ lại để không vỡ bookmark/link cũ đang
+    trỏ /change-password (vd link trong email cũ, tab đã mở sẵn).
+    Redirect cả GET lẫn POST — nếu ai đó POST thẳng vào URL cũ (form cũ
+    còn mở trong tab), request sẽ mất kèm theo (browser tự bỏ body khi
+    redirect), buộc submit lại ở trang mới — chấp nhận được vì trường
+    hợp này hiếm (form đổi mật khẩu không phải trang hay để mở lâu)."""
+    return redirect(url_for("profile.security"), code=307 if request.method == "POST" else 302)
 
 
 @auth_bp.route("/logout")

@@ -120,6 +120,24 @@ def get_me(access_token: str) -> dict:
     return _request("GET", "/auth/me", access_token=access_token)
 
 
+def update_profile(access_token: str, full_name: str, phone: str | None = None,
+                    track: str | None = None) -> dict:
+    """PATCH /auth/me (thêm 08/2026, xem trang cá nhân — blueprints/profile.py).
+    Tự sửa full_name/phone/track của CHÍNH tài khoản đang đăng nhập.
+
+    KHÁC change_password() ngay bên dưới (route riêng, không đụng mật
+    khẩu) và KHÁC mọi hàm admin sửa user khác (crawler_client/*.py,
+    dùng access token của ADMIN gọi PATCH /auth/users/{id}/...) — hàm
+    này CHỈ sửa được đúng user đang cầm access_token, không nhận
+    ss_user_id vì route backend tự suy ra "chính mình" từ JWT.
+
+    phone/track backend sẽ tự ép về None nếu tài khoản là staff (xem
+    docstring route PATCH /auth/me phía backend) — truyền lên vô hại
+    với staff, chỉ đơn giản bị bỏ qua."""
+    payload = {"full_name": full_name, "phone": phone, "track": track}
+    return _request("PATCH", "/auth/me", access_token=access_token, json=payload)
+
+
 def change_password(access_token: str, new_password: str, old_password: str | None = None) -> dict:
     """POST /auth/change-password. old_password có thể bỏ trống nếu tài
     khoản đang must_change_password=True (mật khẩu tạm admin cấp)."""

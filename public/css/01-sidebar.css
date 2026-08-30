@@ -184,6 +184,21 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   margin-bottom: 12px;
 }
 
+/* 08/2026 — .auth-box giờ là <a href="/profile"> (trước là <div> tĩnh,
+   xem templates/base.html) để bấm avatar/tên vào thẳng trang cá nhân,
+   pattern quen thuộc ở hầu hết app (Gmail, GitHub...). Reset lại style
+   <a> mặc định (màu xanh + gạch chân khi hover) để trông vẫn y hệt
+   block tĩnh cũ, chỉ thêm hiệu ứng hover nhẹ làm rõ đây là bấm được. */
+.auth-box,
+.auth-box:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth-box:hover {
+  opacity: 0.85;
+}
+
 .auth-avatar {
   width: 34px;
   height: 34px;

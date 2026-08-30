@@ -102,14 +102,14 @@
 
     <div class="sidebar-foot">
       {% if current_user.is_authenticated %}
-        <div class="auth-box">
+        <a class="auth-box" href="{{ url_for('profile.index') }}" title="Trang cá nhân">
           <div class="auth-avatar">{{ current_user.full_name[0]|upper }}</div>
           <div class="auth-info">
             <strong>{{ current_user.full_name }}</strong>
             <span>{{ role_labels.get(current_user.role, current_user.email) if current_user.is_staff else current_user.email }}</span>
           </div>
-        </div>
-        <a class="btn btn-ghost btn-block" href="{{ url_for('auth.change_password') }}" title="Đổi mật khẩu"><span class="btn-text-label">Đổi mật khẩu</span></a>
+        </a>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('profile.index') }}" title="Trang cá nhân"><span class="btn-text-label">Trang cá nhân</span></a>
         <a class="btn btn-ghost btn-block" href="{{ url_for('auth.logout') }}" title="Đăng xuất"><span class="btn-text-label">Đăng xuất</span></a>
       {% else %}
         <div class="auth-box auth-box-guest">

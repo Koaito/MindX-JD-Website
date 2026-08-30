@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Trang cá nhân — MindX Career Hub{% endblock %}
+{% block content %}
+
+<div class="auth-shell">
+  <div class="auth-card profile-card">
+    <span class="eyebrow">Career Hub / Trang cá nhân</span>
+    <h1>Trang cá nhân</h1>
+    <p class="lede">Xem lại thông tin tài khoản và cập nhật họ tên hiển thị.</p>
+
+    {% include "_profile_subnav.html" with context %}
+
+    <div class="profile-info-grid">
+      <div>
+        <span class="profile-info-label">Email</span>
+        <span class="profile-info-value">{{ current_user.email }}</span>
+      </div>
+      <div>
+        <span class="profile-info-label">Vai trò</span>
+        <span class="profile-info-value">{{ role_labels.get(current_user.role, current_user.role) if current_user.is_staff else 'Học viên' }}</span>
+      </div>
+      {% if current_user.created_at %}
+      <div>
+        <span class="profile-info-label">Tham gia từ</span>
+        <span class="profile-info-value">{{ current_user.created_at|format_date }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Họ và tên *
+        <input type="text" name="full_name" value="{{ form.get('full_name', '') }}" required>
+      </label>
+
+      {% if current_user.is_student %}
+      <div class="two-col">
+        <label>Số điện thoại
+          <input type="text" name="phone" value="{{ form.get('phone', '') }}">
+        </label>
+        <label>Định hướng ngành
+          <select name="track">
+            <option value="">— chọn —</option>
+            {% for i in industries %}
+              <option value="{{ i }}" {{ 'selected' if form.get('track') == i }}>{{ i }}</option>
+            {% endfor %}
+            <option value="Khác / Chưa xác định" {{ 'selected' if form.get('track') == 'Khác / Chưa xác định' }}>Khác / Chưa xác định</option>
+          </select>
+        </label>
+      </div>
+      {% endif %}
+
+      <button class="btn btn-primary" type="submit">Lưu thay đổi</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

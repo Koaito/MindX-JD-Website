@@ -1,0 +1,17 @@
+{# Sub-nav ngang cho khu vực "Trang cá nhân" (/profile/...) — thêm
+   08/2026. Include ở đầu MỌI template thuộc blueprint profile (xem
+   blueprints/profile.py), truyền biến `active` = 'overview' | 'security'
+   để tô mục đang đứng.
+
+   Chỉ 2 mục hiện có (Thông tin chung, Bảo mật) — CHỖ TRỐNG có chủ đích
+   cho 2 mục sẽ thêm sau (Job đã lưu, Đã ứng tuyển — dời từ
+   my_stuff.py, chỉ hiện với is_student, xem thảo luận trang cá nhân)
+   để không phải đổi cấu trúc file này lần nữa, chỉ thêm 1 <a> mới. #}
+<nav class="profile-subnav">
+  <a href="{{ url_for('profile.index') }}" class="{{ 'active' if active == 'overview' else '' }}">
+    Thông tin chung
+  </a>
+  <a href="{{ url_for('profile.security') }}" class="{{ 'active' if active == 'security' else '' }}">
+    Bảo mật
+  </a>
+</nav>

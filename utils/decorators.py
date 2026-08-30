@@ -22,8 +22,12 @@ def _wants_json():
 def staff_required(view):
     """Chỉ tài khoản team SS (role ss_team/admin) mới được vào; còn lại
     bị chặn. Nếu tài khoản đang phải đổi mật khẩu lần đầu
-    (must_change_password=True), ép về /change-password trước — trừ
-    chính route change_password/logout để không tự khoá lối thoát.
+    (must_change_password=True), ép về /profile/security trước (08/2026
+    — trước đây là /change-password, đã dời sang trang cá nhân, xem
+    blueprints/profile.py) — trừ chính route đó (tên hàm "security",
+    giữ thêm "change_password" cho chắc vì auth.change_password vẫn
+    còn tồn tại dưới dạng redirect) và route "logout", để không tự khoá
+    lối thoát.
 
     Với các route trả JSON (vd: company_suggestions) mà bị chặn ở đây,
     trả thẳng JSON lỗi thay vì redirect sang trang HTML login/error —
@@ -44,11 +48,11 @@ def staff_required(view):
                 return jsonify({"error": "Chức năng này chỉ dành cho tài khoản team SS."}), 403
             flash("Chức năng này chỉ dành cho tài khoản team SS.", "error")
             return redirect(url_for("jobs.index"))
-        if current_user.must_change_password and view.__name__ not in ("change_password", "logout"):
+        if current_user.must_change_password and view.__name__ not in ("security", "change_password", "logout"):
             if _wants_json():
                 return jsonify({"error": "Vui lòng đổi mật khẩu trước khi tiếp tục."}), 403
             flash("Vui lòng đổi mật khẩu trước khi tiếp tục.", "error")
-            return redirect(url_for("auth.change_password"))
+            return redirect(url_for("profile.security"))
         return view(*args, **kwargs)
     return wrapped
 

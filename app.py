@@ -157,12 +157,14 @@ from blueprints.dashboard import dashboard_bp
 from blueprints.data_management import data_mgmt_bp
 from blueprints.jobs import jobs_bp
 from blueprints.my_stuff import my_stuff_bp
+from blueprints.profile import profile_bp
 from blueprints.staff import staff_bp
 from blueprints.staff_activity import staff_activity_bp
 from blueprints.students import students_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(my_stuff_bp)
+app.register_blueprint(profile_bp)
 app.register_blueprint(jobs_bp)
 app.register_blueprint(companies_bp)
 app.register_blueprint(contacts_bp)

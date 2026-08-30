@@ -1,13 +1,82 @@
 /* ---------------- Auth pages ---------------- */
 /* Used by: login.html, register.html, forgot_password.html,
-   reset_password.html, change_password.html, verify_email.html.
-   .save-btn / .applicant-list / .access-note here are also reused on
-   job/company detail and saved-jobs pages — check 04/05/06 before
-   renaming any of those three. */
+   reset_password.html, verify_email.html, profile_overview.html,
+   profile_security.html (2 trang cuối thay cho change_password.html cũ
+   đã xoá 08/2026 — xem blueprints/profile.py). .save-btn /
+   .applicant-list / .access-note here are also reused on job/company
+   detail and saved-jobs pages — check 04/05/06 before renaming any of
+   those three. */
 
 .auth-shell {
   max-width: 420px;
   margin: 40px auto;
+}
+
+/* profile_overview.html/profile_security.html dùng .auth-shell.
+   profile-card (thêm class thứ 2 trên CHÍNH .auth-card, không đổi
+   .auth-shell dùng chung) để rộng hơn login/register — 2 trang cá
+   nhân có thêm sub-nav + info-grid, 420px quá chật, còn login/register
+   (chỉ 1 form dọc đơn giản) vẫn giữ nguyên 420px như cũ. */
+.auth-shell:has(.profile-card) {
+  max-width: 620px;
+}
+
+/* Sub-nav ngang trong khu vực trang cá nhân (templates/_profile_subnav.html)
+   — 2 mục hiện có (Thông tin chung/Bảo mật), chỗ trống cho Job đã lưu/
+   Đã ứng tuyển sau này (xem kế hoạch trang cá nhân). Đặt NGAY dưới
+   .lede, TRÊN info-grid/form — đúng vị trí "chọn mục trước khi xem nội
+   dung mục đó" quen thuộc của pattern tab. */
+.profile-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-subnav a {
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.profile-subnav a:hover { color: var(--ink); }
+
+.profile-subnav a.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Khối thông tin tĩnh (email/vai trò/ngày tham gia) ở đầu
+   profile_overview.html — trước form đổi tên. */
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-info-label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
+}
+
+.profile-info-value {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .auth-card {

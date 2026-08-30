@@ -36,6 +36,10 @@ class BackendUser(UserMixin):
         self.phone = me.get("phone")
         self.track = me.get("track")
         self.must_change_password = bool(me.get("must_change_password"))
+        # Thêm 08/2026 (trang cá nhân) — GET /auth/me đã trả sẵn field
+        # này từ lâu (UserOut.created_at, backend), chỉ chưa có ai cần
+        # dùng ở phía frontend nên trước đây không lưu vào BackendUser.
+        self.created_at = me.get("created_at")
         self._active = bool(me.get("is_active", True))
 
     @property
