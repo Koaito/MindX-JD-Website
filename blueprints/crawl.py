@@ -60,13 +60,24 @@ crawl_bp = Blueprint("crawl", __name__)
 # đủ để card CareerViet xuất hiện.
 _SOURCE_LABELS = {"topcv": "TopCV", "vietnamworks": "VietnamWorks", "careerviet": "CareerViet"}
 
-# Pool dùng chung để song song hoá vòng lặp per-source ở index() bên
-# dưới (thêm 08/2026) — max_workers=4 dư ra 1 so với 3 nguồn hiện có
-# (_SOURCE_LABELS) để thêm nguồn mới sau này (đội "đa dạng hoá nguồn
-# crawl" đang có kế hoạch, xem lịch sử trao đổi) không cần sửa số này
-# ngay lập tức mới chạy đúng — vẫn nên rà lại nếu số nguồn tăng nhiều
-# hơn nữa. Tạo 1 lần ở module-level, không tạo mới mỗi request.
-_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="crawl-io")
+# Pool dùng chung cho CẢ 2 việc ở index() bên dưới (thêm 08/2026):
+# (1) vòng lặp per-source poll trạng thái đang chạy (_source_active_state,
+# có từ trước — "/crawl chậm 4.69s vì gọi tuần tự từng nguồn"), (2) 2
+# stage tuần tự bị BỎ SÓT ở đợt sửa trước — list_crawl_runs() (lịch sử)
+# và backend_auth.list_users() (dropdown "người bấm") từng chạy NỐI TIẾP
+# sau khi per-source poll xong dù hoàn toàn độc lập với nó lẫn với nhau
+# (xem lịch sử trao đổi "làm cái crawl" — đo thực tế /crawl 3.42s,
+# 4 bước tuần tự nối tiếp: get_sources -> poll nguồn -> list_crawl_runs
+# -> list_users, chỉ bước 2 từng được song song hoá).
+#
+# max_workers=6 — TĂNG từ 4 (đủ 3 nguồn hiện có, dư 1 để thêm nguồn sau
+# này không cần sửa ngay) lên 6 để chứa được thời điểm bận nhất: TỐI ĐA
+# 4 nguồn (dư 1 so với 3 hiện có, xem _SOURCE_LABELS) + list_crawl_runs +
+# list_users cùng chạy song song 1 lúc (get_sources() không tính vào
+# đỉnh này — future của nó luôn resolve/nhả slot trước khi per-source
+# poll bắt đầu, vì per-source poll CẦN biết `sources` mới lặp được, xem
+# index() bên dưới). Rà lại số này nếu số nguồn tăng nhiều hơn nữa.
+_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="crawl-io")
 
 
 def _active_run_for_source(source):
@@ -165,8 +176,45 @@ def index():
         from blueprints.crawl_maintenance import _maintenance_tab_context
         return render_template("crawl.html", tab=tab, **_maintenance_tab_context())
 
+    # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
+    # cho CẢ 3 nhóm việc độc lập bên dưới (per-source poll / list_crawl_runs
+    # / list_users) — cùng lý do _source_active_state() không tự gọi
+    # _auth_tokens_from_session() (worker thread không có request context).
+    access_token, refresh_token = _auth_tokens_from_session()
+
+    f_source = request.args.get("source", "")
+    f_status = request.args.get("status", "")
+    f_triggered_by = request.args.get("triggered_by", "")
+    page, per_page = _paginate_args(30)
+    offset = (page - 1) * per_page
+
+    # get_sources() bắn đi NGAY (không phụ thuộc access_token) — độc lập
+    # hoàn toàn với list_crawl_runs/list_users bên dưới, nên KHÔNG cần
+    # nằm trong _run_wave() (không cần resubmit lại nếu access_token
+    # phải refresh — get_sources() không nhận token, refresh không ảnh
+    # hưởng gì tới nó).
+    sources_future = _pool.submit(db_data.get_sources)
+
+    def _run_wave(token):
+        """Bắn 2 việc ĐỘC LẬP NHAU vào _pool: (1) lịch sử crawl phân
+        trang (list_crawl_runs), (2) dropdown "người bấm" (list_users) —
+        2 việc này thêm 08/2026 (xem lịch sử trao đổi "làm cái crawl từ
+        đầu") từng bị xếp NỐI TIẾP sau vòng poll per-source dù không phụ
+        thuộc gì vào nó lẫn vào nhau. Trả về future (KHÔNG .result() ở
+        đây) để nơi gọi tự quyết định thời điểm chờ — cho phép vòng poll
+        per-source (submit NGAY SAU lời gọi hàm này, xem bên dưới) chạy
+        chồng lấn thời gian với 2 future này, không phải đợi tuần tự."""
+        runs_future = _pool.submit(
+            db_data.list_crawl_runs, token, source=f_source, status=f_status,
+            triggered_by=f_triggered_by, limit=per_page, offset=offset,
+        )
+        users_future = _pool.submit(backend_auth.list_users, token)
+        return runs_future, users_future
+
+    runs_future, users_future = _run_wave(access_token)
+
     try:
-        sources = db_data.get_sources()
+        sources = sources_future.result()
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
         sources = {}
@@ -178,27 +226,27 @@ def index():
     # /companies") — trước đây for source in sources: gọi
     # _active_run_for_source() (+ batch status nếu có) TUẦN TỰ từng
     # nguồn, tổng thời gian = tổng round-trip mọi nguồn. Giờ bắn cả
-    # N nguồn cùng lúc qua _pool, tổng thời gian ≈ nguồn CHẬM NHẤT.
+    # N nguồn cùng lúc qua _pool, tổng thời gian ≈ nguồn CHẬM NHẤT —
+    # VÀ chạy CHỒNG LẤN với runs_future/users_future ở trên (2 future đó
+    # đã bắn đi TRƯỚC KHI biết sources, đang chạy song song ngay lúc
+    # này, không phải đợi thêm round-trip riêng).
     #
-    # access_token lấy 1 LẦN ở đây (main thread, có Flask session
-    # context) rồi truyền tay vào _source_active_state() chạy trên
-    # worker thread — KHÔNG gọi _call_authed() bên trong thread pool
-    # (xem docstring _source_active_state() để biết lý do: session
-    # proxy của Flask cần request context, worker thread không có).
-    # Nếu access_token hết hạn (401) ở BẤT KỲ nguồn nào, refresh 1 LẦN
-    # trên main thread rồi submit lại TOÀN BỘ — refresh token là ghi
-    # session, chỉ an toàn làm ở main thread, không phải việc mỗi
-    # request/nguồn tự refresh riêng.
-    access_token, refresh_token = _auth_tokens_from_session()
-
-    def _run_all_sources(token):
+    # Nếu access_token hết hạn (401) ở BẤT KỲ nguồn nào (hoặc ở
+    # runs_future/users_future), refresh 1 LẦN trên main thread rồi
+    # submit lại TOÀN BỘ (cả 3 nhóm) — refresh token là ghi session, chỉ
+    # an toàn làm ở main thread.
+    def _run_sources(token):
         futures = {source: _pool.submit(_source_active_state, source, token) for source in sources}
         return {source: futures[source].result() for source in sources}
 
-    results = _run_all_sources(access_token)
-    had_401 = any(
-        isinstance(error, CrawlerAPIError) and error.status_code == 401
-        for _s, _r, _b, error in results.values()
+    source_results = _run_sources(access_token)
+    had_401 = (
+        any(
+            isinstance(error, CrawlerAPIError) and error.status_code == 401
+            for _s, _r, _b, error in source_results.values()
+        )
+        or (isinstance(runs_future.exception(), CrawlerAPIError) and runs_future.exception().status_code == 401)
+        or (isinstance(users_future.exception(), BackendAuthError) and users_future.exception().status_code == 401)
     )
     if had_401 and refresh_token:
         try:
@@ -207,10 +255,11 @@ def index():
             pair = None
         if pair:
             _store_auth_tokens(pair["access_token"], pair["refresh_token"])
-            results = _run_all_sources(pair["access_token"])
+            runs_future, users_future = _run_wave(pair["access_token"])
+            source_results = _run_sources(pair["access_token"])
 
     for source in sources:
-        _src, run, batch, error = results[source]
+        _src, run, batch, error = source_results[source]
         if error:
             flash(str(error), "error")
         if run:
@@ -218,18 +267,12 @@ def index():
             if batch:
                 active_batches[source] = batch
 
-    # Filter lịch sử
-    f_source = request.args.get("source", "")
-    f_status = request.args.get("status", "")
-    f_triggered_by = request.args.get("triggered_by", "")
-
+    # Lịch sử crawl (list_crawl_runs) — .result() ở ĐÂY (không phải lúc
+    # runs_future vừa tạo) vì future đã chạy song song với per-source
+    # poll ở trên, tới đây nhiều khả năng đã xong sẵn, .result() gần
+    # như không phải chờ thêm.
     try:
-        page, per_page = _paginate_args(30)
-        offset = (page - 1) * per_page
-        result = _call_authed(
-            db_data.list_crawl_runs, source=f_source, status=f_status,
-            triggered_by=f_triggered_by, limit=per_page, offset=offset,
-        )
+        result = runs_future.result()
         runs = result["items"]
         total_runs = result["total"]
         total_pages = max(1, math.ceil(total_runs / per_page))
@@ -239,10 +282,11 @@ def index():
         runs, total_runs, total_pages, page, per_page = [], 0, 1, 1, 30
 
     # Dropdown "người bấm" — CHỈ admin (khớp POST /crawl chỉ admin bấm
-    # được, khác staff_members ở activity_logs.py gồm cả ss_team).
-    access_token, _ = _auth_tokens_from_session()
+    # được, khác staff_members ở activity_logs.py gồm cả ss_team). Cùng
+    # lý do trên — future đã chạy song song từ đầu, .result() ở đây gần
+    # như không tốn thêm thời gian chờ.
     try:
-        all_users = backend_auth.list_users(access_token)
+        all_users = users_future.result()
         admin_members = [u for u in all_users if u.get("role") == "admin"]
     except BackendAuthError as exc:
         flash(str(exc), "error")
