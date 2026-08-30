@@ -38,8 +38,9 @@ Người dùng (trình duyệt)
    Flask app (app.py) — deploy Vercel
    ├── backend_auth.py ──► Backend API /auth/*, /me/* (JWT: đăng ký, đăng
    │                        nhập, đổi/quên mật khẩu, ứng tuyển, lưu job)
-   └── crawler_client.py ─► Backend API /jobs, /companies,
-                             /companies/{id}/contacts, /stats
+   └── crawler_client/ ───► Backend API /jobs, /companies,
+                             /companies/{id}/contacts, /stats,
+                             /jobs/data-health, /companies/data-health
                              │
                              ▼
                     Backend "Scrap JD" (FastAPI) — deploy Render
@@ -55,7 +56,7 @@ Người dùng (trình duyệt)
 | `app.py` | Toàn bộ route (URL) của web app; quản lý session token, auto-refresh khi access token hết hạn |
 | `auth.py` | `BackendUser` — lớp user cho Flask-Login, dựng từ response `GET /auth/me` |
 | `backend_auth.py` | Client gọi API xác thực: register/login/refresh/change-password/forgot-password/reset-password/logout, và `/me/applications`, `/me/saved-jobs` |
-| `crawler_client.py` | Client gọi API job/company/contact/stats — chuẩn hoá field backend sang tên field template dùng (`job.company`, `job.position`...) |
+| `crawler_client/` | Package client gọi API job/company/contact/stats (tách theo domain: `jobs.py`, `companies.py`, `contacts.py`, `crawl.py`, `audit_logs.py`, `stats.py`, `enums.py`, `import_export.py`, `maintenance.py`, `email_templates.py`, `base.py` dùng chung `_request()`) — chuẩn hoá field backend sang tên field template dùng (`job.company`, `job.position`...) |
 | `env_loader.py` | Đọc file `.env` khi chạy local (`python app.py`) — Vercel không dùng, set env trực tiếp trên dashboard |
 | `templates/*.html` | Giao diện các trang (Jinja2), gồm `_pagination.html` dùng chung cho trang job/công ty |
 | `public/style.css`, `public/app.js` | CSS + JS — đặt ở `public/` (không phải `static/`) để khớp cách Vercel serve static files |
@@ -126,7 +127,11 @@ repo đó — `python main.py create-admin --email ... --name ...`. Sau khi có 
 | Quản lý công ty | `/companies` | Tìm kiếm + lọc theo thành phố, phân trang (20 công ty/trang, có ô "Tới trang") |
 | Thêm / sửa công ty | `/companies/add`, `/companies/<id>/edit` | Tạo idempotent theo `tax_id` (gọi lại với tax_id đã có sẽ vá thông tin công ty cũ, không tạo trùng). Không có xoá công ty (backend không hỗ trợ) |
 | Quản lý người liên hệ (contact) | Trang chi tiết công ty | Contact là bảng con của company — CRUD đầy đủ (thêm/sửa/đổi trạng thái/xoá) |
+| Danh sách contact toàn hệ thống + mẫu email | `/contacts` | Tab "Danh sách": bảng contact gộp từ mọi công ty, lọc theo trạng thái/công ty/từ khoá. Tab "Quản lý": CRUD mẫu email liên hệ dùng khi gửi thư mời hợp tác |
 | Quản lý tài khoản team SS | `/staff-accounts`, `/staff-accounts/add` | Xem danh sách; **chỉ `admin`** thêm tài khoản mới hoặc đổi role người khác (`/staff-accounts/<id>/role`). `ss_team` xem được danh sách nhưng không sửa được |
+| Vận hành crawl + tình trạng dữ liệu | `/crawl` (tab `status`/`maintenance`) | Trigger crawl thủ công, xem lịch sử lần chạy, và tab "Tình trạng dữ liệu": thống kê company/job thiếu field, job hết hạn còn `OPEN`, job nghi trùng — tính sẵn bằng SQL ở backend (`GET /jobs/data-health`, `GET /companies/data-health`), không kéo dữ liệu thô về Flask |
+| Xem hoạt động team SS | `/staff-activity/<id>` | Job/công ty/contact do 1 thành viên cụ thể tạo hoặc được gán phụ trách |
+| Nhật ký hoạt động hệ thống | `/activity-logs` | Audit log các thay đổi job/công ty/contact toàn hệ thống, lọc theo loại/công ty/người thực hiện |
 
 ## 5. Hướng dẫn cài đặt & chạy (cho dev)
 

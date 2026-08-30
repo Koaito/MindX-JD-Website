@@ -3,7 +3,6 @@ backend -> field template đang dùng."""
 
 from .base import _request
 from .jobs import _normalize_job
-from .data_health import count_missing_fields
 
 # Đánh giá tiềm năng hợp tác của company — staff tự chấm tay qua UI add/edit
 # company (xem sql/migration_add_partnership_potential.sql). UNVERIFIED =
@@ -179,64 +178,6 @@ def list_company_cities():
         offset += 200
     return sorted(cities)
 
-
-# Field nào tính vào thống kê "thiếu dữ liệu" ở tab Tình trạng dữ liệu
-# (blueprints/crawl_status.py) — company_name/id KHÔNG đưa vào vì luôn
-# có sẵn (backend bắt buộc lúc tạo company), không có ý nghĩa thống kê.
-# Thứ tự ở đây = thứ tự hiển thị trên UI (xem lịch sử trao đổi 08/2026).
-COMPANY_HEALTH_FIELDS = [
-    ("tax_id", "Mã số thuế"),
-    ("website", "Website"),
-    ("industry", "Ngành"),
-    ("address", "Địa chỉ"),
-    ("company_size", "Quy mô"),
-    ("fanpage", "Fanpage"),
-    ("linkedin_company", "LinkedIn"),
-]
-
-
-def company_field_health(companies):
-    """Đếm số company thiếu (rỗng) từng field trong COMPANY_HEALTH_FIELDS.
-
-    Nhận sẵn list company đã _normalize_company() (KHÔNG tự gọi
-    list_all_companies() ở đây) — để nơi gọi (crawl_status.py) tự quyết
-    định lấy company từ đâu/khi nào, giống cách dashboard.py truyền
-    `companies`/`jobs` vào các hàm _companies_*/_jd_* thay vì mỗi hàm tự
-    fetch riêng — tránh gọi API lặp lại nhiều lần cho cùng 1 lần render
-    trang.
-
-    Logic đếm thật sự nằm ở count_missing_fields() (data_health.py) —
-    dùng CHUNG với job_field_health() (jobs.py), xem docstring ở đó.
-    """
-    return count_missing_fields(companies, COMPANY_HEALTH_FIELDS)
-
-
-def count_companies_without_contact(companies, contacts):
-    """Đếm company ĐANG ACTIVE chưa có bất kỳ contact (người liên hệ HR)
-    nào trong bảng contacts — quan trọng vì company không có contact thì
-    team SS không có cách nào chủ động liên hệ hợp tác tuyển dụng, dù
-    company đó có bao nhiêu job đăng lên cũng vậy (thêm 08/2026, tab
-    Tình trạng dữ liệu, xem lịch sử trao đổi).
-
-    Nhận sẵn list company đã _normalize_company() VÀ list contact đã
-    _normalize_contact() (list_all_contacts(), có company_id trên mỗi
-    contact) — cùng nguyên tắc company_field_health(): nơi gọi
-    (crawl_status.py) tự fetch, hàm này chỉ tính on-the-fly, không gọi
-    API. Chỉ tính contact ĐANG ACTIVE (is_active — contact đã xoá mềm
-    không tính là "đã có người liên hệ").
-
-    Trả (missing: int, total: int) — total = số company active (bỏ
-    company đã xoá mềm, is_active=False, giống cách company_health_rows
-    đang tính), missing = số company trong đó có company_id không xuất
-    hiện ở bất kỳ contact active nào."""
-    active_companies = [c for c in companies if c.get("is_active", True)]
-    company_ids_with_contact = {
-        c.get("company_id") for c in contacts if c.get("is_active", True)
-    }
-    missing = sum(
-        1 for c in active_companies if c.get("id") not in company_ids_with_contact
-    )
-    return missing, len(active_companies)
 
 
 def get_company(company_id):
