@@ -16,7 +16,7 @@
   <article class="ticket">
     <div class="ticket-stub">
       <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
-      <span class="ticket-industry ind-{{ loop.index0 % 3 }}">{{ job.industry }}</span>
+      <span class="ticket-industry {{ job.industry|industry_class }}">{{ job.industry }}</span>
       <span class="ticket-level">{{ job.level }}</span>
     </div>
     <div class="ticket-body">

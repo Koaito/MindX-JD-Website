@@ -72,9 +72,69 @@
   flex-shrink: 0;
 }
 
-.ind-0 { background: var(--teal-soft); color: var(--teal); }
-.ind-1 { background: var(--accent-soft); color: #C4401F; }
-.ind-2 { background: var(--amber-soft); color: var(--amber); }
+/* Màu badge ngành — CỐ ĐỊNH theo tên ngành (xem helpers.industry_class()
+   ở backend Flask, mindx-jobs/helpers.py), KHÔNG còn xoay vòng theo vị
+   trí card như trước (ind-0/1/2 cũ). Mỗi ngành trong 6 ngành chuẩn
+   (constants.INDUSTRIES, khớp matching_industry ở Scrap JD/config.py)
+   có đúng 1 màu duy nhất, dùng xuyên suốt mọi trang/mọi lần load —
+   người dùng học màu 1 lần là nhận diện được mãi. Bảng màu đối chiếu ở
+   chú thích .industry-legend bên dưới. */
+.ind-code { background: var(--accent-soft); color: var(--accent); }
+.ind-business-analysis { background: var(--blue-soft); color: var(--blue); }
+.ind-data-analysis { background: var(--teal-soft); color: var(--teal); }
+.ind-data-engineer { background: #EDE6FB; color: #7C3AED; }
+.ind-data-scientist { background: var(--amber-soft); color: var(--amber); }
+.ind-ui-ux-design { background: #FBE3EE; color: #C22B7A; }
+
+/* Fallback cho industry lạ ngoài 6 giá trị chuẩn (dữ liệu cũ/nhập tay
+   lệch chính tả) — xám trung tính, không mượn nhầm màu của ngành khác. */
+.ind-other { background: #EDEFEC; color: var(--muted); }
+
+/* ---------------- Chú thích màu ngành (industry legend) ---------------- */
+/* Dải nhỏ phía trên job-grid (templates/index.html) giải thích mỗi màu
+   badge .ticket-industry tương ứng ngành nào — thêm 08/2026 cùng lúc với
+   việc đổi màu badge từ "xoay vòng theo vị trí" sang "cố định theo
+   ngành" (xem comment ở .ind-code trở lên), vì đổi màu cố định chỉ có
+   tác dụng nếu người dùng có nơi tra cứu màu nào ứng với ngành nào. */
+.industry-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.industry-legend-label {
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 2px;
+}
+
+.industry-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ô vuông 10x10 trong chú thích: mượn LUÔN class .ind-* (background +
+   color) của chính badge thật để không phải khai báo lại 6 mã màu lần
+   thứ 2 ở đây — nhưng nền nhạt (--*-soft) của .ind-* khó thấy ở ô bé
+   xíu 10x10px nên đảo ngược: swatch dùng chính `color` (màu đậm) của
+   .ind-* LÀM NỀN, còn text ngành đứng ngoài span này (xem index.html)
+   nên không bị ảnh hưởng. */
+.industry-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: currentColor;
+}
 
 .ticket-level {
   font-size: 11px;

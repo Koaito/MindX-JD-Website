@@ -202,6 +202,47 @@ def _jobs_by_month(jobs, date_field, months_back=6, only_past=False):
 
 
 # ---------------------------------------------------------------------------
+# Industry badge color mapping
+# ---------------------------------------------------------------------------
+# Sửa 08/2026 — trước đây .ticket-industry được tô màu bằng
+# `ind-{{ loop.index0 % 3 }}` (xem git blame templates/index.html cũ):
+# màu chỉ phụ thuộc VỊ TRÍ của card trong danh sách (card thứ 1/4/7...
+# luôn ind-0, thứ 2/5/8... luôn ind-1...), KHÔNG phụ thuộc job.industry
+# thật sự là gì. Hậu quả: cùng ngành "Code" nhưng job này màu xanh, job
+# kia màu cam tuỳ nó rơi vào ô nào trong lưới -> người dùng nhìn màu
+# không đoán được ngành, mất hết tác dụng của việc tô màu.
+#
+# INDUSTRY_CLASS_MAP dưới đây gán CỐ ĐỊNH 1 class CSS cho từng giá trị
+# industry (constants.INDUSTRIES — đúng 6 giá trị, khớp matching_industry
+# bên Scrap JD/config.py, xem JOB_CATEGORIES). Style thật (màu chữ/nền)
+# nằm ở public/css/04-job-cards.css (.ind-code, .ind-business-analysis...).
+#
+# industry_class() dùng làm Jinja filter (xem app.py) thay cho
+# `loop.index0 % 3` ở mọi nơi render .ticket-industry (templates/
+# index.html, saved_jobs.html, staff_activity_detail.html).
+INDUSTRY_CLASS_MAP = {
+    "Code": "ind-code",
+    "Business Analysis": "ind-business-analysis",
+    "Data Analysis": "ind-data-analysis",
+    "Data Engineer": "ind-data-engineer",
+    "Data Scientist": "ind-data-scientist",
+    "UI/UX Design": "ind-ui-ux-design",
+}
+
+# Fallback cho industry lạ (không có trong 6 giá trị chuẩn — vd dữ liệu
+# cũ/nhập tay lệch chính tả): tô xám trung tính thay vì crash hoặc rơi
+# vào 1 trong 6 màu đã có (gây hiểu lầm là đúng ngành đó).
+_INDUSTRY_CLASS_FALLBACK = "ind-other"
+
+
+def industry_class(value):
+    """Trả về class CSS cố định (đã kèm tiền tố "ind-...") cho 1 giá trị
+    industry. Dùng trực tiếp trong template:
+    `class="ticket-industry {{ job.industry|industry_class }}"`."""
+    return INDUSTRY_CLASS_MAP.get(value, _INDUSTRY_CLASS_FALLBACK)
+
+
+# ---------------------------------------------------------------------------
 # Template filters
 # ---------------------------------------------------------------------------
 

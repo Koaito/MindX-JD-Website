@@ -20,6 +20,7 @@ from helpers import (
     _clear_auth_tokens,
     _store_auth_tokens,
     format_date,
+    industry_class,
     to_bullets,
 )
 
@@ -75,6 +76,7 @@ app.jinja_env.globals["asset_version"] = _asset_version
 
 app.add_template_filter(format_date, name="format_date")
 app.add_template_filter(to_bullets, name="to_bullets")
+app.add_template_filter(industry_class, name="industry_class")
 
 
 @login_manager.user_loader

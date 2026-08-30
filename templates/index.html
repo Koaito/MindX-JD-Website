@@ -70,13 +70,30 @@
 <p class="list-hint">💡 Bấm vào <strong>tên vị trí</strong> của mỗi job để xem chi tiết đầy đủ và nộp CV ứng tuyển ngay trong hệ thống.</p>
 {% endif %}
 
+{# Chú thích màu ngành — thêm 08/2026 cùng lúc với việc đổi màu badge
+   .ticket-industry từ "xoay vòng theo vị trí card" sang "cố định theo
+   ngành" (xem public/css/04-job-cards.css, helpers.industry_class()).
+   Dùng lại đúng biến `industries` (constants.INDUSTRIES) đã truyền sẵn
+   cho dropdown lọc phía trên — không hardcode lại danh sách 6 ngành ở
+   đây để tránh lệch dữ liệu nếu sau này thêm/bớt ngành. #}
+{% if jobs and industries %}
+<div class="industry-legend">
+  <span class="industry-legend-label">Màu ngành:</span>
+  {% for i in industries %}
+  <span class="industry-legend-item">
+    <span class="industry-legend-swatch {{ i|industry_class }}"></span>{{ i }}
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if jobs %}
 <div class="job-grid job-grid-3col">
   {% for job in jobs %}
   <article class="ticket">
     <div class="ticket-stub">
       <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
-      <span class="ticket-industry ind-{{ loop.index0 % 3 }}">{{ job.industry }}</span>
+      <span class="ticket-industry {{ job.industry|industry_class }}">{{ job.industry }}</span>
       <span class="ticket-level">{{ job.level }}</span>
     </div>
     <div class="ticket-body">
