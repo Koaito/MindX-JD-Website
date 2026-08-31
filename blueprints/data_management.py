@@ -16,7 +16,7 @@ from flask import (
 
 import crawler_client as db_data
 from crawler_client import CrawlerAPIError
-from helpers import _call_authed
+from helpers import _auth_tokens_from_session, _call_authed
 from utils.decorators import staff_required
 
 data_mgmt_bp = Blueprint("data_mgmt", __name__)
@@ -59,7 +59,23 @@ def index():
       entity: "job" | "company" | "contact" (mặc định "job")
       tab: "export" | "import" (mặc định "export")
       preview: preview_id — nếu có, load lại preview đã tạo
-    """
+
+    ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án 1 — client-side tab
+    như dashboard"): tab Export/Import giờ RENDER CẢ 2 CÙNG LÚC trong 1
+    response (trước đây early-return theo tab, mỗi lần bấm là 1 request
+    riêng) — chuyển giữa 2 tab này sau khi trang tải xong là JS thuần
+    (ẩn/hiện .dashboard-tab, xem script cuối data_management.html),
+    KHÔNG round-trip nữa. entity_type (JD/Công ty/Người liên hệ) VẪN giữ
+    full-reload như cũ — đổi entity là đổi hẳn bộ field/filter/preview
+    hoàn toàn khác nhau (không phải chỉ "xem tab khác" như export/import
+    trong CÙNG 1 entity), gộp thêm chiều đó vào client-side sẽ phải tải
+    trước dữ liệu của 3 entity x 2 tab = 6 tổ hợp mỗi lần vào trang,
+    không đáng — xem lịch sử trao đổi phần "chỉ gộp Export/Import".
+
+    export_companies giờ LUÔN tải (bỏ điều kiện `if tab == "export"`
+    trước đây) vì tab export giờ luôn có mặt trên trang dù đang xem tab
+    nào — đánh đổi lần load đầu nặng thêm 1 round-trip cố định
+    (list_all_companies) để đổi lấy chuyển tab tức thì sau đó."""
     entity_type = request.args.get("entity", "job")
     if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
         entity_type = "job"
@@ -67,17 +83,12 @@ def index():
     if tab not in ("export", "import"):
         tab = "export"
 
+    access_token, _ = _auth_tokens_from_session()
     preview = None
     preview_id = request.args.get("preview", "")
     if preview_id:
         try:
-            # _call_authed (KHÔNG gọi thẳng access_token) — sửa 08/2026, bug
-            # đã biết: gọi thẳng access_token không tự refresh khi hết hạn
-            # (30 phút), khiến staff bị flash "phiên hết hạn" giữa lúc thao
-            # tác Data Management dù cookie đăng nhập vẫn còn nguyên. Xem
-            # helpers.py::_call_authed docstring + lịch sử trao đổi "hay bị
-            # kick khỏi acc khi chạy vài script bên vận hành dữ liệu".
-            preview = _call_authed(db_data.get_import_preview, entity_type, preview_id)
+            preview = db_data.get_import_preview(access_token, entity_type, preview_id)
             if preview is None:
                 flash("Bản xem trước đã hết hạn hoặc không tồn tại — vui lòng tải file lên lại.", "error")
         except CrawlerAPIError as exc:
@@ -117,7 +128,9 @@ def index():
         # tay lại map thứ 3 riêng cho dropdown filter export.
         job_status_labels=db_data.JOB_STATUS_MAP,
         contact_status_labels=db_data.CONTACT_STATUS_MAP,
-        export_companies=db_data.list_all_companies() if tab == "export" else [],
+        # Luôn tải (không còn `if tab == "export"`) — cả 2 tab giờ cùng
+        # nằm sẵn trên trang, xem docstring index() ở trên.
+        export_companies=db_data.list_all_companies(),
     )
 
 
@@ -233,11 +246,9 @@ def company_suggestions(entity_type):
     except (TypeError, ValueError):
         return jsonify({"error": "row_index không hợp lệ"}), 400
 
+    access_token, _ = _auth_tokens_from_session()
     try:
-        # _call_authed — sửa 08/2026 (trước đây gọi thẳng access_token, bản
-        # CŨ thiếu logic tự refresh token hết hạn; xem helpers.py::
-        # _call_authed docstring + lịch sử trao đổi "hay bị kick khỏi acc").
-        suggestions = _call_authed(db_data.get_company_suggestions, entity_type, preview_id, row_index)
+        suggestions = db_data.get_company_suggestions(access_token, entity_type, preview_id, row_index)
         return jsonify({"suggestions": suggestions})
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
@@ -251,11 +262,11 @@ def verify_field(entity_type):
     mờ ngay tại đó, KHÔNG đợi tới bước confirm cuối (xem trao đổi thiết kế
     "cảnh báo trùng contact sau khi sửa field lỗi", 08/2026).
 
-    Dùng _call_authed (tự refresh token hết hạn) — cùng cách company_
-    suggestions() ở trên đang làm từ 08/2026 (trước đó gọi thẳng
-    access_token, là bug đã biết, xem helpers.py::_call_authed docstring +
-    lịch sử trao đổi "hay bị kick khỏi acc khi chạy vài script bên vận
-    hành dữ liệu")."""
+    Dùng _call_authed (KHÔNG gọi thẳng db_data.verify_field với access_token
+    như company_suggestions() ở trên đang làm) — company_suggestions() là
+    bản CŨ, thiếu logic tự refresh token khi access token hết hạn (401),
+    đã ghi chú là bug đã biết trong helpers.py::_call_authed docstring;
+    route mới này không lặp lại lỗi đó."""
     if entity_type not in db_data.IMPORT_EXPORT_ENTITY_TYPES:
         abort(404)
 
@@ -276,10 +287,9 @@ def verify_field(entity_type):
     # preview đổi giữa chừng) để _normalize_preview_row() tính đúng
     # existing_id nếu dòng chuyển sang trạng thái "conflict" (khớp cách
     # get_import_preview() ở index() đang làm).
+    access_token, _ = _auth_tokens_from_session()
     try:
-        # _call_authed — cùng lý do sửa ở index()/company_suggestions() phía
-        # trên (bug: gọi thẳng access_token không tự refresh khi hết hạn).
-        preview = _call_authed(db_data.get_import_preview, entity_type, preview_id)
+        preview = db_data.get_import_preview(access_token, entity_type, preview_id)
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
     id_field = preview["id_field"] if preview else None
@@ -320,10 +330,9 @@ def resolve_company(entity_type):
     if not preview_id:
         return jsonify({"error": "Thiếu preview_id"}), 400
 
+    access_token, _ = _auth_tokens_from_session()
     try:
-        # _call_authed — cùng lý do sửa ở index()/company_suggestions() phía
-        # trên (bug: gọi thẳng access_token không tự refresh khi hết hạn).
-        preview = _call_authed(db_data.get_import_preview, entity_type, preview_id)
+        preview = db_data.get_import_preview(access_token, entity_type, preview_id)
     except CrawlerAPIError as exc:
         return jsonify({"error": str(exc)}), (exc.status_code or 500)
     id_field = preview["id_field"] if preview else None

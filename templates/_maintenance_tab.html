@@ -33,14 +33,6 @@
     </p>
     {% endif %}
 
-    {# 08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận
-       hành dữ liệu") — cùng nguyên tắc _crawl_tab.html: ss_team xem
-       được cả tab này (khớp @staff_required) nhưng KHÔNG bấm chạy job
-       bảo trì được (route crawl.maintenance_trigger vẫn
-       @admin_required) -> ẩn hẳn form bấm, chỉ admin mới thấy. #}
-    {% if current_user.role != 'admin' %}
-    <p class="crawl-source-sub">Chỉ admin mới có thể kích hoạt job bảo trì này. Bạn vẫn xem được tiến độ và lịch sử bên dưới.</p>
-    {% else %}
     <form method="post" action="{{ url_for('crawl.maintenance_trigger', job_type=jt) }}"
           class="form-grid form-card maint-trigger-form" data-job-type="{{ jt }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -72,7 +64,6 @@
         </button>
       </div>
     </form>
-    {% endif %}
 
     {# ---- Log live RIÊNG cho job_type này — xem đầu docstring file ---- #}
     {% set latest = latest_log_runs.get(jt) %}
@@ -89,6 +80,45 @@
     </div>
   </div>
   {% endfor %}
+</div>
+
+{# ================= Widget nổi "Đang chạy" (tối đa 5, 1/job_type) =================
+   08/2026 (theo yêu cầu thảo luận, mirror y hệt cách làm bên
+   _crawl_tab.html) — nổi cố định góc dưới-phải, đi theo khi cuộn, thu
+   gọn được. TÁI DÙNG NGUYÊN #maint-running-zone + .crawl-running-card-wrap
+   như cũ -> JS polling (pollMaintenanceRun/onRunDone ở cuối file) không
+   cần sửa gì, chỉ đổi chỗ hiển thị bằng CSS (.crawl-live-widget dùng
+   chung với tab Crawl, xem 15-crawl.css). #}
+<div class="crawl-live-widget{{ '' if active_runs else ' is-collapsed' }}" id="maint-live-widget">
+  <div class="crawl-live-widget-head" data-role="widget-toggle">
+    <span class="crawl-live-widget-title">
+      Đang chạy
+      <span class="crawl-live-widget-count" id="maint-live-widget-count" {{ 'hidden' if not active_runs }}>{{ active_runs|length }}</span>
+    </span>
+    <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
+  </div>
+  <div class="crawl-live-widget-body">
+    <div class="crawl-running-list" id="maint-running-zone">
+      {% if active_runs %}
+        {% for jt, run in active_runs.items() %}
+        <div class="dm-export-card crawl-running-card-wrap" id="maint-running-{{ jt }}"
+             data-run-id="{{ run.run_id }}" data-job-type="{{ jt }}">
+          <div class="crawl-running-card">
+            <div>
+              <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
+              <p class="crawl-running-meta" style="margin-top: 8px;">
+                {{ job_labels.get(jt, jt) }}<br>
+                Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="muted crawl-running-empty">Hiện không có job bảo trì nào đang chạy.</p>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
 {# ================= Khu C — Lịch sử ================= #}
@@ -196,6 +226,14 @@
 <script>
 (function () {
   "use strict";
+
+  // Chặn polling nhân đôi khi trang "Vận hành dữ liệu" gộp 3 tab vào 1
+  // lần render — mirror isCrawlTabActive() bên _crawl_tab.html, chỉ đổi
+  // tab cần kiểm tra thành "maintenance". Xem docstring bên đó.
+  function isMaintenanceTabActive() {
+    var panel = document.querySelector('.dashboard-tab[data-tab="maintenance"]');
+    return !panel || panel.classList.contains("active");
+  }
 
   var JOB_LABEL_MAP = {{ job_labels|tojson }};
   var STAT_LABELS_BY_JOB = {{ stat_labels_by_job|tojson }};  // {job_type: [[key, label], ...]}
@@ -348,7 +386,7 @@
     var inFlight = false;  // chặn race 2 response chồng nhau, cùng lý do pollRun() bên _crawl_tab.html.
 
     var timer = setInterval(function () {
-      if (stopped || inFlight) return;
+      if (stopped || inFlight || !isMaintenanceTabActive()) return;
       inFlight = true;
       fetch("/crawl/maintenance/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
@@ -443,6 +481,7 @@
   pollAllLatestLogRuns();
   // Poll log của run hiện tại (nếu có) cho từng khung — 2s/lần.
   setInterval(function () {
+    if (!isMaintenanceTabActive()) return;
     document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
       var runId = logCard.getAttribute("data-run-id");
       if (runId) fetchLogsFor(logCard, runId);
@@ -450,7 +489,10 @@
   }, 2000);
   // Poll phát hiện run MỚI cho CẢ 5 job_type — 6s/lần, cùng chu kỳ
   // loadAndPollLatestLog() bên _crawl_tab.html.
-  setInterval(pollAllLatestLogRuns, 6000);
+  setInterval(function () {
+    if (!isMaintenanceTabActive()) return;
+    pollAllLatestLogRuns();
+  }, 6000);
 
   // Widget nổi "Đang chạy" — mirror _crawl_tab.html (xem docstring bên đó).
   var liveWidget = document.getElementById("maint-live-widget");

@@ -222,4 +222,43 @@
 })();
 </script>
 
+<script>
+(function () {
+  "use strict";
+  // Prefetch khi hover tab Tự động/Thủ công (08/2026, phương án 2 — xem
+  // lịch sử trao đổi "phương án 1 vs 2 cho từng trang"). KHÁC crawl.html/
+  // data_management.html (client-side tab, không round-trip) — trang
+  // này mỗi view có filter + phân trang RIÊNG theo query string, gộp cả
+  // 2 view vào 1 lần render sẽ nhân đôi dữ liệu mỗi lần đổi trang/lọc,
+  // không đáng. Vẫn giữ <a href> full-reload như cũ, chỉ thêm: hover/
+  // focus vào tab kia -> trình duyệt ÂM THẦM tải sẵn trang đó
+  // (<link rel="prefetch">) trước khi người dùng thật sự click.
+  //
+  // LƯU Ý HIỆU QUẢ THỰC TẾ (nói rõ, không phóng đại): đây là click điều
+  // hướng bình thường (không tự swap DOM bằng tay), nên chỉ có ích nếu
+  // trình duyệt tái sử dụng được response đã prefetch từ HTTP cache lúc
+  // điều hướng thật — phụ thuộc trình duyệt + cache-control của response
+  // Flask trả về (mặc định Flask không set cache header cho HTML). Coi
+  // đây là "cải thiện một phần khi may mắn cache được", KHÔNG phải giải
+  // pháp tức thì như 2 trang kia — chấp nhận được vì trang log không ai
+  // chuyển tab liên tục như dashboard.
+  var prefetched = {};
+
+  function prefetch(url) {
+    if (!url || prefetched[url]) return;
+    prefetched[url] = true;
+    var link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = url;
+    document.head.appendChild(link);
+  }
+
+  document.querySelectorAll(".tab-nav a[href]").forEach(function (a) {
+    a.addEventListener("mouseenter", function () { prefetch(a.href); }, {passive: true});
+    a.addEventListener("focus", function () { prefetch(a.href); });
+    a.addEventListener("touchstart", function () { prefetch(a.href); }, {passive: true});
+  });
+})();
+</script>
+
 {% endblock %}

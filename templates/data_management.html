@@ -1,3 +1,18 @@
+{#
+  ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án 1 — client-side tab
+  như dashboard"): tab Export/Import trước đây early-return theo ?tab=
+  ở data_management.py::index() (mỗi lần bấm = 1 request riêng). Giờ
+  CẢ 2 được render sẵn trong 1 lần load, chuyển tab là JS thuần ẩn/hiện
+  .dashboard-tab — không round-trip. _dm_export.html và _dm_import.html
+  KHÔNG trùng tên biến top-level nào (đã rà: export dùng status_labels/
+  export_companies/job_status_values..., import dùng preview/
+  level_code_values...) nên include thẳng cả 2, KHÔNG cần {% with %}
+  scoped-rename như bên crawl.html.
+
+  entity_type (JD/Công ty/Người liên hệ) VẪN giữ full-reload — đổi
+  entity là đổi hẳn bộ field/filter/preview khác nhau hoàn toàn, không
+  phải "xem tab khác" trong cùng 1 bộ dữ liệu như export/import.
+#}
 {% extends "base.html" %}
 {% block title %}Xuất / Nhập dữ liệu — MindX Career Hub{% endblock %}
 {% block content_class %}content-full{% endblock %}
@@ -20,19 +35,54 @@
   {% endfor %}
 </div>
 
-<nav class="tab-nav">
-  <a href="{{ url_for('data_mgmt.index', entity=entity_type, tab='export') }}" class="{{ 'active' if tab == 'export' else '' }}">
-    Xuất dữ liệu (Export)
-  </a>
-  <a href="{{ url_for('data_mgmt.index', entity=entity_type, tab='import') }}" class="{{ 'active' if tab == 'import' else '' }}">
-    Nhập dữ liệu (Import)
-  </a>
-</nav>
+<div class="tab-bar" id="dmTabBar" role="tablist">
+  <button type="button" data-tab="export" role="tab">Xuất dữ liệu (Export)</button>
+  <button type="button" data-tab="import" role="tab">Nhập dữ liệu (Import)</button>
+</div>
 
-{% if tab == 'export' %}
+<div class="dashboard-tab" id="tab-export" data-tab="export">
   {% include "_dm_export.html" %}
-{% else %}
+</div>
+
+<div class="dashboard-tab" id="tab-import" data-tab="import">
   {% include "_dm_import.html" %}
-{% endif %}
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Tab nội bộ Export/Import (08/2026) — mirror ĐÚNG cách dashboard.html
+  // / crawl.html đang làm. entity_type switch ở trên KHÔNG đụng tới
+  // (vẫn <a href>, full-reload — xem docstring đầu file).
+  var VALID_TABS = ["export", "import"];
+  var tabBar = document.getElementById("dmTabBar");
+  if (!tabBar) return;
+
+  function activate(tab) {
+    if (VALID_TABS.indexOf(tab) === -1) tab = "export";
+    var buttons = tabBar.querySelectorAll("button[data-tab]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].getAttribute("data-tab") === tab);
+    }
+    var panels = document.querySelectorAll(".dashboard-tab[data-tab]");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].classList.toggle("active", panels[j].getAttribute("data-tab") === tab);
+    }
+  }
+
+  tabBar.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-tab]");
+    if (!btn) return;
+    var tab = btn.getAttribute("data-tab");
+    activate(tab);
+    var url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    history.replaceState(null, "", url);
+  });
+
+  var params = new URLSearchParams(window.location.search);
+  activate(params.get("tab") || "{{ tab }}" || "export");
+})();
+</script>
 
 {% endblock %}

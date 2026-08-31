@@ -1,16 +1,8 @@
 """Crawl blueprint — trang "Vận hành dữ liệu" (08/2026, đổi tên từ
 "Crawl dữ liệu" — xem lịch sử trao đổi "1 mục, 2 tab như
-data_management.py").
-
-08/2026 (SỬA — xem lịch sử trao đổi "ss_team muốn thấy mục Vận hành dữ
-liệu") — ss_team giờ XEM được cả trang (menu sidebar, 3 tab, khu "đang
-chạy"/log live, lịch sử) qua @staff_required, khớp đúng mức GET /crawl
-+ GET /crawl/{run_id} phía backend (chỉ cần 'ss_team'). CHỈ 2 route
-TRIGGER thật sự (trigger()/trigger_batch() bên dưới, ứng POST /crawl
-phía backend) còn giữ @admin_required — ss_team không bấm chạy được,
-form Khu A ẩn khỏi mắt họ ở template (xem _crawl_tab.html,
-current_user.role == 'admin'). Tab "maintenance" cùng nguyên tắc, xem
-blueprints/crawl_maintenance.py.
+data_management.py"). CHỈ admin thấy và dùng được (khớp yêu cầu gốc,
+chặt hơn @staff_required cho ss_team đang dùng ở hầu hết trang quản trị
+khác) — xem utils/decorators.py::admin_required.
 
 TAB "crawl" (mặc định) — nội dung y hệt trang cũ, dời sang
 _crawl_tab.html, KHÔNG đổi logic.
@@ -49,7 +41,7 @@ from backend_auth import BackendAuthError
 from blueprints.crawl_status import _status_tab_context
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _store_auth_tokens, _io_pool as _pool
-from utils.decorators import admin_required, staff_required
+from utils.decorators import admin_required
 
 crawl_bp = Blueprint("crawl", __name__)
 
@@ -142,152 +134,63 @@ def _source_active_state(source, access_token):
     return source, run, batch, None
 
 
-def _crawl_widget_state():
-    """08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục
-    trong trang Vận hành dữ liệu") — tách phần "lấy active_runs/
-    active_batches theo NGUỒN" ra khỏi index() để DÙNG LẠI được cho
-    widget nổi "Đang chạy" khi đang xem tab 'status' hoặc 'maintenance'
-    (trước đây phần này BỊ KẸT bên trong nhánh tab=='crawl' của index(),
-    2 tab kia không gọi tới nên không có gì để hiện).
-
-    tab=='crawl' KHÔNG gọi hàm này — nhánh đó tự làm inline y hệt logic
-    bên dưới nhưng chạy CHỒNG LẤN song song với runs_future/users_future
-    (xem index()), tối ưu hơn bản đơn giản ở đây. Hàm này CHỈ dùng khi
-    đang xem 1 trong 2 tab còn lại — lúc đó không có runs_future/
-    users_future nào để chồng lấn cùng, nên không cần giữ y hệt độ phức
-    tạp đó.
-
-    Trả (sources, active_runs, active_batches, category_labels)."""
-    try:
-        sources = db_data.get_sources()
-    except CrawlerAPIError as exc:
-        flash(str(exc), "error")
-        return {}, {}, {}, {}
-
-    access_token, refresh_token = _auth_tokens_from_session()
-
-    def _poll(token):
-        futures = {source: _pool.submit(_source_active_state, source, token) for source in sources}
-        return {source: futures[source].result() for source in sources}
-
-    source_results = _poll(access_token)
-    had_401 = any(
-        isinstance(error, CrawlerAPIError) and error.status_code == 401
-        for _s, _r, _b, error in source_results.values()
-    )
-    if had_401 and refresh_token:
-        try:
-            pair = backend_auth.refresh(refresh_token)
-        except BackendAuthError:
-            pair = None
-        if pair:
-            _store_auth_tokens(pair["access_token"], pair["refresh_token"])
-            source_results = _poll(pair["access_token"])
-
-    active_runs, active_batches = {}, {}
-    for source in sources:
-        _src, run, batch, error = source_results[source]
-        if error:
-            flash(str(error), "error")
-        if run:
-            active_runs[source] = run
-            if batch:
-                active_batches[source] = batch
-
-    category_labels = {
-        f"{src}:{cat}": label
-        for src, cats in sources.items() for cat, label in cats.items()
-    }
-    return sources, active_runs, active_batches, category_labels
-
-
-def _shell_widget_defaults():
-    """08/2026 — dict mặc định (rỗng) cho TOÀN BỘ key mà widget nổi
-    "Đang chạy" ở templates/crawl.html cần, để LUÔN truyền đủ ở CẢ 3
-    nhánh tab bên dưới (index()) — tránh Jinja lỗi "undefined" khi
-    template tham chiếu 1 key mà nhánh đang chạy không tính (vd tab
-    'crawl' không tính crawl_active_runs vì đã có widget riêng, xem
-    docstring index()). show_shell_crawl_widget/show_shell_maint_widget
-    mới là cờ QUYẾT ĐỊNH có render hay không — 2 dict rỗng ở trên chỉ
-    để an toàn, không tự ý làm hiện widget."""
-    return {
-        "show_shell_crawl_widget": False,
-        "show_shell_maint_widget": False,
-        "crawl_active_runs": {}, "crawl_active_batches": {},
-        "crawl_category_labels": {}, "crawl_source_labels": {}, "crawl_status_labels": {},
-        "maint_active_runs": {}, "maint_status_labels": {}, "maint_job_labels": {},
-    }
-
-
 @crawl_bp.route("/crawl")
-@staff_required
+@admin_required
 def index():
-    """Trang chính — 3 tab (?tab=crawl mặc định | ?tab=status | ?tab=maintenance).
+    """Trang chính "Vận hành dữ liệu" — 3 tab (crawl/status/maintenance),
+    RENDER CẢ 3 CÙNG LÚC trong 1 response (08/2026, đổi từ early-return
+    theo ?tab=, xem lịch sử trao đổi "phương án 1 — client-side tab như
+    dashboard"). Chuyển tab sau khi trang đã tải là JS thuần (ẩn/hiện
+    .dashboard-tab, xem script cuối crawl.html) — KHÔNG round-trip nữa.
+    ?tab= trong URL giờ chỉ còn ý nghĩa "tab nào active lúc mở link này"
+    (đọc bởi JS lúc init, y hệt cách dashboard.html đang làm), KHÔNG còn
+    quyết định server render gì.
 
-    Tab 'crawl': Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
-    1/nguồn), Khu C (lịch sử, filter + phân trang) — y hệt trước đây.
+    3 context (crawl/status/maintenance) CỐ Ý để trong 3 dict RIÊNG
+    (crawl_ctx / status_ctx / maintenance_ctx) thay vì merge phẳng vào 1
+    namespace — 2 tab crawl và maintenance TRÙNG khá nhiều tên biến
+    (active_runs, runs, total_runs, page, total_pages, per_page,
+    status_labels, admin_members, filters, pagination_filters); merge
+    phẳng bằng **kwargs như code cũ (chỉ merge được 1 tab/lần vì trước
+    đây early-return) giờ sẽ làm biến tab sau ĐÈ tab trước nếu gộp cả 3
+    cùng lúc. crawl.html tự {% with %} scoped-rename ngay trước mỗi
+    {% include %} — KHÔNG phải sửa 1 dòng nào bên trong 3 file partial
+    (_crawl_tab.html/_status_tab.html/_maintenance_tab.html), giữ
+    nguyên logic JS/Jinja đang chạy ổn định của từng tab.
 
-    Tab 'status': bảng company đang thiếu field gì/tỉ lệ bao nhiêu, xem
-    docstring _status_tab_context() (blueprints/crawl_status.py).
-
-    Tab 'maintenance': build context riêng ở
-    _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
-    merge vào đây — tách hàm để file này không phình to.
-
-    08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục") —
-    widget nổi "Đang chạy" (crawl.html, sau khối include tab) giờ hiện
-    TRÊN CẢ 3 TAB, không chỉ đúng tab đang xem. Để tránh hiện TRÙNG (tab
-    'crawl' đã có sẵn widget riêng cho crawl, tab 'maintenance' đã có
-    sẵn widget riêng cho bảo trì — xem _crawl_tab.html/
-    _maintenance_tab.html), mỗi nhánh CHỈ tính thêm PHẦN CÒN THIẾU của
-    tab đó (tab='crawl' thiếu phần bảo trì, tab='maintenance' thiếu
-    phần crawl, tab='status' thiếu CẢ HAI — tab này vốn không có widget
-    riêng nào). Đặt tên biến `crawl_*`/`maint_*` PHÂN BIỆT khỏi tên biến
-    "gốc" (`active_runs`/`status_labels`...) mà từng tab tự dùng cho
-    widget CỦA CHÍNH NÓ, tránh đè lẫn nhau khi cùng truyền vào 1 lần
-    render_template()."""
+    CHƯA song song hoá 3 lệnh build context này VỚI NHAU (khác các nơi
+    khác trong app đang dùng _io_pool) — _status_tab_context()/
+    _maintenance_tab_context() tự đọc Flask session
+    (_auth_tokens_from_session()/_call_authed()) bên trong thân hàm, cả
+    2 đều CẦN request context, không chạy được trên worker thread (xem
+    docstring _source_active_state() ở file này để biết rõ lý do — cùng
+    ràng buộc). Song song hoá thật 3 tab với nhau cần refactor 2 hàm đó
+    nhận access_token qua tham số thay vì tự đọc session (giống cách
+    _source_active_state() đã làm) — để lại cho đợt sau, không đụng vào
+    trong lần sửa này để tránh ảnh hưởng luồng refresh-token đang chạy
+    ổn định ở 2 hàm đó. Chấp nhận được vì cả 2 tab mới đều rẻ: status =
+    2 round-trip SQL cố định (không tăng theo tổng số record), maintenance
+    = lịch sử đã phân trang server + 1 call gộp đủ 5 job_type — lần load
+    đầu tăng thêm vừa phải, không đáng kể so với tab crawl (vốn đã nặng
+    nhất, đã song song hoá nội bộ từ trước)."""
     tab = request.args.get("tab", "crawl")
     if tab not in ("crawl", "status", "maintenance"):
         tab = "crawl"
 
-    if tab == "status":
-        _, crawl_runs, crawl_batches, crawl_cats = _crawl_widget_state()
-        from blueprints.crawl_maintenance import _active_maintenance_runs
-        try:
-            maint_runs = _active_maintenance_runs()
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            maint_runs = {}
-        return render_template(
-            "crawl.html", tab=tab,
-            **{**_shell_widget_defaults(),
-               "show_shell_crawl_widget": True, "show_shell_maint_widget": True,
-               "crawl_active_runs": crawl_runs, "crawl_active_batches": crawl_batches,
-               "crawl_category_labels": crawl_cats, "crawl_source_labels": _SOURCE_LABELS,
-               "crawl_status_labels": db_data.CRAWL_STATUS_LABELS,
-               "maint_active_runs": maint_runs, "maint_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
-               "maint_job_labels": db_data.MAINTENANCE_JOB_LABELS},
-            **_status_tab_context(),
-        )
+    status_ctx = _status_tab_context()
 
-    if tab == "maintenance":
-        # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
-        # `from blueprints.crawl import crawl_bp`, import ở đầu file
-        # này sẽ chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) ->
-        # ImportError. Import trễ bên trong hàm chỉ chạy lúc request
-        # thật tới, lúc đó module đã load xong hoàn toàn.
-        from blueprints.crawl_maintenance import _maintenance_tab_context
-        _, crawl_runs, crawl_batches, crawl_cats = _crawl_widget_state()
-        return render_template(
-            "crawl.html", tab=tab,
-            **{**_shell_widget_defaults(),
-               "show_shell_crawl_widget": True,
-               "crawl_active_runs": crawl_runs, "crawl_active_batches": crawl_batches,
-               "crawl_category_labels": crawl_cats, "crawl_source_labels": _SOURCE_LABELS,
-               "crawl_status_labels": db_data.CRAWL_STATUS_LABELS},
-            **_maintenance_tab_context(),
-        )
+    # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
+    # `from blueprints.crawl import crawl_bp`, import ở đầu file này sẽ
+    # chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) -> ImportError.
+    # Import trễ bên trong hàm chỉ chạy lúc request thật tới, lúc đó
+    # module đã load xong hoàn toàn. Trước đây chỉ import khi tab==
+    # 'maintenance' (early-return) — giờ LUÔN cần vì tab maintenance
+    # luôn được build cùng 2 tab kia, nhưng vẫn giữ import Ở ĐÂY (không
+    # dời lên đầu file) vì lý do vòng lặp import không đổi.
+    from blueprints.crawl_maintenance import _maintenance_tab_context
+    maintenance_ctx = _maintenance_tab_context()
 
+    # ---- Tab "crawl" (mặc định) — Khu A/B/C, logic y hệt trước đây ----
     # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
     # cho CẢ 3 nhóm việc độc lập bên dưới (per-source poll / list_crawl_runs
     # / list_users) — cùng lý do _source_active_state() không tự gọi
@@ -413,33 +316,21 @@ def index():
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
-    # 08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục")
-    # — widget nổi ở crawl.html cần THÊM phần bảo trì (tab này vốn đã
-    # có sẵn phần crawl qua active_runs/active_batches ở trên rồi, xem
-    # docstring index() đầu hàm). Lỗi ở đây KHÔNG chặn phần còn lại của
-    # trang render — chỉ ảnh hưởng đúng widget.
-    from blueprints.crawl_maintenance import _active_maintenance_runs
-    try:
-        maint_active_runs = _active_maintenance_runs()
-    except CrawlerAPIError as exc:
-        flash(str(exc), "error")
-        maint_active_runs = {}
+    crawl_ctx = {
+        "sources": sources, "source_labels": _SOURCE_LABELS,
+        "active_runs": active_runs, "active_batches": active_batches, "category_labels": category_labels,
+        "runs": runs, "total_runs": total_runs, "page": page, "total_pages": total_pages, "per_page": per_page,
+        "status_labels": db_data.CRAWL_STATUS_LABELS, "stat_labels": db_data.CRAWL_STAT_LABELS,
+        "admin_members": admin_members,
+        "filters": {"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
+        "pagination_filters": {k: v for k, v in
+                                {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
+    }
 
     return render_template(
         "crawl.html",
         tab=tab,
-        sources=sources, source_labels=_SOURCE_LABELS,
-        active_runs=active_runs, active_batches=active_batches, category_labels=category_labels,
-        runs=runs, total_runs=total_runs, page=page, total_pages=total_pages, per_page=per_page,
-        status_labels=db_data.CRAWL_STATUS_LABELS, stat_labels=db_data.CRAWL_STAT_LABELS,
-        admin_members=admin_members,
-        filters={"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
-        pagination_filters={k: v for k, v in
-                             {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
-        **{**_shell_widget_defaults(),
-           "show_shell_maint_widget": True,
-           "maint_active_runs": maint_active_runs, "maint_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
-           "maint_job_labels": db_data.MAINTENANCE_JOB_LABELS},
+        crawl_ctx=crawl_ctx, status_ctx=status_ctx, maintenance_ctx=maintenance_ctx,
     )
 
 
@@ -523,7 +414,7 @@ def trigger_batch():
 
 
 @crawl_bp.route("/crawl/<string:run_id>/status.json")
-@staff_required
+@admin_required
 def status_json(run_id):
     """JSON polling — JS ở crawl.html gọi định kỳ tới khi status
     'done'/'error'. @admin_required tự trả JSON lỗi (không redirect
@@ -538,7 +429,7 @@ def status_json(run_id):
 
 
 @crawl_bp.route("/crawl/<string:run_id>/logs.json")
-@staff_required
+@admin_required
 def logs_json(run_id):
     """JSON polling khu "Xem log live" — JS ở crawl.html gọi định kỳ
     (song song với status.json) kèm ?after_id=N để chỉ lấy dòng log MỚI
@@ -555,7 +446,7 @@ def logs_json(run_id):
 
 
 @crawl_bp.route("/crawl/batch/<string:batch_id>/status.json")
-@staff_required
+@admin_required
 def batch_status_json(batch_id):
     """JSON polling cho card batch ở Khu B — JS ở crawl.html gọi định
     kỳ (khác hẳn status.json ở trên vốn poll 1 run đơn lẻ) tới khi
@@ -572,7 +463,7 @@ def batch_status_json(batch_id):
 
 
 @crawl_bp.route("/crawl/latest-log-run")
-@staff_required
+@admin_required
 def latest_log_run():
     """JSON — khung "Log live" (LUÔN HIỆN cố định trên trang, 08/2026,
     xem lịch sử trao đổi) gọi lúc tải trang để biết run_id GẦN NHẤT

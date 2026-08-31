@@ -151,6 +151,19 @@ def staff_client(flask_app, staff_user, mocker):
 
 
 @pytest.fixture()
+def admin_client(flask_app, admin_user, mocker):
+    """Như staff_client nhưng role=admin — dùng cho route @admin_required
+    (vd. /crawl — thêm 08/2026 cùng đợt gộp 3 tab, xem test_crawl.py)."""
+    mocker.patch("app.backend_auth.get_me", return_value={
+        "ss_user_id": admin_user.id, "email": admin_user.email,
+        "full_name": admin_user.full_name, "role": admin_user.role,
+        "must_change_password": admin_user.must_change_password,
+        "is_active": True,
+    })
+    return _login_client(flask_app, admin_user)
+
+
+@pytest.fixture()
 def must_change_password_client(flask_app, must_change_password_user, mocker):
     mocker.patch("app.backend_auth.get_me", return_value={
         "ss_user_id": must_change_password_user.id,
