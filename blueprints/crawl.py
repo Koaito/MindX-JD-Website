@@ -142,6 +142,83 @@ def _source_active_state(source, access_token):
     return source, run, batch, None
 
 
+def _crawl_widget_state():
+    """08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục
+    trong trang Vận hành dữ liệu") — tách phần "lấy active_runs/
+    active_batches theo NGUỒN" ra khỏi index() để DÙNG LẠI được cho
+    widget nổi "Đang chạy" khi đang xem tab 'status' hoặc 'maintenance'
+    (trước đây phần này BỊ KẸT bên trong nhánh tab=='crawl' của index(),
+    2 tab kia không gọi tới nên không có gì để hiện).
+
+    tab=='crawl' KHÔNG gọi hàm này — nhánh đó tự làm inline y hệt logic
+    bên dưới nhưng chạy CHỒNG LẤN song song với runs_future/users_future
+    (xem index()), tối ưu hơn bản đơn giản ở đây. Hàm này CHỈ dùng khi
+    đang xem 1 trong 2 tab còn lại — lúc đó không có runs_future/
+    users_future nào để chồng lấn cùng, nên không cần giữ y hệt độ phức
+    tạp đó.
+
+    Trả (sources, active_runs, active_batches, category_labels)."""
+    try:
+        sources = db_data.get_sources()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        return {}, {}, {}, {}
+
+    access_token, refresh_token = _auth_tokens_from_session()
+
+    def _poll(token):
+        futures = {source: _pool.submit(_source_active_state, source, token) for source in sources}
+        return {source: futures[source].result() for source in sources}
+
+    source_results = _poll(access_token)
+    had_401 = any(
+        isinstance(error, CrawlerAPIError) and error.status_code == 401
+        for _s, _r, _b, error in source_results.values()
+    )
+    if had_401 and refresh_token:
+        try:
+            pair = backend_auth.refresh(refresh_token)
+        except BackendAuthError:
+            pair = None
+        if pair:
+            _store_auth_tokens(pair["access_token"], pair["refresh_token"])
+            source_results = _poll(pair["access_token"])
+
+    active_runs, active_batches = {}, {}
+    for source in sources:
+        _src, run, batch, error = source_results[source]
+        if error:
+            flash(str(error), "error")
+        if run:
+            active_runs[source] = run
+            if batch:
+                active_batches[source] = batch
+
+    category_labels = {
+        f"{src}:{cat}": label
+        for src, cats in sources.items() for cat, label in cats.items()
+    }
+    return sources, active_runs, active_batches, category_labels
+
+
+def _shell_widget_defaults():
+    """08/2026 — dict mặc định (rỗng) cho TOÀN BỘ key mà widget nổi
+    "Đang chạy" ở templates/crawl.html cần, để LUÔN truyền đủ ở CẢ 3
+    nhánh tab bên dưới (index()) — tránh Jinja lỗi "undefined" khi
+    template tham chiếu 1 key mà nhánh đang chạy không tính (vd tab
+    'crawl' không tính crawl_active_runs vì đã có widget riêng, xem
+    docstring index()). show_shell_crawl_widget/show_shell_maint_widget
+    mới là cờ QUYẾT ĐỊNH có render hay không — 2 dict rỗng ở trên chỉ
+    để an toàn, không tự ý làm hiện widget."""
+    return {
+        "show_shell_crawl_widget": False,
+        "show_shell_maint_widget": False,
+        "crawl_active_runs": {}, "crawl_active_batches": {},
+        "crawl_category_labels": {}, "crawl_source_labels": {}, "crawl_status_labels": {},
+        "maint_active_runs": {}, "maint_status_labels": {}, "maint_job_labels": {},
+    }
+
+
 @crawl_bp.route("/crawl")
 @staff_required
 def index():
@@ -155,14 +232,43 @@ def index():
 
     Tab 'maintenance': build context riêng ở
     _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
-    merge vào đây — tách hàm để file này không phình to, KHÔNG tính lại
-    context tab đang KHÔNG hiển thị (đỡ gọi API thừa lúc chỉ xem 1 tab)."""
+    merge vào đây — tách hàm để file này không phình to.
+
+    08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục") —
+    widget nổi "Đang chạy" (crawl.html, sau khối include tab) giờ hiện
+    TRÊN CẢ 3 TAB, không chỉ đúng tab đang xem. Để tránh hiện TRÙNG (tab
+    'crawl' đã có sẵn widget riêng cho crawl, tab 'maintenance' đã có
+    sẵn widget riêng cho bảo trì — xem _crawl_tab.html/
+    _maintenance_tab.html), mỗi nhánh CHỈ tính thêm PHẦN CÒN THIẾU của
+    tab đó (tab='crawl' thiếu phần bảo trì, tab='maintenance' thiếu
+    phần crawl, tab='status' thiếu CẢ HAI — tab này vốn không có widget
+    riêng nào). Đặt tên biến `crawl_*`/`maint_*` PHÂN BIỆT khỏi tên biến
+    "gốc" (`active_runs`/`status_labels`...) mà từng tab tự dùng cho
+    widget CỦA CHÍNH NÓ, tránh đè lẫn nhau khi cùng truyền vào 1 lần
+    render_template()."""
     tab = request.args.get("tab", "crawl")
     if tab not in ("crawl", "status", "maintenance"):
         tab = "crawl"
 
     if tab == "status":
-        return render_template("crawl.html", tab=tab, **_status_tab_context())
+        _, crawl_runs, crawl_batches, crawl_cats = _crawl_widget_state()
+        from blueprints.crawl_maintenance import _active_maintenance_runs
+        try:
+            maint_runs = _active_maintenance_runs()
+        except CrawlerAPIError as exc:
+            flash(str(exc), "error")
+            maint_runs = {}
+        return render_template(
+            "crawl.html", tab=tab,
+            **{**_shell_widget_defaults(),
+               "show_shell_crawl_widget": True, "show_shell_maint_widget": True,
+               "crawl_active_runs": crawl_runs, "crawl_active_batches": crawl_batches,
+               "crawl_category_labels": crawl_cats, "crawl_source_labels": _SOURCE_LABELS,
+               "crawl_status_labels": db_data.CRAWL_STATUS_LABELS,
+               "maint_active_runs": maint_runs, "maint_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
+               "maint_job_labels": db_data.MAINTENANCE_JOB_LABELS},
+            **_status_tab_context(),
+        )
 
     if tab == "maintenance":
         # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
@@ -171,7 +277,16 @@ def index():
         # ImportError. Import trễ bên trong hàm chỉ chạy lúc request
         # thật tới, lúc đó module đã load xong hoàn toàn.
         from blueprints.crawl_maintenance import _maintenance_tab_context
-        return render_template("crawl.html", tab=tab, **_maintenance_tab_context())
+        _, crawl_runs, crawl_batches, crawl_cats = _crawl_widget_state()
+        return render_template(
+            "crawl.html", tab=tab,
+            **{**_shell_widget_defaults(),
+               "show_shell_crawl_widget": True,
+               "crawl_active_runs": crawl_runs, "crawl_active_batches": crawl_batches,
+               "crawl_category_labels": crawl_cats, "crawl_source_labels": _SOURCE_LABELS,
+               "crawl_status_labels": db_data.CRAWL_STATUS_LABELS},
+            **_maintenance_tab_context(),
+        )
 
     # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
     # cho CẢ 3 nhóm việc độc lập bên dưới (per-source poll / list_crawl_runs
@@ -298,6 +413,18 @@ def index():
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
+    # 08/2026 (SỬA — xem lịch sử trao đổi "đồng bộ đang chạy mọi mục")
+    # — widget nổi ở crawl.html cần THÊM phần bảo trì (tab này vốn đã
+    # có sẵn phần crawl qua active_runs/active_batches ở trên rồi, xem
+    # docstring index() đầu hàm). Lỗi ở đây KHÔNG chặn phần còn lại của
+    # trang render — chỉ ảnh hưởng đúng widget.
+    from blueprints.crawl_maintenance import _active_maintenance_runs
+    try:
+        maint_active_runs = _active_maintenance_runs()
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        maint_active_runs = {}
+
     return render_template(
         "crawl.html",
         tab=tab,
@@ -309,6 +436,10 @@ def index():
         filters={"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
         pagination_filters={k: v for k, v in
                              {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
+        **{**_shell_widget_defaults(),
+           "show_shell_maint_widget": True,
+           "maint_active_runs": maint_active_runs, "maint_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
+           "maint_job_labels": db_data.MAINTENANCE_JOB_LABELS},
     )
 
 

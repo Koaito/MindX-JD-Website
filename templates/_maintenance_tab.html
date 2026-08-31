@@ -91,45 +91,6 @@
   {% endfor %}
 </div>
 
-{# ================= Widget nổi "Đang chạy" (tối đa 5, 1/job_type) =================
-   08/2026 (theo yêu cầu thảo luận, mirror y hệt cách làm bên
-   _crawl_tab.html) — nổi cố định góc dưới-phải, đi theo khi cuộn, thu
-   gọn được. TÁI DÙNG NGUYÊN #maint-running-zone + .crawl-running-card-wrap
-   như cũ -> JS polling (pollMaintenanceRun/onRunDone ở cuối file) không
-   cần sửa gì, chỉ đổi chỗ hiển thị bằng CSS (.crawl-live-widget dùng
-   chung với tab Crawl, xem 15-crawl.css). #}
-<div class="crawl-live-widget{{ '' if active_runs else ' is-collapsed' }}" id="maint-live-widget">
-  <div class="crawl-live-widget-head" data-role="widget-toggle">
-    <span class="crawl-live-widget-title">
-      Đang chạy
-      <span class="crawl-live-widget-count" id="maint-live-widget-count" {{ 'hidden' if not active_runs }}>{{ active_runs|length }}</span>
-    </span>
-    <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
-  </div>
-  <div class="crawl-live-widget-body">
-    <div class="crawl-running-list" id="maint-running-zone">
-      {% if active_runs %}
-        {% for jt, run in active_runs.items() %}
-        <div class="dm-export-card crawl-running-card-wrap" id="maint-running-{{ jt }}"
-             data-run-id="{{ run.run_id }}" data-job-type="{{ jt }}">
-          <div class="crawl-running-card">
-            <div>
-              <span class="badge badge-info"><span class="crawl-spinner"></span>{{ status_labels.get(run.status, run.status) }}</span>
-              <p class="crawl-running-meta" style="margin-top: 8px;">
-                {{ job_labels.get(jt, jt) }}<br>
-                Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
-              </p>
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <p class="muted crawl-running-empty">Hiện không có job bảo trì nào đang chạy.</p>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
 {# ================= Khu C — Lịch sử ================= #}
 <h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử bảo trì</h2>
 

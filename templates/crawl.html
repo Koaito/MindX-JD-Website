@@ -44,4 +44,314 @@
   {% include "_crawl_tab.html" %}
 {% endif %}
 
+{# =========================================================================
+   Widget nổi "Đang chạy" — PHẦN CÒN THIẾU của tab đang xem (08/2026, xem
+   lịch sử trao đổi "đồng bộ đang chạy mọi mục trong trang Vận hành dữ
+   liệu"). Tab 'crawl' đã tự có widget crawl riêng (#crawl-live-widget,
+   trong _crawl_tab.html) -> ở ĐÂY chỉ thêm widget bảo trì. Tab
+   'maintenance' đã tự có widget bảo trì riêng (#maint-live-widget,
+   trong _maintenance_tab.html) -> ở ĐÂY chỉ thêm widget crawl. Tab
+   'status' không có widget riêng nào -> ở ĐÂY thêm CẢ HAI.
+
+   2 khối bên dưới CHỈ RENDER khi (1) cờ show_shell_crawl_widget/
+   show_shell_maint_widget bật (đúng tab CHƯA có widget riêng của loại
+   đó, xem blueprints/crawl.py::_shell_widget_defaults() + index()) VÀ
+   (2) dict active_runs tương ứng KHÔNG rỗng (đỡ hiện 1 widget trống
+   thu gọn suốt ngày trên tab 'status' lúc không có gì chạy) — khác
+   #crawl-live-widget/#maint-live-widget "gốc" (LUÔN hiện kể cả rỗng,
+   theo đúng hành vi cũ, không đổi ở đây).
+
+   Card bên trong CHỦ Ý viết ĐƠN GIẢN hơn bản gốc trong _crawl_tab.html/
+   _maintenance_tab.html — KHÔNG cập nhật lịch sử (Khu C, vì tab đang
+   xem không có bảng lịch sử của loại này) hay bật lại form (Khu A của
+   tab khác, không có mặt ở đây) — JS riêng ở <script> cuối khối này
+   chỉ tự xoá card khỏi widget khi xong, KHÔNG động vào gì khác. Khi
+   bấm sang đúng tab đó, trang tải lại từ server nên tự thấy trạng thái
+   mới nhất qua Jinja bình thường, không cần đồng bộ 2 chiều qua JS.
+
+   Việc XẾP CHỒNG nhiều `.crawl-live-widget` cùng lúc (widget gốc của
+   tab + widget "phần còn thiếu" ở đây) xử lý bằng JS ở CUỐI FILE này
+   (layoutWidgetStack) — tính lại `bottom` từng widget dựa trên chiều
+   cao THỰC TẾ (offsetHeight) của các widget bên dưới nó, không dùng
+   CSS thuần vì các widget nằm ở NHIỀU nơi khác nhau trong DOM (1 cái
+   trong _crawl_tab.html/_maintenance_tab.html, 1 cái ở đây), không
+   phải anh em ruột (sibling) để dùng được CSS combinator. #}
+<div class="crawl-live-widget-stack">
+  {% if show_shell_crawl_widget and crawl_active_runs %}
+  <div class="crawl-live-widget" id="shell-crawl-live-widget">
+    <div class="crawl-live-widget-head" data-role="widget-toggle">
+      <span class="crawl-live-widget-title">
+        Đang chạy · Crawl
+        <span class="crawl-live-widget-count" id="shell-crawl-live-widget-count">{{ crawl_active_runs|length }}</span>
+      </span>
+      <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
+    </div>
+    <div class="crawl-live-widget-body">
+      <div class="crawl-running-list" id="shell-crawl-running-zone">
+        {% for source, run in crawl_active_runs.items() %}
+        {% set batch = crawl_active_batches.get(source) %}
+        <div class="dm-export-card crawl-running-card-wrap"
+             id="shell-crawl-running-{{ source }}"
+             data-run-id="{{ run.run_id }}"
+             data-source="{{ source }}"
+             {% if batch %}data-batch-id="{{ batch.batch_id }}"{% endif %}>
+          <div class="crawl-running-card">
+            <div>
+              <span class="badge badge-info"><span class="crawl-spinner"></span>{{ crawl_status_labels.get(run.status, run.status) }}</span>
+              <p class="crawl-running-meta" style="margin-top: 8px;">
+                {% if batch %}
+                  {{ crawl_source_labels.get(source, source) }} ·
+                  <span data-role="batch-count">{{ batch.completed }}/{{ batch.total }}</span> ngành xong
+                {% else %}
+                  {{ crawl_source_labels.get(source, source) }} · {{ crawl_category_labels.get(source ~ ':' ~ run.category, run.category) }}
+                {% endif %}<br>
+                Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+              </p>
+            </div>
+          </div>
+          {% if batch %}
+          <ul class="crawl-batch-checklist" data-role="batch-checklist">
+            {% for item in batch.checklist %}
+            <li class="crawl-batch-item" data-category="{{ item.category }}">
+              <span class="badge {{ item.status_badge }}" data-role="item-badge">{{ item.status_label }}</span>
+              <span class="crawl-batch-item-label">{{ crawl_category_labels.get(source ~ ':' ~ item.category, item.category) }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="crawl-progress" data-role="progress">
+            <p class="crawl-progress-line">
+              <span data-role="progress-fetched">Đang chờ dữ liệu tiến độ đầu tiên…</span>
+            </p>
+            <p class="crawl-progress-updated muted" data-role="progress-updated"></p>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if show_shell_maint_widget and maint_active_runs %}
+  <div class="crawl-live-widget" id="shell-maint-live-widget">
+    <div class="crawl-live-widget-head" data-role="widget-toggle">
+      <span class="crawl-live-widget-title">
+        Đang chạy · Bảo trì
+        <span class="crawl-live-widget-count" id="shell-maint-live-widget-count">{{ maint_active_runs|length }}</span>
+      </span>
+      <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
+    </div>
+    <div class="crawl-live-widget-body">
+      <div class="crawl-running-list" id="shell-maint-running-zone">
+        {% for jt, run in maint_active_runs.items() %}
+        <div class="dm-export-card crawl-running-card-wrap" id="shell-maint-running-{{ jt }}"
+             data-run-id="{{ run.run_id }}" data-job-type="{{ jt }}">
+          <div class="crawl-running-card">
+            <div>
+              <span class="badge badge-info"><span class="crawl-spinner"></span>{{ maint_status_labels.get(run.status, run.status) }}</span>
+              <p class="crawl-running-meta" style="margin-top: 8px;">
+                {{ maint_job_labels.get(jt, jt) }}<br>
+                Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# 08/2026 — luôn chèn (KHÔNG gate theo show_shell_*_widget) vì cần
+   chạy CẢ lúc chỉ có đúng 1 widget "gốc" của tab (crawl/maintenance,
+   render trong _crawl_tab.html/_maintenance_tab.html — nằm NGOÀI
+   .crawl-live-widget-stack) — tuy TH đó không cần xếp chồng gì (mặc
+   định bottom:24px của CSS đã đúng), nhưng để 1 CƠ CHẾ DUY NHẤT xử lý
+   MỌI trường hợp (1 widget/2 widget) thay vì tách riêng "có cần xếp
+   chồng không" ở phía Jinja, dễ rối. document.querySelectorAll tìm
+   KHẮP TRANG (không quan tâm widget nằm trong include nào). #}
+<script>
+(function () {
+  "use strict";
+
+  function layoutWidgetStack() {
+    var widgets = Array.prototype.slice.call(document.querySelectorAll(".crawl-live-widget"));
+    if (widgets.length < 2) return;  // Đúng 1 widget (hoặc 0) -> CSS mặc định (bottom:24px) đã đúng, khỏi tính.
+    var GAP = 12;
+    var cumulative = 24;  // Khớp giá trị `bottom` mặc định trong CSS (.crawl-live-widget, 15-crawl.css).
+    // Duyệt NGƯỢC thứ tự DOM — widget đứng SAU cùng trong trang nằm
+    // THẤP NHẤT (gần góc màn hình nhất), giữ đúng cảm giác widget nào
+    // "mới thêm gần đây hơn" (thường là widget gốc của tab đang xem,
+    // luôn render TRƯỚC widget "phần còn thiếu" ở đây) nằm bên TRÊN.
+    for (var i = widgets.length - 1; i >= 0; i--) {
+      widgets[i].style.bottom = cumulative + "px";
+      cumulative += widgets[i].offsetHeight + GAP;
+    }
+  }
+
+  layoutWidgetStack();
+
+  // Chiều cao 1 widget đổi khi: thu gọn/mở rộng (click), hoặc card bên
+  // trong tự xoá lúc 1 lượt chạy xong (JS polling ở nơi khác) — dùng
+  // ResizeObserver bắt được CẢ 2 trường hợp mà không cần 2 nơi tự gọi
+  // lại layoutWidgetStack() thủ công.
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(function () { layoutWidgetStack(); });
+    document.querySelectorAll(".crawl-live-widget").forEach(function (w) { ro.observe(w); });
+  } else {
+    // Trình duyệt cũ không có ResizeObserver — fallback đơn giản: tính
+    // lại định kỳ, đủ dùng (không cần mượt tuyệt đối).
+    setInterval(layoutWidgetStack, 3000);
+  }
+})();
+</script>
+
+{% if (show_shell_crawl_widget and crawl_active_runs) or (show_shell_maint_widget and maint_active_runs) %}
+<script>
+(function () {
+  "use strict";
+  // 08/2026 — JS RIÊNG, ĐƠN GIẢN cho 2 widget "phần còn thiếu" ở trên.
+  // CHỦ Ý không tái dùng pollRun/pollBatch/pollMaintenanceRun (định
+  // nghĩa trong _crawl_tab.html/_maintenance_tab.html, chỉ tồn tại khi
+  // include đúng tab) — bản ở đây chỉ cập nhật progress/checklist bên
+  // trong card rồi TỰ XOÁ khi xong, KHÔNG đụng tới lịch sử/form (những
+  // thứ đó thuộc về tab kia, không có mặt trên trang đang xem).
+
+  function formatTimeShell(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return pad(d.getHours()) + ":" + pad(d.getMinutes()) + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
+  function renderProgressShell(card, progress) {
+    var fetchedEl = card.querySelector('[data-role="progress-fetched"]');
+    var updatedEl = card.querySelector('[data-role="progress-updated"]');
+    if (!progress) return;
+    if (fetchedEl) fetchedEl.textContent = "Đã lấy " + (progress.fetched || 0) + " job · lưu mới " + (progress.inserted || 0);
+    if (updatedEl) updatedEl.textContent = "Cập nhật lúc " + formatTimeShell(progress.last_update);
+  }
+
+  var STATUS_BADGE_SHELL = {"queued": "badge-info", "running": "badge-info", "done": "badge-success", "error": "badge-danger"};
+  var CRAWL_STATUS_LABELS_SHELL = {{ (crawl_status_labels if crawl_status_labels is defined else {})|tojson }};
+
+  function renderBatchChecklistShell(card, batch) {
+    var list = card.querySelector('[data-role="batch-checklist"]');
+    if (!list || !batch.checklist) return;
+    batch.checklist.forEach(function (item) {
+      var li = list.querySelector('li[data-category="' + item.category + '"]');
+      if (!li) return;
+      var badge = li.querySelector('[data-role="item-badge"]');
+      if (badge) {
+        badge.className = "badge " + (STATUS_BADGE_SHELL[item.status] || "badge-warning");
+        badge.textContent = CRAWL_STATUS_LABELS_SHELL[item.status] || item.status;
+      }
+    });
+  }
+
+  function updateWidgetCountShell(zoneId, countId) {
+    var zone = document.getElementById(zoneId);
+    var countEl = document.getElementById(countId);
+    if (!zone || !countEl) return;
+    var n = zone.querySelectorAll(".crawl-running-card-wrap").length;
+    if (n > 0) { countEl.hidden = false; countEl.textContent = String(n); } else { countEl.hidden = true; }
+  }
+
+  function onCardDoneShell(card, zoneId, countId, emptyText) {
+    card.remove();
+    var zone = document.getElementById(zoneId);
+    if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+      var empty = document.createElement("p");
+      empty.className = "muted crawl-running-empty";
+      empty.textContent = emptyText;
+      zone.appendChild(empty);
+    }
+    updateWidgetCountShell(zoneId, countId);
+  }
+
+  function pollShellCrawlRun(card) {
+    var runId = card.getAttribute("data-run-id");
+    var stopped = false, inFlight = false;
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          inFlight = false;
+          if (stopped) return;
+          if (run.error) { stopped = true; clearInterval(timer); return; }
+          renderProgressShell(card, run.progress);
+          if (run.status === "done" || run.status === "error") {
+            stopped = true; clearInterval(timer);
+            onCardDoneShell(card, "shell-crawl-running-zone", "shell-crawl-live-widget-count", "Hiện không có lượt crawl nào đang chạy.");
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  function pollShellCrawlBatch(card) {
+    var batchId = card.getAttribute("data-batch-id");
+    var stopped = false, inFlight = false;
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/batch/" + batchId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (batch) {
+          inFlight = false;
+          if (stopped) return;
+          if (batch.error) { stopped = true; clearInterval(timer); return; }
+          var countEl = card.querySelector('[data-role="batch-count"]');
+          if (countEl) countEl.textContent = batch.completed + "/" + batch.total;
+          renderBatchChecklistShell(card, batch);
+          if (batch.status === "done" || batch.status === "error") {
+            stopped = true; clearInterval(timer);
+            onCardDoneShell(card, "shell-crawl-running-zone", "shell-crawl-live-widget-count", "Hiện không có lượt crawl nào đang chạy.");
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  function pollShellMaintenanceRun(card) {
+    var runId = card.getAttribute("data-run-id");
+    var stopped = false, inFlight = false;
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/maintenance/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          inFlight = false;
+          if (stopped) return;
+          if (run.error) { stopped = true; clearInterval(timer); return; }
+          if (run.status === "done" || run.status === "error") {
+            stopped = true; clearInterval(timer);
+            onCardDoneShell(card, "shell-maint-running-zone", "shell-maint-live-widget-count", "Hiện không có job bảo trì nào đang chạy.");
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  document.querySelectorAll("#shell-crawl-running-zone .crawl-running-card-wrap[data-run-id]").forEach(function (card) {
+    if (card.getAttribute("data-batch-id")) { pollShellCrawlBatch(card); } else { pollShellCrawlRun(card); }
+  });
+  document.querySelectorAll("#shell-maint-running-zone .crawl-running-card-wrap[data-run-id]").forEach(function (card) {
+    pollShellMaintenanceRun(card);
+  });
+
+  document.querySelectorAll(".crawl-live-widget-stack .crawl-live-widget").forEach(function (widget) {
+    var head = widget.querySelector('[data-role="widget-toggle"]');
+    if (head) head.addEventListener("click", function () { widget.classList.toggle("is-collapsed"); });
+  });
+})();
+</script>
+{% endif %}
+
 {% endblock %}
