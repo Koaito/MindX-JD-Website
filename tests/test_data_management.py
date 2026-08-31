@@ -264,10 +264,192 @@ class TestImportPreview:
         assert resp.status_code == 404
 
 
+class TestIndexPreviewRefresh:
+    """index() (GET /data-management?preview=...) đọc lại preview qua
+    _call_authed từ 08/2026 — TRƯỚC ĐÓ gọi thẳng
+    db_data.get_import_preview(access_token, ...), bug đã biết: access
+    token hết hạn (30 phút) giữa lúc thao tác Data Management khiến
+    route flash "phiên đã hết hạn" thay vì tự refresh êm ru như các
+    route khác cùng file (xem lịch sử trao đổi "hay bị kick khỏi acc
+    khi chạy vài script bên vận hành dữ liệu")."""
+
+    def test_preview_401_triggers_refresh_transparently(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        mocker.patch(
+            "helpers.backend_auth.refresh",
+            return_value={"access_token": "new-tok", "refresh_token": "new-refresh"},
+        )
+
+        call_count = {"n": 0}
+
+        def get_import_preview_side_effect(token, *args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise CrawlerAPIError("hết hạn", status_code=401)
+            # Đủ field template _dm_import.html cần render (preview.rows,
+            # preview.preview_id, các *_count) — thiếu field nào Jinja sẽ
+            # crash lúc |tojson vì Undefined không serialize được.
+            return {
+                "preview_id": "prev-1", "total_rows": 3, "new_count": 3,
+                "conflict_count": 0, "conflict_inactive_count": 0,
+                "id_field": "job_id", "rows": [],
+            }
+
+        mocker.patch(
+            "blueprints.data_management.db_data.get_import_preview",
+            side_effect=get_import_preview_side_effect,
+        )
+
+        resp = staff_client.get("/data-management?entity=job&tab=import&preview=prev-1")
+        assert resp.status_code == 200
+        assert call_count["n"] == 2
+
+
+class TestCompanySuggestions:
+    """company_suggestions() — TRƯỚC 08/2026 gọi thẳng
+    db_data.get_company_suggestions(access_token, ...), là bản CŨ thiếu
+    logic tự refresh (xem docstring lịch sử trong verify_field() và
+    helpers.py::_call_authed). Test đảm bảo route này giờ đi qua
+    _call_authed, không lặp lại bug đó."""
+
+    def test_success_path(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.get_company_suggestions",
+            return_value=[{"company_id": "c-1", "name": "Acme"}],
+        )
+        resp = staff_client.get(
+            "/data-management/import/job/company-suggestions?preview_id=prev-1&row_index=0"
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["suggestions"][0]["name"] == "Acme"
+
+    def test_invalid_row_index_returns_400(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        resp = staff_client.get(
+            "/data-management/import/job/company-suggestions?preview_id=prev-1&row_index=abc"
+        )
+        assert resp.status_code == 400
+
+    def test_401_triggers_refresh_transparently(self, staff_client, mocker):
+        """Bài test cốt lõi: đây chính là route trước đây KHÔNG tự
+        refresh — access token hết hạn giữa chừng phải không còn khiến
+        staff bị flash 'phiên hết hạn' nữa."""
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        mocker.patch(
+            "helpers.backend_auth.refresh",
+            return_value={"access_token": "new-tok", "refresh_token": "new-refresh"},
+        )
+
+        call_count = {"n": 0}
+
+        def suggestions_side_effect(token, *args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise CrawlerAPIError("hết hạn", status_code=401)
+            return [{"company_id": "c-1", "name": "Acme"}]
+
+        mocker.patch(
+            "blueprints.data_management.db_data.get_company_suggestions",
+            side_effect=suggestions_side_effect,
+        )
+
+        resp = staff_client.get(
+            "/data-management/import/job/company-suggestions?preview_id=prev-1&row_index=0"
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["suggestions"][0]["name"] == "Acme"
+        assert call_count["n"] == 2
+
+
+class TestResolveCompany:
+    """resolve_company() đọc lại preview qua _call_authed từ 08/2026 —
+    cùng bug lịch sử với index()/company_suggestions() ở trên (gọi thẳng
+    access_token, không tự refresh khi hết hạn)."""
+
+    def test_missing_preview_id_returns_400(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        resp = staff_client.post(
+            "/data-management/import/job/resolve-company",
+            json={"company_id": "c-1", "row_index": 0},
+        )
+        assert resp.status_code == 400
+
+    def test_success_path(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.get_import_preview",
+            return_value={"id_field": "job_id"},
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.resolve_company",
+            return_value={"ok": True, "row_index": 0},
+        )
+        resp = staff_client.post(
+            "/data-management/import/job/resolve-company",
+            json={"preview_id": "prev-1", "company_id": "c-1", "row_index": 0},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+    def test_preview_401_triggers_refresh_transparently(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.data_management.db_data.get_level_codes",
+            return_value=["Intern"],
+        )
+        mocker.patch(
+            "helpers.backend_auth.refresh",
+            return_value={"access_token": "new-tok", "refresh_token": "new-refresh"},
+        )
+        mocker.patch(
+            "blueprints.data_management.db_data.resolve_company",
+            return_value={"ok": True, "row_index": 0},
+        )
+
+        call_count = {"n": 0}
+
+        def get_import_preview_side_effect(token, *args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise CrawlerAPIError("hết hạn", status_code=401)
+            return {"id_field": "job_id"}
+
+        mocker.patch(
+            "blueprints.data_management.db_data.get_import_preview",
+            side_effect=get_import_preview_side_effect,
+        )
+
+        resp = staff_client.post(
+            "/data-management/import/job/resolve-company",
+            json={"preview_id": "prev-1", "company_id": "c-1", "row_index": 0},
+        )
+        assert resp.status_code == 200
+        assert call_count["n"] == 2
+
+
 class TestVerifyField:
-    """verify_field() cố ý dùng _call_authed thay vì gọi thẳng như
-    company_suggestions() (bản cũ, thiếu refresh) — test đảm bảo route
-    MỚI này thực sự tự refresh khi 401, không lặp lại bug cũ."""
+    """verify_field() dùng _call_authed (tự refresh khi 401) — test đảm
+    bảo route này không lặp lại bug cũ (gọi thẳng access_token, không tự
+    refresh — xem TestCompanySuggestions bên dưới, nơi bug đó từng tồn
+    tại thật cho tới khi được sửa 08/2026)."""
 
     def test_missing_preview_id_returns_400(self, staff_client, mocker):
         mocker.patch(
