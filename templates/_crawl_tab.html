@@ -154,117 +154,19 @@
 </div>
 
 {# ================= Khu C — Lịch sử ================= #}
-<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử crawl</h2>
-
-<form class="filter-bar" method="get">
-  <select name="source">
-    <option value="">Mọi nguồn</option>
-    {% for src, label in source_labels.items() %}
-      <option value="{{ src }}" {{ 'selected' if filters.source == src }}>{{ label }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="status">
-    <option value="">Mọi trạng thái</option>
-    {% for st, label in status_labels.items() %}
-      <option value="{{ st }}" {{ 'selected' if filters.status == st }}>{{ label }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="triggered_by">
-    <option value="">Mọi admin</option>
-    {% for u in admin_members %}
-      <option value="{{ u.ss_user_id }}" {{ 'selected' if filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
-    {% endfor %}
-  </select>
-
-  <button type="submit" class="btn btn-ghost">Lọc</button>
-  {% if filters.source or filters.status or filters.triggered_by %}
-    <a class="btn btn-text" href="{{ url_for('crawl.index') }}">Xóa lọc</a>
-  {% endif %}
-</form>
-
-<p class="result-count" id="crawl-history-count">{{ total_runs }} lượt phù hợp</p>
-
-{% if runs %}
-<div class="activity-table-wrap">
-  <table class="activity-table">
-    <thead>
-      <tr>
-        <th style="width: 130px;">Thời gian</th>
-        <th style="width: 130px;">Nguồn / Ngành</th>
-        <th style="width: 150px;">Người bấm</th>
-        <th style="width: 110px;">Trạng thái</th>
-        <th>Kết quả</th>
-      </tr>
-    </thead>
-    <tbody id="crawl-history-tbody">
-      {% for run in runs %}
-      <tr data-run-id="{{ run.run_id }}">
-        <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
-        <td>
-          {{ source_labels.get(run.source, run.source) }}<br>
-          <span class="muted" style="font-size: 12px;">{{ category_labels.get(run.source ~ ':' ~ run.category, run.category) }}</span>
-        </td>
-        <td>{{ run.triggered_by_name }}</td>
-        <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
-        <td>
-          {% if run.status == 'done' and run.stat_items %}
-            <div class="crawl-result-main">{{ run.stat_items[0][1] }} job mới</div>
-            <details class="crawl-result-details">
-              <summary>Xem đủ 8 chỉ số</summary>
-              <dl>
-                {% for label, value in run.stat_items %}
-                  <dt>{{ label }}</dt><dd>{{ value }}</dd>
-                {% endfor %}
-              </dl>
-            </details>
-          {% elif run.status == 'error' %}
-            <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-{% if total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang">
-  {% if page > 1 %}
-    <a class="page-link" href="{{ url_for('crawl.index', page=page-1, **pagination_filters) }}">‹ Trang trước</a>
-  {% endif %}
-  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
-  {% if page < total_pages %}
-    <a class="page-link" href="{{ url_for('crawl.index', page=page+1, **pagination_filters) }}">Trang sau ›</a>
-  {% endif %}
-</nav>
-{% endif %}
-
-{% else %}
-<div class="empty-state" id="crawl-history-empty">
-  <p>Chưa có lượt crawl nào khớp bộ lọc.</p>
-</div>
-{% endif %}
+{# 08/2026 (xem lịch sử trao đổi "tách 2 bảng lịch sử ra tab riêng") —
+   bảng "Lịch sử crawl" (filter + phân trang) đã DỜI sang tab riêng
+   "Lịch sử" (_history_tab.html, ?tab=history), không còn render ở đây
+   nữa. Các hàm JS bên dưới (buildHistoryRow/prependHistoryRow...) VẪN
+   GIỮ NGUYÊN — vô hại khi không tìm thấy #crawl-history-tbody (đã tự
+   `if (!tbody) return;`), không xoá để tránh phải sửa lại toàn bộ luồng
+   callback onDone() của pollRun()/pollBatch() bên dưới. Muốn xem lịch
+   sử, admin qua tab "Lịch sử". #}
 
 {# ================= JS: poll trạng thái + tự thêm dòng lịch sử ================= #}
 <script>
 (function () {
   "use strict";
-
-  // Chặn polling nhân đôi khi trang "Vận hành dữ liệu" gộp 3 tab vào 1
-  // lần render (08/2026, xem lịch sử trao đổi "phương án 1 — client-side
-  // tab") — tab này chỉ nên tiếp tục fetch định kỳ khi .dashboard-tab
-  // data-tab="crawl" đang active, tránh vừa tốn request vừa cập nhật
-  // nhầm state khi người dùng đang xem tab khác. An toàn nếu template
-  // này lỡ được include đơn lẻ (không nằm trong shell gộp tab) — lúc đó
-  // querySelector trả null, coi như luôn active như hành vi cũ.
-  function isCrawlTabActive() {
-    var panel = document.querySelector('.dashboard-tab[data-tab="crawl"]');
-    return !panel || panel.classList.contains("active");
-  }
 
   var SOURCE_LABELS = {{ source_labels|tojson }};
   var CATEGORY_LABELS = {{ category_labels|tojson }};
@@ -505,7 +407,6 @@
 
     // Poll log của run hiện tại — 2s/lần, đủ nhanh để cảm giác "live".
     setInterval(function () {
-      if (!isCrawlTabActive()) return;
       var runId = logCard.getAttribute("data-run-id");
       if (runId) fetchLogsFor(runId);
     }, 2000);
@@ -514,7 +415,6 @@
     // kịp lúc có người bấm "Bắt đầu crawl" ở nguồn khác trong lúc đang
     // xem log của run cũ).
     setInterval(function () {
-      if (!isCrawlTabActive()) return;
       fetch("/crawl/latest-log-run", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
         .then(function (run) {
@@ -555,7 +455,7 @@
     var addedRunIds = {};
 
     var timer = setInterval(function () {
-      if (stopped || inFlight || !isCrawlTabActive()) return;
+      if (stopped || inFlight) return;
       inFlight = true;
       fetch("/crawl/batch/" + batchId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
@@ -610,7 +510,7 @@
     var inFlight = false;
 
     var statusTimer = setInterval(function () {
-      if (stopped || inFlight || !isCrawlTabActive()) return;
+      if (stopped || inFlight) return;
       inFlight = true;
       fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })

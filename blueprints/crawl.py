@@ -137,60 +137,53 @@ def _source_active_state(source, access_token):
 @crawl_bp.route("/crawl")
 @admin_required
 def index():
-    """Trang chính "Vận hành dữ liệu" — 3 tab (crawl/status/maintenance),
-    RENDER CẢ 3 CÙNG LÚC trong 1 response (08/2026, đổi từ early-return
-    theo ?tab=, xem lịch sử trao đổi "phương án 1 — client-side tab như
-    dashboard"). Chuyển tab sau khi trang đã tải là JS thuần (ẩn/hiện
-    .dashboard-tab, xem script cuối crawl.html) — KHÔNG round-trip nữa.
-    ?tab= trong URL giờ chỉ còn ý nghĩa "tab nào active lúc mở link này"
-    (đọc bởi JS lúc init, y hệt cách dashboard.html đang làm), KHÔNG còn
-    quyết định server render gì.
+    """Trang chính — 4 tab (?tab=crawl mặc định | ?tab=status |
+    ?tab=maintenance | ?tab=history).
 
-    3 context (crawl/status/maintenance) CỐ Ý để trong 3 dict RIÊNG
-    (crawl_ctx / status_ctx / maintenance_ctx) thay vì merge phẳng vào 1
-    namespace — 2 tab crawl và maintenance TRÙNG khá nhiều tên biến
-    (active_runs, runs, total_runs, page, total_pages, per_page,
-    status_labels, admin_members, filters, pagination_filters); merge
-    phẳng bằng **kwargs như code cũ (chỉ merge được 1 tab/lần vì trước
-    đây early-return) giờ sẽ làm biến tab sau ĐÈ tab trước nếu gộp cả 3
-    cùng lúc. crawl.html tự {% with %} scoped-rename ngay trước mỗi
-    {% include %} — KHÔNG phải sửa 1 dòng nào bên trong 3 file partial
-    (_crawl_tab.html/_status_tab.html/_maintenance_tab.html), giữ
-    nguyên logic JS/Jinja đang chạy ổn định của từng tab.
+    Tab 'crawl': Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
+    1/nguồn) — y hệt trước đây. Khu C (lịch sử) đã DỜI sang tab
+    'history' (08/2026, xem lịch sử trao đổi "tách 2 bảng lịch sử ra tab
+    riêng") — chỉ còn tab này Khu A/B, không còn filter/phân trang lịch
+    sử ở đây nữa.
 
-    CHƯA song song hoá 3 lệnh build context này VỚI NHAU (khác các nơi
-    khác trong app đang dùng _io_pool) — _status_tab_context()/
-    _maintenance_tab_context() tự đọc Flask session
-    (_auth_tokens_from_session()/_call_authed()) bên trong thân hàm, cả
-    2 đều CẦN request context, không chạy được trên worker thread (xem
-    docstring _source_active_state() ở file này để biết rõ lý do — cùng
-    ràng buộc). Song song hoá thật 3 tab với nhau cần refactor 2 hàm đó
-    nhận access_token qua tham số thay vì tự đọc session (giống cách
-    _source_active_state() đã làm) — để lại cho đợt sau, không đụng vào
-    trong lần sửa này để tránh ảnh hưởng luồng refresh-token đang chạy
-    ổn định ở 2 hàm đó. Chấp nhận được vì cả 2 tab mới đều rẻ: status =
-    2 round-trip SQL cố định (không tăng theo tổng số record), maintenance
-    = lịch sử đã phân trang server + 1 call gộp đủ 5 job_type — lần load
-    đầu tăng thêm vừa phải, không đáng kể so với tab crawl (vốn đã nặng
-    nhất, đã song song hoá nội bộ từ trước)."""
+    Tab 'status': bảng company đang thiếu field gì/tỉ lệ bao nhiêu, xem
+    docstring _status_tab_context() (blueprints/crawl_status.py).
+
+    Tab 'maintenance': build context riêng ở
+    _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
+    merge vào đây — tách hàm để file này không phình to, KHÔNG tính lại
+    context tab đang KHÔNG hiển thị (đỡ gọi API thừa lúc chỉ xem 1 tab).
+    Cùng lý do Khu C đã dời đi như tab 'crawl' ở trên.
+
+    Tab 'history' (mới, 08/2026): 2 bảng lịch sử TÁCH BIỆT (crawl_runs +
+    maintenance_runs), mỗi bảng tự lọc/phân trang riêng (6 dòng/trang) —
+    build context ở _history_tab_context() (blueprints/crawl_history.py,
+    CHỈ ĐỌC, không route trigger nào)."""
     tab = request.args.get("tab", "crawl")
-    if tab not in ("crawl", "status", "maintenance"):
+    if tab not in ("crawl", "status", "maintenance", "history"):
         tab = "crawl"
 
-    status_ctx = _status_tab_context()
+    if tab == "status":
+        return render_template("crawl.html", tab=tab, **_status_tab_context())
 
-    # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
-    # `from blueprints.crawl import crawl_bp`, import ở đầu file này sẽ
-    # chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) -> ImportError.
-    # Import trễ bên trong hàm chỉ chạy lúc request thật tới, lúc đó
-    # module đã load xong hoàn toàn. Trước đây chỉ import khi tab==
-    # 'maintenance' (early-return) — giờ LUÔN cần vì tab maintenance
-    # luôn được build cùng 2 tab kia, nhưng vẫn giữ import Ở ĐÂY (không
-    # dời lên đầu file) vì lý do vòng lặp import không đổi.
-    from blueprints.crawl_maintenance import _maintenance_tab_context
-    maintenance_ctx = _maintenance_tab_context()
+    if tab == "maintenance":
+        # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
+        # `from blueprints.crawl import crawl_bp`, import ở đầu file
+        # này sẽ chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) ->
+        # ImportError. Import trễ bên trong hàm chỉ chạy lúc request
+        # thật tới, lúc đó module đã load xong hoàn toàn.
+        from blueprints.crawl_maintenance import _maintenance_tab_context
+        return render_template("crawl.html", tab=tab, **_maintenance_tab_context())
 
-    # ---- Tab "crawl" (mặc định) — Khu A/B/C, logic y hệt trước đây ----
+    if tab == "history":
+        # crawl_history.py CHỈ ĐỌC (không route/form trigger nào) nên
+        # không có nguy cơ import vòng như crawl_maintenance.py — vẫn
+        # import trễ ở đây cho đồng nhất & để module đó tự import
+        # _SOURCE_LABELS ngược lại từ file này (xem docstring
+        # blueprints/crawl_history.py) mà không lo thứ tự load.
+        from blueprints.crawl_history import _history_tab_context
+        return render_template("crawl.html", tab=tab, **_history_tab_context())
+
     # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
     # cho CẢ 3 nhóm việc độc lập bên dưới (per-source poll / list_crawl_runs
     # / list_users) — cùng lý do _source_active_state() không tự gọi
@@ -316,21 +309,17 @@ def index():
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
-    crawl_ctx = {
-        "sources": sources, "source_labels": _SOURCE_LABELS,
-        "active_runs": active_runs, "active_batches": active_batches, "category_labels": category_labels,
-        "runs": runs, "total_runs": total_runs, "page": page, "total_pages": total_pages, "per_page": per_page,
-        "status_labels": db_data.CRAWL_STATUS_LABELS, "stat_labels": db_data.CRAWL_STAT_LABELS,
-        "admin_members": admin_members,
-        "filters": {"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
-        "pagination_filters": {k: v for k, v in
-                                {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
-    }
-
     return render_template(
         "crawl.html",
         tab=tab,
-        crawl_ctx=crawl_ctx, status_ctx=status_ctx, maintenance_ctx=maintenance_ctx,
+        sources=sources, source_labels=_SOURCE_LABELS,
+        active_runs=active_runs, active_batches=active_batches, category_labels=category_labels,
+        runs=runs, total_runs=total_runs, page=page, total_pages=total_pages, per_page=per_page,
+        status_labels=db_data.CRAWL_STATUS_LABELS, stat_labels=db_data.CRAWL_STAT_LABELS,
+        admin_members=admin_members,
+        filters={"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
+        pagination_filters={k: v for k, v in
+                             {"source": f_source, "status": f_status, "triggered_by": f_triggered_by}.items() if v},
     )
 
 

@@ -1,0 +1,220 @@
+{#
+  Tab "Lịch sử" (08/2026, xem lịch sử trao đổi "tách 2 bảng lịch sử ra
+  tab riêng"). Include từ crawl.html (shell) khi tab='history'. CHỈ ĐỌC
+  — không form trigger nào, khác _crawl_tab.html/_maintenance_tab.html.
+
+  2 BẢNG TÁCH BIỆT, chú thích rõ ràng — KHÔNG gộp:
+    - "Lịch sử crawl" (bảng crawl_runs) — y hệt Khu C cũ ở
+      _crawl_tab.html, chỉ đổi per_page 30 -> 6 + query-param phân
+      trang "page".
+    - "Lịch sử bảo trì" (bảng maintenance_runs) — y hệt Khu C cũ ở
+      _maintenance_tab.html, chỉ đổi per_page 30 -> 6 + query-param
+      phân trang "m_page" (đã dùng sẵn tiền tố m_ cho bộ lọc, giữ nhất
+      quán).
+
+  2 bảng phân trang ĐỘC LẬP — lật trang bảng này không ảnh hưởng trang
+  đang xem của bảng kia (xem pagination_filters_crawl/_maint,
+  blueprints/crawl_history.py).
+#}
+
+<div class="history-tab-section">
+  <h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 4px;">Lịch sử crawl</h2>
+  <p class="muted" style="margin: 0 0 12px;">Các lượt crawl JD từ TopCV/VietnamWorks/CareerViet — bảng crawl_runs.</p>
+
+  <form class="filter-bar" method="get">
+    <input type="hidden" name="tab" value="history">
+    <select name="source">
+      <option value="">Mọi nguồn</option>
+      {% for src, label in source_labels.items() %}
+        <option value="{{ src }}" {{ 'selected' if crawl_filters.source == src }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="status">
+      <option value="">Mọi trạng thái</option>
+      {% for st, label in crawl_status_labels.items() %}
+        <option value="{{ st }}" {{ 'selected' if crawl_filters.status == st }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="triggered_by">
+      <option value="">Mọi admin</option>
+      {% for u in admin_members %}
+        <option value="{{ u.ss_user_id }}" {{ 'selected' if crawl_filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" class="btn btn-ghost">Lọc</button>
+    {% if crawl_filters.source or crawl_filters.status or crawl_filters.triggered_by %}
+      <a class="btn btn-text" href="{{ url_for('crawl.index', tab='history', **pagination_filters_maint) }}">Xóa lọc</a>
+    {% endif %}
+  </form>
+
+  <p class="result-count">{{ crawl_total_runs }} lượt phù hợp</p>
+
+  {% if crawl_runs %}
+  <div class="activity-table-wrap">
+    <table class="activity-table">
+      <thead>
+        <tr>
+          <th style="width: 130px;">Thời gian</th>
+          <th style="width: 130px;">Nguồn / Ngành</th>
+          <th style="width: 150px;">Người bấm</th>
+          <th style="width: 110px;">Trạng thái</th>
+          <th>Kết quả</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in crawl_runs %}
+        <tr>
+          <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
+          <td>
+            {{ source_labels.get(run.source, run.source) }}<br>
+            <span class="muted" style="font-size: 12px;">{{ category_labels.get(run.source ~ ':' ~ run.category, run.category) }}</span>
+          </td>
+          <td>{{ run.triggered_by_name }}</td>
+          <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
+          <td>
+            {% if run.status == 'done' and run.stat_items %}
+              <div class="crawl-result-main">{{ run.stat_items[0][1] }} job mới</div>
+              <details class="crawl-result-details">
+                <summary>Xem đủ 8 chỉ số</summary>
+                <dl>
+                  {% for label, value in run.stat_items %}
+                    <dt>{{ label }}</dt><dd>{{ value }}</dd>
+                  {% endfor %}
+                </dl>
+              </details>
+            {% elif run.status == 'error' %}
+              <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if crawl_total_pages > 1 %}
+  <nav class="pagination" aria-label="Phân trang lịch sử crawl">
+    {% if crawl_page > 1 %}
+      <a class="page-link" href="{{ url_for('crawl.index', tab='history', page=crawl_page-1, **pagination_filters_crawl) }}">‹ Trang trước</a>
+    {% endif %}
+    <span class="page-info">Trang {{ crawl_page }} / {{ crawl_total_pages }}</span>
+    {% if crawl_page < crawl_total_pages %}
+      <a class="page-link" href="{{ url_for('crawl.index', tab='history', page=crawl_page+1, **pagination_filters_crawl) }}">Trang sau ›</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <p>Chưa có lượt crawl nào khớp bộ lọc.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="history-tab-section" style="margin-top: 32px;">
+  <h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 4px;">Lịch sử bảo trì</h2>
+  <p class="muted" style="margin: 0 0 12px;">Các lượt chạy job bảo trì dữ liệu (vá hồ sơ, tra cứu web, dọn job hết hạn...) — bảng maintenance_runs.</p>
+
+  <form class="filter-bar" method="get">
+    <input type="hidden" name="tab" value="history">
+    <select name="m_job_type">
+      <option value="">Mọi job</option>
+      {% for job in maintenance_jobs %}
+        <option value="{{ job.job_type }}" {{ 'selected' if maint_filters.job_type == job.job_type }}>{{ job.label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="m_status">
+      <option value="">Mọi trạng thái</option>
+      {% for st, label in maint_status_labels.items() %}
+        <option value="{{ st }}" {{ 'selected' if maint_filters.status == st }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="m_triggered_by">
+      <option value="">Mọi admin</option>
+      {% for u in admin_members %}
+        <option value="{{ u.ss_user_id }}" {{ 'selected' if maint_filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" class="btn btn-ghost">Lọc</button>
+    {% if maint_filters.job_type or maint_filters.status or maint_filters.triggered_by %}
+      <a class="btn btn-text" href="{{ url_for('crawl.index', tab='history', **pagination_filters_crawl) }}">Xóa lọc</a>
+    {% endif %}
+  </form>
+
+  <p class="result-count">{{ maint_total_runs }} lượt phù hợp</p>
+
+  {% if maint_runs %}
+  <div class="activity-table-wrap">
+    <table class="activity-table">
+      <thead>
+        <tr>
+          <th style="width: 130px;">Thời gian</th>
+          <th style="width: 170px;">Job</th>
+          <th style="width: 150px;">Người bấm</th>
+          <th style="width: 110px;">Trạng thái</th>
+          <th>Kết quả</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in maint_runs %}
+        <tr>
+          <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
+          <td>
+            {{ run.job_label }}<br>
+            <span class="muted" style="font-size: 12px;">
+              {% if run.limit %}limit={{ run.limit }}{% else %}không giới hạn{% endif %}
+              {% if run.dry_run %} · dry-run{% endif %}
+              {% if run.check_deadline_only %} · chỉ check deadline{% endif %}
+            </span>
+          </td>
+          <td>{{ run.triggered_by_name }}</td>
+          <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
+          <td>
+            {% if run.status == 'done' and run.stat_items %}
+              <div class="crawl-result-main">{{ run.stat_items[0][1] }} {{ run.stat_items[0][0]|lower }}</div>
+              <details class="crawl-result-details">
+                <summary>Xem đủ chỉ số</summary>
+                <dl>
+                  {% for label, value in run.stat_items %}
+                    <dt>{{ label }}</dt><dd>{{ value }}</dd>
+                  {% endfor %}
+                </dl>
+              </details>
+            {% elif run.status == 'error' %}
+              <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if maint_total_pages > 1 %}
+  <nav class="pagination" aria-label="Phân trang lịch sử bảo trì">
+    {% if maint_page > 1 %}
+      <a class="page-link" href="{{ url_for('crawl.index', tab='history', m_page=maint_page-1, **pagination_filters_maint) }}">‹ Trang trước</a>
+    {% endif %}
+    <span class="page-info">Trang {{ maint_page }} / {{ maint_total_pages }}</span>
+    {% if maint_page < maint_total_pages %}
+      <a class="page-link" href="{{ url_for('crawl.index', tab='history', m_page=maint_page+1, **pagination_filters_maint) }}">Trang sau ›</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <p>Chưa có lượt chạy nào khớp bộ lọc.</p>
+  </div>
+  {% endif %}
+</div>

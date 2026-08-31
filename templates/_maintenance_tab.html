@@ -122,118 +122,19 @@
 </div>
 
 {# ================= Khu C — Lịch sử ================= #}
-<h2 style="font-family: var(--font-display); font-size: 18px; margin: 0 0 12px;">Lịch sử bảo trì</h2>
-
-<form class="filter-bar" method="get">
-  <input type="hidden" name="tab" value="maintenance">
-  <select name="m_job_type">
-    <option value="">Mọi job</option>
-    {% for job in maintenance_jobs %}
-      <option value="{{ job.job_type }}" {{ 'selected' if filters.job_type == job.job_type }}>{{ job.label }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="m_status">
-    <option value="">Mọi trạng thái</option>
-    {% for st, label in status_labels.items() %}
-      <option value="{{ st }}" {{ 'selected' if filters.status == st }}>{{ label }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="m_triggered_by">
-    <option value="">Mọi admin</option>
-    {% for u in admin_members %}
-      <option value="{{ u.ss_user_id }}" {{ 'selected' if filters.triggered_by == u.ss_user_id }}>{{ u.full_name }}</option>
-    {% endfor %}
-  </select>
-
-  <button type="submit" class="btn btn-ghost">Lọc</button>
-  {% if filters.job_type or filters.status or filters.triggered_by %}
-    <a class="btn btn-text" href="{{ url_for('crawl.index', tab='maintenance') }}">Xóa lọc</a>
-  {% endif %}
-</form>
-
-<p class="result-count" id="maint-history-count">{{ total_runs }} lượt phù hợp</p>
-
-{% if runs %}
-<div class="activity-table-wrap">
-  <table class="activity-table">
-    <thead>
-      <tr>
-        <th style="width: 130px;">Thời gian</th>
-        <th style="width: 170px;">Job</th>
-        <th style="width: 150px;">Người bấm</th>
-        <th style="width: 110px;">Trạng thái</th>
-        <th>Kết quả</th>
-      </tr>
-    </thead>
-    <tbody id="maint-history-tbody">
-      {% for run in runs %}
-      <tr data-run-id="{{ run.run_id }}">
-        <td class="muted">{{ run.started_at|format_date('%d/%m/%Y %H:%M') if run.started_at else '—' }}</td>
-        <td>
-          {{ run.job_label }}<br>
-          <span class="muted" style="font-size: 12px;">
-            {% if run.limit %}limit={{ run.limit }}{% else %}không giới hạn{% endif %}
-            {% if run.dry_run %} · dry-run{% endif %}
-            {% if run.check_deadline_only %} · chỉ check deadline{% endif %}
-          </span>
-        </td>
-        <td>{{ run.triggered_by_name }}</td>
-        <td><span class="badge {{ run.status_badge }}">{{ run.status_label }}</span></td>
-        <td>
-          {% if run.status == 'done' and run.stat_items %}
-            <div class="crawl-result-main">{{ run.stat_items[0][1] }} {{ run.stat_items[0][0]|lower }}</div>
-            <details class="crawl-result-details">
-              <summary>Xem đủ chỉ số</summary>
-              <dl>
-                {% for label, value in run.stat_items %}
-                  <dt>{{ label }}</dt><dd>{{ value }}</dd>
-                {% endfor %}
-              </dl>
-            </details>
-          {% elif run.status == 'error' %}
-            <div class="crawl-error-text">{{ run.error or 'Không rõ lỗi.' }}</div>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-{% if total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang">
-  {% if page > 1 %}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='maintenance', page=page-1, **pagination_filters) }}">‹ Trang trước</a>
-  {% endif %}
-  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
-  {% if page < total_pages %}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='maintenance', page=page+1, **pagination_filters) }}">Trang sau ›</a>
-  {% endif %}
-</nav>
-{% endif %}
-
-{% else %}
-<div class="empty-state" id="maint-history-empty">
-  <p>Chưa có lượt chạy nào khớp bộ lọc.</p>
-</div>
-{% endif %}
+{# 08/2026 (xem lịch sử trao đổi "tách 2 bảng lịch sử ra tab riêng") —
+   bảng "Lịch sử bảo trì" (filter + phân trang) đã DỜI sang tab riêng
+   "Lịch sử" (_history_tab.html, ?tab=history), không còn render ở đây
+   nữa. Các hàm JS bên dưới (buildHistoryRow/prependHistoryRow...) VẪN
+   GIỮ NGUYÊN — vô hại khi không tìm thấy #maint-history-tbody (đã tự
+   `if (!tbody) return;`), không xoá để tránh phải sửa lại toàn bộ luồng
+   callback pollMaintenanceRun() bên dưới. Muốn xem lịch sử, admin qua
+   tab "Lịch sử". #}
 
 {# ================= JS ================= #}
 <script>
 (function () {
   "use strict";
-
-  // Chặn polling nhân đôi khi trang "Vận hành dữ liệu" gộp 3 tab vào 1
-  // lần render — mirror isCrawlTabActive() bên _crawl_tab.html, chỉ đổi
-  // tab cần kiểm tra thành "maintenance". Xem docstring bên đó.
-  function isMaintenanceTabActive() {
-    var panel = document.querySelector('.dashboard-tab[data-tab="maintenance"]');
-    return !panel || panel.classList.contains("active");
-  }
 
   var JOB_LABEL_MAP = {{ job_labels|tojson }};
   var STAT_LABELS_BY_JOB = {{ stat_labels_by_job|tojson }};  // {job_type: [[key, label], ...]}
@@ -386,7 +287,7 @@
     var inFlight = false;  // chặn race 2 response chồng nhau, cùng lý do pollRun() bên _crawl_tab.html.
 
     var timer = setInterval(function () {
-      if (stopped || inFlight || !isMaintenanceTabActive()) return;
+      if (stopped || inFlight) return;
       inFlight = true;
       fetch("/crawl/maintenance/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
@@ -481,7 +382,6 @@
   pollAllLatestLogRuns();
   // Poll log của run hiện tại (nếu có) cho từng khung — 2s/lần.
   setInterval(function () {
-    if (!isMaintenanceTabActive()) return;
     document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
       var runId = logCard.getAttribute("data-run-id");
       if (runId) fetchLogsFor(logCard, runId);
@@ -489,10 +389,7 @@
   }, 2000);
   // Poll phát hiện run MỚI cho CẢ 5 job_type — 6s/lần, cùng chu kỳ
   // loadAndPollLatestLog() bên _crawl_tab.html.
-  setInterval(function () {
-    if (!isMaintenanceTabActive()) return;
-    pollAllLatestLogRuns();
-  }, 6000);
+  setInterval(pollAllLatestLogRuns, 6000);
 
   // Widget nổi "Đang chạy" — mirror _crawl_tab.html (xem docstring bên đó).
   var liveWidget = document.getElementById("maint-live-widget");

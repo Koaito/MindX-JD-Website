@@ -1,25 +1,17 @@
 {#
   Shell 3 tab cho mục sidebar "Vận hành dữ liệu" (08/2026, đổi tên từ
-  "Crawl dữ liệu"). ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án 1
-  — client-side tab như dashboard"): trước đây mỗi tab là 1 request
-  riêng (<a href="?tab=...">, early-return ở crawl.py::index()) —
-  chuyển tab = full page reload. Giờ CẢ 3 TAB được render sẵn trong 1
-  lần load (blueprints/crawl.py::index() build đủ 3 context, KHÔNG còn
-  early-return), chuyển tab là JS thuần ẩn/hiện .dashboard-tab — không
-  round-trip, mirror ĐÚNG pattern templates/dashboard.html
-  (#dashboardTabBar).
+  "Crawl dữ liệu" — xem lịch sử trao đổi). Chỉ chọn tab + include đúng
+  partial, KHÔNG tự chứa logic UI nào — mirror pattern
+  templates/data_management.html (tab-nav + include theo query param).
 
-  3 context (crawl_ctx/status_ctx/maintenance_ctx) TRÙNG khá nhiều tên
-  biến (active_runs, runs, total_runs, page...) — dùng {% with %} SCOPE
-  RIÊNG ngay trước mỗi include để "ánh xạ" đúng tên biến mà từng partial
-  đang mong đợi, KHÔNG sửa 1 dòng nào bên trong _crawl_tab.html/
-  _status_tab.html/_maintenance_tab.html (giữ nguyên JS polling/Jinja
-  đang chạy ổn định của từng tab — {% with %} tự đóng scope ở
-  {% endwith %}, không rò biến ra ngoài cho include kế tiếp).
-
-  tab='crawl' (mặc định) -> _crawl_tab.html.
-  tab='status' -> _status_tab.html (Tình trạng dữ liệu).
+  tab='crawl' (mặc định) -> _crawl_tab.html (nội dung y hệt trang cũ).
+  tab='status' -> _status_tab.html (Tình trạng dữ liệu — company đang
+  thiếu field gì/tỉ lệ bao nhiêu, thêm 08/2026).
   tab='maintenance' -> _maintenance_tab.html (5 job bảo trì dữ liệu).
+  tab='history' -> _history_tab.html (08/2026, xem lịch sử trao đổi
+  "tách 2 bảng lịch sử ra tab riêng" — 2 bảng "Lịch sử crawl"/"Lịch sử
+  bảo trì" dời từ cuối 2 tab kia về đây, tách biệt rõ ràng, mỗi bảng tự
+  phân trang 6 dòng/trang).
 #}
 {% extends "base.html" %}
 {% block title %}Vận hành dữ liệu — MindX Career Hub{% endblock %}
@@ -31,94 +23,34 @@
     <span class="eyebrow">Career Hub / Quản trị</span>
     <h1>Vận hành dữ liệu</h1>
     <p class="lede">
-      Kích hoạt crawl JD từ TopCV/VietnamWorks/CareerViet, xem tình trạng dữ liệu, chạy các job bảo trì — theo dõi tiến độ và tra lại lịch sử các lượt đã chạy.
+      {% if tab == 'status' %}
+        Xem nhanh company đang thiếu dữ liệu gì (mã số thuế, website, ngành...) và tỉ lệ bao nhiêu, không cần vào thẳng database.
+      {% elif tab == 'maintenance' %}
+        Kích hoạt các job bảo trì dữ liệu (vá hồ sơ công ty, tra cứu web, dọn job hết hạn) và theo dõi tiến độ. Xem lại lịch sử các lượt đã chạy ở tab "Lịch sử".
+      {% elif tab == 'history' %}
+        Tra lại lịch sử các lượt crawl và bảo trì dữ liệu đã chạy — 2 bảng riêng biệt, lọc và phân trang độc lập nhau.
+      {% else %}
+        Kích hoạt crawl JD từ TopCV/VietnamWorks/CareerViet và theo dõi tiến độ. Xem lại lịch sử các lượt đã chạy ở tab "Lịch sử".
+      {% endif %}
     </p>
   </div>
 </header>
 
-<div class="tab-bar" id="opsTabBar" role="tablist">
-  <button type="button" data-tab="crawl" role="tab">Crawl dữ liệu</button>
-  <button type="button" data-tab="status" role="tab">Tình trạng dữ liệu</button>
-  <button type="button" data-tab="maintenance" role="tab">Bảo trì dữ liệu</button>
-</div>
+<nav class="tab-nav">
+  <a href="{{ url_for('crawl.index', tab='crawl') }}" class="{{ 'active' if tab == 'crawl' else '' }}">Crawl dữ liệu</a>
+  <a href="{{ url_for('crawl.index', tab='status') }}" class="{{ 'active' if tab == 'status' else '' }}">Tình trạng dữ liệu</a>
+  <a href="{{ url_for('crawl.index', tab='maintenance') }}" class="{{ 'active' if tab == 'maintenance' else '' }}">Bảo trì dữ liệu</a>
+  <a href="{{ url_for('crawl.index', tab='history') }}" class="{{ 'active' if tab == 'history' else '' }}">Lịch sử</a>
+</nav>
 
-<div class="dashboard-tab" id="tab-crawl" data-tab="crawl">
-  {% with sources=crawl_ctx.sources, source_labels=crawl_ctx.source_labels,
-          active_runs=crawl_ctx.active_runs, active_batches=crawl_ctx.active_batches,
-          category_labels=crawl_ctx.category_labels,
-          runs=crawl_ctx.runs, total_runs=crawl_ctx.total_runs, page=crawl_ctx.page,
-          total_pages=crawl_ctx.total_pages, per_page=crawl_ctx.per_page,
-          status_labels=crawl_ctx.status_labels, stat_labels=crawl_ctx.stat_labels,
-          admin_members=crawl_ctx.admin_members,
-          filters=crawl_ctx.filters, pagination_filters=crawl_ctx.pagination_filters %}
-    {% include "_crawl_tab.html" %}
-  {% endwith %}
-</div>
-
-<div class="dashboard-tab" id="tab-status" data-tab="status">
-  {% with company_health_rows=status_ctx.company_health_rows, company_health_total=status_ctx.company_health_total,
-          job_health_rows=status_ctx.job_health_rows, job_health_total=status_ctx.job_health_total,
-          expired_open_jobs=status_ctx.expired_open_jobs, job_health_by_source=status_ctx.job_health_by_source,
-          duplicate_job_groups=status_ctx.duplicate_job_groups,
-          company_no_contact_missing=status_ctx.company_no_contact_missing,
-          company_no_contact_total=status_ctx.company_no_contact_total %}
-    {% include "_status_tab.html" %}
-  {% endwith %}
-</div>
-
-<div class="dashboard-tab" id="tab-maintenance" data-tab="maintenance">
-  {% with maintenance_jobs=maintenance_ctx.maintenance_jobs, job_labels=maintenance_ctx.job_labels,
-          stat_labels_by_job=maintenance_ctx.stat_labels_by_job,
-          require_limit_job_types=maintenance_ctx.require_limit_job_types,
-          check_expired_job_type=maintenance_ctx.check_expired_job_type,
-          active_runs=maintenance_ctx.active_runs, latest_log_runs=maintenance_ctx.latest_log_runs,
-          runs=maintenance_ctx.runs, total_runs=maintenance_ctx.total_runs, page=maintenance_ctx.page,
-          total_pages=maintenance_ctx.total_pages, per_page=maintenance_ctx.per_page,
-          status_labels=maintenance_ctx.status_labels, admin_members=maintenance_ctx.admin_members,
-          filters=maintenance_ctx.filters, pagination_filters=maintenance_ctx.pagination_filters %}
-    {% include "_maintenance_tab.html" %}
-  {% endwith %}
-</div>
-
-<script>
-(function () {
-  "use strict";
-  // Tab nội bộ trang "Vận hành dữ liệu" (08/2026) — mirror ĐÚNG cách
-  // dashboard.html đang làm (#dashboardTabBar): ẩn/hiện .dashboard-tab
-  // bằng class "active", lưu lựa chọn vào ?tab= (history.replaceState,
-  // không reload) để chia sẻ link trực tiếp tới đúng tab được. Các nút
-  // "Bắt đầu crawl"/"Chạy job" bên trong mỗi tab VẪN submit form POST
-  // bình thường (reload cả trang) — chỉ việc XEM tab là tức thì, không
-  // đổi hành vi các thao tác ghi dữ liệu.
-  var VALID_TABS = ["crawl", "status", "maintenance"];
-  var tabBar = document.getElementById("opsTabBar");
-  if (!tabBar) return;
-
-  function activate(tab) {
-    if (VALID_TABS.indexOf(tab) === -1) tab = "crawl";
-    var buttons = tabBar.querySelectorAll("button[data-tab]");
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].classList.toggle("active", buttons[i].getAttribute("data-tab") === tab);
-    }
-    var panels = document.querySelectorAll(".dashboard-tab[data-tab]");
-    for (var j = 0; j < panels.length; j++) {
-      panels[j].classList.toggle("active", panels[j].getAttribute("data-tab") === tab);
-    }
-  }
-
-  tabBar.addEventListener("click", function (e) {
-    var btn = e.target.closest("button[data-tab]");
-    if (!btn) return;
-    var tab = btn.getAttribute("data-tab");
-    activate(tab);
-    var url = new URL(window.location.href);
-    url.searchParams.set("tab", tab);
-    history.replaceState(null, "", url);
-  });
-
-  var params = new URLSearchParams(window.location.search);
-  activate(params.get("tab") || "{{ tab }}" || "crawl");
-})();
-</script>
+{% if tab == 'status' %}
+  {% include "_status_tab.html" %}
+{% elif tab == 'maintenance' %}
+  {% include "_maintenance_tab.html" %}
+{% elif tab == 'history' %}
+  {% include "_history_tab.html" %}
+{% else %}
+  {% include "_crawl_tab.html" %}
+{% endif %}
 
 {% endblock %}
