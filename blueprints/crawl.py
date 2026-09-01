@@ -142,55 +142,56 @@ def _source_active_state(source, access_token):
 @crawl_bp.route("/crawl")
 @admin_required
 def index():
-    """Trang chính — 4 mục (?tab=crawl mặc định | ?tab=status |
-    ?tab=maintenance | ?tab=history).
+    """Trang chính "Vận hành dữ liệu" — 4 tab (crawl/status/maintenance/
+    history), RENDER CẢ 4 CÙNG LÚC trong 1 response (SỬA LẠI 08/2026 —
+    xem lịch sử trao đổi "sơ suất — revert mất bản gộp client-side lúc
+    thêm tab history, gộp lại theo đúng pattern cũ"). Bản gộp NÀY từng
+    làm 1 lần cho 3 tab (crawl/status/maintenance) nhưng bị mất khi
+    commit thêm tab 'history' vô tình bắt đầu từ 1 bản trước khi gộp —
+    lần này áp dụng lại CHO CẢ 4 TAB để không lặp lại tình trạng cũ.
 
-    Tab 'crawl': Khu A (kích hoạt), Khu B (đang chạy, tối đa 2 —
-    1/nguồn). TỪ 08/2026: Khu C (lịch sử) đã CHUYỂN sang tab 'history'
-    riêng (mục sidebar thứ 4 "Lịch sử vận hành") — xem lịch sử trao đổi
-    "tách 2 bảng log crawl/bảo trì sang mục thứ 4 riêng, không gộp".
+    Chuyển tab sau khi trang đã tải là JS thuần (ẩn/hiện .dashboard-tab,
+    xem script cuối crawl.html) — KHÔNG round-trip. ?tab= trong URL giờ
+    chỉ còn ý nghĩa "tab nào active lúc mở link này" (JS đọc lúc init),
+    KHÔNG còn quyết định server render nhánh nào.
 
-    Tab 'status': bảng company đang thiếu field gì/tỉ lệ bao nhiêu, xem
-    docstring _status_tab_context() (blueprints/crawl_status.py).
+    4 context (crawl_ctx/status_ctx/maintenance_ctx/history_ctx) CỐ Ý
+    để trong 4 dict RIÊNG thay vì merge phẳng — trùng khá nhiều tên
+    biến giữa các tab: active_runs (crawl/maintenance/history đều
+    dùng), status_labels (CẢ 3 tab dùng nhưng là 3 map NHÃN KHÁC NHAU —
+    CRAWL_STATUS_LABELS ở tab crawl/history, MAINTENANCE_STATUS_LABELS
+    ở tab maintenance — merge phẳng sẽ khiến 1 tab hiện SAI nhãn trạng
+    thái, không chỉ đơn thuần đè giá trị), category_labels/source_labels
+    (crawl + history), job_labels (maintenance + history). crawl.html tự
+    {% with %} scoped-rename ngay trước mỗi {% include %} — KHÔNG sửa
+    gì bên trong 4 file partial.
 
-    Tab 'maintenance': build context riêng ở
-    _maintenance_tab_context() (blueprints/crawl_maintenance.py) rồi
-    merge vào đây — tách hàm để file này không phình to, KHÔNG tính lại
-    context tab đang KHÔNG hiển thị (đỡ gọi API thừa lúc chỉ xem 1 tab).
-    TỪ 08/2026: chỉ còn Khu A/B, Khu C cũng đã chuyển sang tab 'history'.
-
-    Tab 'history' (thêm 08/2026): build context riêng ở
-    _history_tab_context() (blueprints/crawl_history.py, file riêng —
-    xem docstring đầu file đó) — 2 bảng lịch sử (crawl + bảo trì) xếp
-    DỌC trên CÙNG 1 trang, mỗi bảng phân trang RIÊNG 6 dòng/trang (2
-    query param khác tên: crawl_page/maint_page — xem
-    helpers.py::_paginate_args_named). CỐ Ý không gộp chung 1 bảng — 2
-    domain khác nhau (crawl nguồn ngoài / bảo trì dữ liệu nội bộ), gộp
-    sẽ khó filter/đọc hơn tách."""
+    CHƯA song song hoá 4 lệnh build context này VỚI NHAU (mỗi hàm tự
+    đọc Flask session bên trong, không chạy được trên worker thread) —
+    cùng lý do/quyết định như lần gộp 3 tab trước, xem lịch sử trao đổi.
+    Tab 'history' vốn đã là tab NẶNG NHẤT (list_crawl_runs + list_users +
+    list_maintenance_runs + poll N nguồn + poll bảo trì, tất cả trong 1
+    "wave" — xem docstring _history_tab_context()) nên phần tăng thêm ở
+    lần load đầu tập trung chủ yếu ở đây, các tab còn lại rẻ như đã đánh
+    giá trước."""
     tab = request.args.get("tab", "crawl")
     if tab not in ("crawl", "status", "maintenance", "history"):
         tab = "crawl"
 
-    if tab == "status":
-        return render_template("crawl.html", tab=tab, **_status_tab_context())
+    status_ctx = _status_tab_context()
 
-    if tab == "maintenance":
-        # Import trễ (KHÔNG để đầu file) để tránh import vòng: file đó
-        # `from blueprints.crawl import crawl_bp`, import ở đầu file
-        # này sẽ chạy TRƯỚC KHI crawl_bp được định nghĩa (dòng 21) ->
-        # ImportError. Import trễ bên trong hàm chỉ chạy lúc request
-        # thật tới, lúc đó module đã load xong hoàn toàn.
-        from blueprints.crawl_maintenance import _maintenance_tab_context
-        return render_template("crawl.html", tab=tab, **_maintenance_tab_context())
+    # Import trễ (KHÔNG để đầu file) để tránh import vòng — xem docstring
+    # đầu file này. Trước đây chỉ import khi tab=='maintenance'/'history'
+    # (early-return) — giờ LUÔN cần vì cả 4 tab được build cùng lúc,
+    # nhưng vẫn giữ import Ở ĐÂY (không dời lên đầu file) vì lý do vòng
+    # lặp import không đổi.
+    from blueprints.crawl_maintenance import _maintenance_tab_context
+    maintenance_ctx = _maintenance_tab_context()
 
-    if tab == "history":
-        # Import trễ (blueprints.crawl_history import ngược
-        # _source_active_state/_SOURCE_LABELS từ file này) — cùng lý do
-        # tab 'maintenance' ở trên. Xem docstring đầu
-        # blueprints/crawl_history.py.
-        from blueprints.crawl_history import _history_tab_context
-        return render_template("crawl.html", tab=tab, **_history_tab_context())
+    from blueprints.crawl_history import _history_tab_context
+    history_ctx = _history_tab_context()
 
+    # ---- Tab "crawl" (mặc định) — Khu A/B, logic y hệt trước đây ----
     # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
     # cho CẢ 2 nhóm việc độc lập bên dưới (per-source poll / list_users)
     # — cùng lý do _source_active_state() không tự gọi
@@ -259,11 +260,9 @@ def index():
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
-    return render_template(
-        "crawl.html",
-        tab=tab,
-        sources=sources, source_labels=_SOURCE_LABELS,
-        active_runs=active_runs, active_batches=active_batches, category_labels=category_labels,
+    crawl_ctx = {
+        "sources": sources, "source_labels": _SOURCE_LABELS,
+        "active_runs": active_runs, "active_batches": active_batches, "category_labels": category_labels,
         # status_labels/stat_labels: KHÔNG còn dùng để render Khu C ở
         # đây (đã chuyển sang tab "history") nhưng JS Khu B
         # (buildHistoryRow(), xem _crawl_tab.html) vẫn cần 2 biến này để
@@ -272,8 +271,15 @@ def index():
         # dòng đó cuối cùng không chèn được vào đâu (không còn
         # #crawl-history-tbody trong DOM tab này) vì buildHistoryRow()
         # bị gọi TRƯỚC bước kiểm tra !tbody.
-        status_labels=db_data.CRAWL_STATUS_LABELS, stat_labels=db_data.CRAWL_STAT_LABELS,
-        filters={"source": f_source},
+        "status_labels": db_data.CRAWL_STATUS_LABELS, "stat_labels": db_data.CRAWL_STAT_LABELS,
+        "filters": {"source": f_source},
+    }
+
+    return render_template(
+        "crawl.html",
+        tab=tab,
+        crawl_ctx=crawl_ctx, status_ctx=status_ctx,
+        maintenance_ctx=maintenance_ctx, history_ctx=history_ctx,
     )
 
 

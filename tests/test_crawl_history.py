@@ -111,10 +111,19 @@ class TestHistoryTabRenders:
         assert "Lịch sử vận hành".encode() in resp.data
 
     def test_lede_text_differs_for_history_tab(self, admin_client):
-        """Điểm 4a: nhánh lede text riêng cho tab=history, không rơi
-        vào nhánh else (mô tả tab crawl)."""
+        """ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "gộp lại cả 4 tab client-
+        side sau sơ suất revert"): crawl.html giờ render CẢ 4 TAB cùng
+        lúc trong 1 response nên không còn 1 lede-text RIÊNG theo từng
+        tab (không thể hiện 4 mô tả khác nhau cùng lúc một cách hợp lý)
+        — page-head giờ dùng 1 mô tả CHUNG cho cả 4 tab. Test đổi sang
+        xác nhận đúng việc đó: cả 4 tab (kể cả history) cùng có mặt
+        trong 1 response, thay vì so khớp lede-text theo tab."""
         resp = admin_client.get("/crawl?tab=history")
-        assert "Tra lại lịch sử".encode() in resp.data
+        html = resp.get_data(as_text=True)
+        assert 'data-tab="crawl"' in html
+        assert 'data-tab="status"' in html
+        assert 'data-tab="maintenance"' in html
+        assert 'data-tab="history"' in html
 
 
 class TestHistoryTabPagination:
