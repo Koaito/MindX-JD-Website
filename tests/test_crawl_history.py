@@ -1,5 +1,5 @@
 """Test tab 'history' (mục sidebar thứ 4 "Lịch sử vận hành", thêm
-08/2026) — blueprints/crawl.py::index()/_history_tab_context().
+08/2026) — blueprints/crawl.py::index() + blueprints/crawl_history.py.
 
 Trọng tâm test: cơ chế REFRESH-ONCE khi 1 request cần gọi backend
 NHIỀU lần (bảng lịch sử crawl, list_users, bảng lịch sử bảo trì, poll
@@ -8,7 +8,14 @@ NHIỀU lần (bảng lịch sử crawl, list_users, bảng lịch sử bảo tr
 lệnh tự refresh riêng (dùng refresh_token cũ đọc từ session lúc đầu),
 lệnh thứ 2 trở đi sẽ dùng refresh_token ĐÃ BỊ XOAY (vô hiệu) → backend
 coi là reuse → thu hồi session → bị kick, xem docstring
-_history_tab_context() (blueprints/crawl.py) để biết đầy đủ."""
+_history_tab_context() (blueprints/crawl_history.py) để biết đầy đủ.
+
+PATCH PATH: mock thẳng vào blueprints.crawl_history.db_data/
+backend_auth (nơi _history_tab_context() thật sự đang chạy, từ
+08/2026 tách file — xem docstring đầu blueprints/crawl_history.py).
+Riêng _source_active_state vẫn patch tại blueprints.crawl — đó là nơi
+hàm ĐƯỢC ĐỊNH NGHĨA thật, crawl_history.py chỉ import trễ (bên trong
+hàm) một tham chiếu tới nó, không có bản sao riêng."""
 
 import pytest
 
@@ -49,12 +56,12 @@ def _empty_crawl_runs(*args, **kwargs):
 def _default_mocks(mocker):
     """Mock tối thiểu để mọi test trong file này render được trang mà
     không thật sự gọi mạng — mỗi test override lại field cần thiết."""
-    mocker.patch("blueprints.crawl.db_data.get_sources", return_value={
+    mocker.patch("blueprints.crawl_history.db_data.get_sources", return_value={
         "topcv": {"it": "CNTT"}, "vietnamworks": {"it": "CNTT"}, "careerviet": {"it": "CNTT"},
     })
-    mocker.patch("blueprints.crawl.db_data.list_crawl_runs", side_effect=_empty_crawl_runs)
-    mocker.patch("blueprints.crawl.backend_auth.list_users", return_value=[])
-    mocker.patch("blueprints.crawl.db_data.list_maintenance_runs", side_effect=_empty_maintenance_runs)
+    mocker.patch("blueprints.crawl_history.db_data.list_crawl_runs", side_effect=_empty_crawl_runs)
+    mocker.patch("blueprints.crawl_history.backend_auth.list_users", return_value=[])
+    mocker.patch("blueprints.crawl_history.db_data.list_maintenance_runs", side_effect=_empty_maintenance_runs)
     mocker.patch("blueprints.crawl._source_active_state", return_value=("topcv", None, None, None))
 
 
@@ -118,7 +125,7 @@ class TestHistoryTabPagination:
             captured.update(kwargs)
             return {"items": [], "total": 20}
 
-        mocker.patch("blueprints.crawl.db_data.list_crawl_runs", side_effect=fake_list_crawl_runs)
+        mocker.patch("blueprints.crawl_history.db_data.list_crawl_runs", side_effect=fake_list_crawl_runs)
         resp = admin_client.get("/crawl?tab=history&crawl_page=2")
         assert resp.status_code == 200
         assert captured["offset"] == 6  # (page 2 - 1) * per_page 6
@@ -131,7 +138,7 @@ class TestHistoryTabPagination:
             calls.append(kwargs)
             return {"items": [], "total": 20}
 
-        mocker.patch("blueprints.crawl.db_data.list_maintenance_runs", side_effect=fake_list_maint_runs)
+        mocker.patch("blueprints.crawl_history.db_data.list_maintenance_runs", side_effect=fake_list_maint_runs)
         resp = admin_client.get("/crawl?tab=history&maint_page=3")
         assert resp.status_code == 200
         # db_data.list_maintenance_runs() bị gọi 2 LẦN trong 1 request:
@@ -150,11 +157,11 @@ class TestHistoryTabPagination:
         captured_crawl = {}
         maint_calls = []
         mocker.patch(
-            "blueprints.crawl.db_data.list_crawl_runs",
+            "blueprints.crawl_history.db_data.list_crawl_runs",
             side_effect=lambda token, **kw: (captured_crawl.update(kw), {"items": [], "total": 0})[1],
         )
         mocker.patch(
-            "blueprints.crawl.db_data.list_maintenance_runs",
+            "blueprints.crawl_history.db_data.list_maintenance_runs",
             side_effect=lambda token, **kw: (maint_calls.append(kw), {"items": [], "total": 0})[1],
         )
         admin_client.get("/crawl?tab=history")
@@ -171,7 +178,7 @@ class TestHistoryTabPagination:
         của bảng bảo trì (2 param độc lập, xem docstring
         _history_tab_context())."""
         mocker.patch(
-            "blueprints.crawl.db_data.list_crawl_runs",
+            "blueprints.crawl_history.db_data.list_crawl_runs",
             # total > per_page(6) VÀ có items thật — backend thật không
             # bao giờ trả total=20 kèm items=[] trừ khi trang vượt quá
             # tổng số; ở đây mô phỏng trang 1 có 6/20 kết quả để bảng
@@ -189,7 +196,7 @@ class TestHistoryTabPagination:
         # test_clear_filter_link_keeps_other_table_page) và assertion
         # bên dưới sẽ sai vì lý do khác với điều test này nhắm tới.
         mocker.patch(
-            "blueprints.crawl.db_data.list_maintenance_runs",
+            "blueprints.crawl_history.db_data.list_maintenance_runs",
             return_value={"items": [{"run_id": "m1", "job_type": "backfill_company_profiles",
                                       "job_label": "Vá hồ sơ công ty", "status": "done",
                                       "status_label": "Hoàn tất", "status_badge": "badge-success",
@@ -211,7 +218,7 @@ class TestHistoryTabRefreshOnce:
 
     def test_401_on_first_call_triggers_single_refresh_then_succeeds(self, admin_client, mocker):
         mocker.patch(
-            "blueprints.crawl.backend_auth.refresh",
+            "blueprints.crawl_history.backend_auth.refresh",
             return_value={"access_token": "new-tok", "refresh_token": "new-refresh"},
         )
         refresh_call_count = {"n": 0}
@@ -220,7 +227,7 @@ class TestHistoryTabRefreshOnce:
             refresh_call_count["n"] += 1
             return {"access_token": "new-tok", "refresh_token": "new-refresh"}
 
-        mocker.patch("blueprints.crawl.backend_auth.refresh", side_effect=fake_refresh)
+        mocker.patch("blueprints.crawl_history.backend_auth.refresh", side_effect=fake_refresh)
 
         call_count = {"n": 0}
 
@@ -230,7 +237,7 @@ class TestHistoryTabRefreshOnce:
                 raise CrawlerAPIError("hết hạn", status_code=401)
             return {"items": [], "total": 0}
 
-        mocker.patch("blueprints.crawl.db_data.list_crawl_runs", side_effect=flaky_list_crawl_runs)
+        mocker.patch("blueprints.crawl_history.db_data.list_crawl_runs", side_effect=flaky_list_crawl_runs)
 
         resp = admin_client.get("/crawl?tab=history")
         assert resp.status_code == 200
@@ -250,27 +257,27 @@ class TestHistoryTabRefreshOnce:
             refresh_call_count["n"] += 1
             return {"access_token": "new-tok", "refresh_token": "new-refresh"}
 
-        mocker.patch("blueprints.crawl.backend_auth.refresh", side_effect=fake_refresh)
+        mocker.patch("blueprints.crawl_history.backend_auth.refresh", side_effect=fake_refresh)
 
         # list_crawl_runs (lệnh 1) LUÔN thành công. list_users (lệnh 2)
         # 401 ở lần gọi ĐẦU (token cũ), thành công ở lần gọi SAU (token mới).
-        mocker.patch("blueprints.crawl.db_data.list_crawl_runs", return_value={"items": [], "total": 0})
+        mocker.patch("blueprints.crawl_history.db_data.list_crawl_runs", return_value={"items": [], "total": 0})
 
         def flaky_list_users(token):
             if token == "fake-access-token":
                 raise BackendAuthError("hết hạn", status_code=401)
             return [{"ss_user_id": "admin-001", "full_name": "Admin", "role": "admin"}]
 
-        mocker.patch("blueprints.crawl.backend_auth.list_users", side_effect=flaky_list_users)
+        mocker.patch("blueprints.crawl_history.backend_auth.list_users", side_effect=flaky_list_users)
 
         resp = admin_client.get("/crawl?tab=history")
         assert resp.status_code == 200
         assert refresh_call_count["n"] == 1
 
     def test_refresh_failure_flashes_error_not_crash(self, admin_client, mocker):
-        mocker.patch("blueprints.crawl.db_data.list_crawl_runs",
+        mocker.patch("blueprints.crawl_history.db_data.list_crawl_runs",
                      side_effect=CrawlerAPIError("hết hạn", status_code=401))
-        mocker.patch("blueprints.crawl.backend_auth.refresh",
+        mocker.patch("blueprints.crawl_history.backend_auth.refresh",
                      side_effect=BackendAuthError("refresh token cũng hết hạn", status_code=401))
         resp = admin_client.get("/crawl?tab=history")
         # KHÔNG crash (500) — trang vẫn render, chỉ rỗng + flash lỗi.
@@ -321,7 +328,7 @@ class TestHistoryTabFilters:
     def test_crawl_filter_by_source(self, admin_client, mocker):
         captured = {}
         mocker.patch(
-            "blueprints.crawl.db_data.list_crawl_runs",
+            "blueprints.crawl_history.db_data.list_crawl_runs",
             side_effect=lambda token, **kw: (captured.update(kw), {"items": [], "total": 0})[1],
         )
         resp = admin_client.get("/crawl?tab=history&source=topcv")
@@ -331,7 +338,7 @@ class TestHistoryTabFilters:
     def test_maintenance_filter_by_job_type(self, admin_client, mocker):
         captured = {}
         mocker.patch(
-            "blueprints.crawl.db_data.list_maintenance_runs",
+            "blueprints.crawl_history.db_data.list_maintenance_runs",
             side_effect=lambda token, **kw: (captured.update(kw), {"items": [], "total": 0})[1],
         )
         resp = admin_client.get("/crawl?tab=history&m_job_type=backfill_company_profiles")
@@ -340,7 +347,7 @@ class TestHistoryTabFilters:
 
     def test_clear_filter_link_keeps_other_table_page(self, admin_client, mocker):
         mocker.patch(
-            "blueprints.crawl.db_data.list_crawl_runs",
+            "blueprints.crawl_history.db_data.list_crawl_runs",
             return_value={"items": [], "total": 0},
         )
         # total đủ lớn để maint_page=2 là trang HỢP LỆ thật (total=0 mà
@@ -348,7 +355,7 @@ class TestHistoryTabFilters:
         # 1, đúng hành vi mong muốn nhưng khiến test này không còn kiểm
         # tra đúng thứ nó nhắm tới; total=20 tránh nhầm 2 việc).
         mocker.patch(
-            "blueprints.crawl.db_data.list_maintenance_runs",
+            "blueprints.crawl_history.db_data.list_maintenance_runs",
             return_value={"items": [{"run_id": "m1", "job_type": "backfill_company_profiles",
                                       "job_label": "Vá hồ sơ công ty", "status": "done",
                                       "status_label": "Hoàn tất", "status_badge": "badge-success",

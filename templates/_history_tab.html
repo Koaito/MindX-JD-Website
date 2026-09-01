@@ -19,7 +19,7 @@
   tên trần) vì giờ cả 2 cùng render trên 1 template, và đổi target
   url_for('crawl.index', ...) sang thêm tab='history' + đúng tên query
   param phân trang riêng (crawl_page/maint_page — xem
-  blueprints/crawl.py::_history_tab_context() để biết lý do không dùng
+  blueprints/crawl_history.py::_history_tab_context() để biết lý do không dùng
   chung "page").
 
   per_page=6 cho CẢ 2 bảng (khác 30 lúc còn nằm chung tab crawl/

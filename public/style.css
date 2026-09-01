@@ -395,6 +395,9 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
   padding: 0 2px;
 }
 
+.nav-note a { color: inherit; text-decoration: underline; }
+.nav-note a:hover { color: var(--text, #fff); }
+
 .nav a {
   display: flex;
   align-items: center;
@@ -414,39 +417,6 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
 }
 
 .nav-ic { width: 18px; text-align: center; opacity: 0.85; }
-
-/* Đặt SAU `.nav a` (cùng độ ưu tiên CSS 0,0,1,1) để thắng cascade —
-   nav-note.a phải là link trong câu văn (inline), không phải khối
-   display:flex như link menu thật. Từng bị `.nav a` đè mất vì khai
-   báo trước đó (xem lỗi hiển thị "Trang cá nhân" bị vỡ layout, đợt
-   thêm ghi chú thay 2 link "Job đã lưu"/"Đã ứng tuyển" ở sidebar). */
-.nav-note a { display: inline; color: inherit; text-decoration: underline; }
-.nav-note a:hover { color: var(--text, #fff); }
-
-/* Badge số tin nhắn chưa đọc, cạnh "Tin nhắn" (base.html). Trước đây
-   không có style gì — hiện ra như số trần khó nhìn giữa dòng chữ.
-   Dùng --accent (cam) để nổi bật như 1 chỉ báo thông báo thật. */
-.nav-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin-left: auto;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #14150F;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.nav a.active .nav-badge {
-  background: #14150F;
-  color: var(--accent);
-}
 
 .sidebar-foot {
   margin-top: auto;
@@ -3901,6 +3871,31 @@ html.sidebar-collapsed .sidebar-foot .btn-block { text-align: center; padding-le
    ngoài ý muốn tới các trang đó. */
 .status-card-title {
   font-size: 28px;
+}
+
+/* Tab "Lịch sử vận hành" (_history_tab.html, 08/2026) — biến thể TĨNH
+   của .crawl-live-widget, đặt ở đầu tab thay vì nổi cố định góc màn
+   hình. KHÁC .crawl-live-widget gốc: position static (nằm trong luồng
+   trang bình thường), width 100% (không phải 360px cố định), không
+   max-height/overflow:hidden (hiện đủ toàn bộ, không cần cuộn riêng —
+   trang này vốn đã cho phép cuộn dài để xem lịch sử), không box-shadow/
+   z-index (không cần "nổi đè" lên nội dung vì đây LÀ 1 phần bố cục
+   bình thường, không phải overlay). Tái dùng NGUYÊN các class con
+   (.crawl-live-widget-head/-title/-count/-body, .crawl-running-list,
+   .crawl-running-card-wrap...) — chỉ ghi đè đúng phần layout khác biệt
+   ở class cha, không định nghĩa lại từ đầu. */
+.crawl-live-widget.crawl-live-widget-static {
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-shadow: none;
+  z-index: auto;
+  overflow: visible;
+}
+
+.crawl-live-widget-static .crawl-live-widget-head {
+  cursor: default;
 }
 
 /* ==== css/16-email-template-manager.css ==== */
