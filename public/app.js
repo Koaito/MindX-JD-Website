@@ -441,6 +441,17 @@
     initClientListPagination();
   }
 
+  // Export (09/2026, xem lịch sử trao đổi "load chậm mỗi lần chuyển
+  // phân trang log") — initClientListPagination() ở trên chỉ tự quét
+  // DOM 1 LẦN lúc DOMContentLoaded. templates/crawl.html giờ lazy-fetch
+  // nội dung tab "status" SAU thời điểm đó (chèn bằng innerHTML khi
+  // người dùng bấm sang tab lần đầu) — [data-paginate-size]/
+  // [data-paginate-for] bên trong nội dung fetch thêm sẽ KHÔNG được
+  // initClientListPagination() quét tới nếu chỉ chạy đúng 1 lần lúc
+  // đầu, cần gọi lại thủ công sau khi chèn xong (xem
+  // crawl.html::loadTabIfNeeded()).
+  window.initClientListPagination = initClientListPagination;
+
   // ---- Tự lật tooltip "Job mới nhất"/checklist tiêu chí lên trên khi
   // gần đáy màn hình (thêm 08/2026, báo lỗi ảnh chụp) -----------------
   //

@@ -380,9 +380,21 @@
       .catch(function () {});
   }
 
+  // isThisTabActive() — 09/2026, cùng lý do/cách làm với
+  // _crawl_tab.html::isThisTabActive() (xem docstring bên đó) —
+  // crawl.html giờ giữ nguyên tab này trong DOM sau khi lazy-fetch,
+  // không còn full-reload mỗi lần chuyển tab/phân trang nữa, nên 2
+  // setInterval bên dưới (LẶP QUA CẢ 5 job-card mỗi lần, tốn hơn hẳn 1
+  // job đơn của tab crawl) cần tự dừng bắn request lúc tab này ẩn.
+  function isThisTabActive() {
+    var panel = document.getElementById("tab-maintenance");
+    return !!panel && panel.classList.contains("active");
+  }
+
   pollAllLatestLogRuns();
   // Poll log của run hiện tại (nếu có) cho từng khung — 2s/lần.
   setInterval(function () {
+    if (!isThisTabActive()) return;
     document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
       var runId = logCard.getAttribute("data-run-id");
       if (runId) fetchLogsFor(logCard, runId);
@@ -390,7 +402,10 @@
   }, 2000);
   // Poll phát hiện run MỚI cho CẢ 5 job_type — 6s/lần, cùng chu kỳ
   // loadAndPollLatestLog() bên _crawl_tab.html.
-  setInterval(pollAllLatestLogRuns, 6000);
+  setInterval(function () {
+    if (!isThisTabActive()) return;
+    pollAllLatestLogRuns();
+  }, 6000);
 
   // Widget nổi "Đang chạy" — mirror _crawl_tab.html (xem docstring bên đó).
   var liveWidget = document.getElementById("maint-live-widget");

@@ -408,8 +408,28 @@
         if (linesEl) linesEl.textContent = "Không tải được log — thử tải lại trang.";
       });
 
+    // isThisTabActive() — 09/2026, xem lịch sử trao đổi "load chậm mỗi
+    // lần chuyển phân trang log": crawl.html giờ lazy-fetch tab này và
+    // GIỮ NGUYÊN trong DOM sau khi đã load 1 lần (không còn full-reload
+    // mỗi lần chuyển tab/phân trang như trước — xem docstring
+    // templates/crawl.html), nên 2 setInterval bên dưới có thể chạy nền
+    // VÔ THỜI HẠN suốt phiên xem trang nếu không tự kiểm tra: người
+    // dùng chỉ cần từng ghé qua tab "Crawl dữ liệu" 1 lần rồi chuyển
+    // hẳn sang tab khác, 2 vòng lặp này vẫn bắn request đều đặn dù
+    // #tab-crawl đã ẩn. Guard bằng class "active" (crawl.html tự toggle
+    // khi chuyển tab, xem activate()) — không dùng setInterval/
+    // clearInterval qua lại (phức tạp hơn không cần thiết), chỉ đơn
+    // giản NO-OP lúc tab ẩn, tự chạy lại bình thường lúc tab active trở
+    // lại (KHÔNG mất nhịp, logCard vẫn giữ nguyên data-run-id/
+    // data-log-after-id suốt lúc ẩn).
+    function isThisTabActive() {
+      var panel = document.getElementById("tab-crawl");
+      return !!panel && panel.classList.contains("active");
+    }
+
     // Poll log của run hiện tại — 2s/lần, đủ nhanh để cảm giác "live".
     setInterval(function () {
+      if (!isThisTabActive()) return;
       var runId = logCard.getAttribute("data-run-id");
       if (runId) fetchLogsFor(runId);
     }, 2000);
@@ -418,6 +438,7 @@
     // kịp lúc có người bấm "Bắt đầu crawl" ở nguồn khác trong lúc đang
     // xem log của run cũ).
     setInterval(function () {
+      if (!isThisTabActive()) return;
       fetch("/crawl/latest-log-run", {headers: {"X-Requested-With": "XMLHttpRequest"}})
         .then(function (res) { return res.json(); })
         .then(function (run) {

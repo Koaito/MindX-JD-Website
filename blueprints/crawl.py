@@ -139,59 +139,20 @@ def _source_active_state(source, access_token):
     return source, run, batch, None
 
 
-@crawl_bp.route("/crawl")
-@admin_required
-def index():
-    """Trang chính "Vận hành dữ liệu" — 4 tab (crawl/status/maintenance/
-    history), RENDER CẢ 4 CÙNG LÚC trong 1 response (SỬA LẠI 08/2026 —
-    xem lịch sử trao đổi "sơ suất — revert mất bản gộp client-side lúc
-    thêm tab history, gộp lại theo đúng pattern cũ"). Bản gộp NÀY từng
-    làm 1 lần cho 3 tab (crawl/status/maintenance) nhưng bị mất khi
-    commit thêm tab 'history' vô tình bắt đầu từ 1 bản trước khi gộp —
-    lần này áp dụng lại CHO CẢ 4 TAB để không lặp lại tình trạng cũ.
+def _crawl_tab_context() -> dict:
+    """Build TOÀN BỘ context cho tab='crawl' (Khu A kích hoạt + Khu B
+    đang chạy) — tách hàm riêng (09/2026, xem lịch sử trao đổi "load
+    chậm mỗi lần chuyển phân trang log — 76 request logs.json chạy nền
+    dù đang đứng ở tab khác") theo ĐÚNG pattern 3 hàm context kia
+    (_status_tab_context/_maintenance_tab_context/_history_tab_context)
+    để index() có thể build ĐÚNG 1 TAB cần thiết mỗi request thay vì
+    LUÔN build cả 4 (xem docstring index() để biết lý do đổi + đánh đổi
+    đã bàn với người dùng: tab đang mở lúc load trang vẫn nhanh như cũ,
+    3 tab còn lại chỉ tốn thêm đúng 1 round-trip nhẹ ở LẦN ĐẦU người
+    dùng bấm sang, không phải mỗi lần — xem script cuối crawl.html).
 
-    Chuyển tab sau khi trang đã tải là JS thuần (ẩn/hiện .dashboard-tab,
-    xem script cuối crawl.html) — KHÔNG round-trip. ?tab= trong URL giờ
-    chỉ còn ý nghĩa "tab nào active lúc mở link này" (JS đọc lúc init),
-    KHÔNG còn quyết định server render nhánh nào.
-
-    4 context (crawl_ctx/status_ctx/maintenance_ctx/history_ctx) CỐ Ý
-    để trong 4 dict RIÊNG thay vì merge phẳng — trùng khá nhiều tên
-    biến giữa các tab: active_runs (crawl/maintenance/history đều
-    dùng), status_labels (CẢ 3 tab dùng nhưng là 3 map NHÃN KHÁC NHAU —
-    CRAWL_STATUS_LABELS ở tab crawl/history, MAINTENANCE_STATUS_LABELS
-    ở tab maintenance — merge phẳng sẽ khiến 1 tab hiện SAI nhãn trạng
-    thái, không chỉ đơn thuần đè giá trị), category_labels/source_labels
-    (crawl + history), job_labels (maintenance + history). crawl.html tự
-    {% with %} scoped-rename ngay trước mỗi {% include %} — KHÔNG sửa
-    gì bên trong 4 file partial.
-
-    CHƯA song song hoá 4 lệnh build context này VỚI NHAU (mỗi hàm tự
-    đọc Flask session bên trong, không chạy được trên worker thread) —
-    cùng lý do/quyết định như lần gộp 3 tab trước, xem lịch sử trao đổi.
-    Tab 'history' vốn đã là tab NẶNG NHẤT (list_crawl_runs + list_users +
-    list_maintenance_runs + poll N nguồn + poll bảo trì, tất cả trong 1
-    "wave" — xem docstring _history_tab_context()) nên phần tăng thêm ở
-    lần load đầu tập trung chủ yếu ở đây, các tab còn lại rẻ như đã đánh
-    giá trước."""
-    tab = request.args.get("tab", "crawl")
-    if tab not in ("crawl", "status", "maintenance", "history"):
-        tab = "crawl"
-
-    status_ctx = _status_tab_context()
-
-    # Import trễ (KHÔNG để đầu file) để tránh import vòng — xem docstring
-    # đầu file này. Trước đây chỉ import khi tab=='maintenance'/'history'
-    # (early-return) — giờ LUÔN cần vì cả 4 tab được build cùng lúc,
-    # nhưng vẫn giữ import Ở ĐÂY (không dời lên đầu file) vì lý do vòng
-    # lặp import không đổi.
-    from blueprints.crawl_maintenance import _maintenance_tab_context
-    maintenance_ctx = _maintenance_tab_context()
-
-    from blueprints.crawl_history import _history_tab_context
-    history_ctx = _history_tab_context()
-
-    # ---- Tab "crawl" (mặc định) — Khu A/B, logic y hệt trước đây ----
+    Logic bên trong GIỮ NGUYÊN 100% so với bản cũ nằm thẳng trong
+    index() — chỉ di chuyển, không đổi hành vi."""
     # access_token lấy 1 LẦN ở đây (main thread, Flask session context)
     # cho CẢ 2 nhóm việc độc lập bên dưới (per-source poll / list_users)
     # — cùng lý do _source_active_state() không tự gọi
@@ -260,7 +221,7 @@ def index():
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
-    crawl_ctx = {
+    return {
         "sources": sources, "source_labels": _SOURCE_LABELS,
         "active_runs": active_runs, "active_batches": active_batches, "category_labels": category_labels,
         # status_labels/stat_labels: KHÔNG còn dùng để render Khu C ở
@@ -275,12 +236,93 @@ def index():
         "filters": {"source": f_source},
     }
 
-    return render_template(
-        "crawl.html",
-        tab=tab,
-        crawl_ctx=crawl_ctx, status_ctx=status_ctx,
-        maintenance_ctx=maintenance_ctx, history_ctx=history_ctx,
-    )
+
+# tab name -> tên file partial tương ứng (SỬA 09/2026, xem docstring
+# index() bên dưới) — DUY NHẤT 1 nơi liệt kê mapping 4 tab, index()
+# (cả nhánh full-page lẫn nhánh AJAX) tra cứu qua đây, không lặp lại
+# danh sách 4 tab ở nhiều chỗ.
+_TAB_TEMPLATES = {
+    "crawl": "_crawl_tab.html",
+    "status": "_status_tab.html",
+    "maintenance": "_maintenance_tab.html",
+    "history": "_history_tab.html",
+}
+
+
+def _build_tab_context(tab: str) -> dict:
+    """Tra đúng 1 hàm build context ứng với `tab` — KHÔNG còn gọi cả 4
+    hàm context như bản cũ (xem docstring index()). Import trễ (không ở
+    đầu file) GIỮ NGUYÊN như trước — 2 module con vẫn import ngược
+    _SOURCE_LABELS/_source_active_state/crawl_bp từ file này, xem
+    docstring đầu file + docstring 2 module đó."""
+    if tab == "status":
+        return _status_tab_context()
+    if tab == "maintenance":
+        from blueprints.crawl_maintenance import _maintenance_tab_context
+        return _maintenance_tab_context()
+    if tab == "history":
+        from blueprints.crawl_history import _history_tab_context
+        return _history_tab_context()
+    return _crawl_tab_context()
+
+
+@crawl_bp.route("/crawl")
+@admin_required
+def index():
+    """Trang chính "Vận hành dữ liệu" — 4 tab (crawl/status/maintenance/
+    history).
+
+    SỬA 09/2026 (xem lịch sử trao đổi "load chậm mỗi lần chuyển phân
+    trang log — 76 request logs.json chạy nền dù đang đứng ở tab
+    khác"): bản trước RENDER CẢ 4 TAB CÙNG LÚC trong 1 response (build
+    đủ cả 4 context, kể cả 3 tab người dùng không xem) — mỗi lần
+    reload trang (kể cả chỉ để bấm phân trang bảng lịch sử) đều tốn
+    công build lại TOÀN BỘ, cộng thêm 2 vòng setInterval poll log ở
+    _crawl_tab.html/_maintenance_tab.html tự khởi động lại và chạy nền
+    suốt phiên xem trang dù tab đó không hiển thị -> hàng chục request
+    thừa mỗi lần, xem chi tiết điều tra trong lịch sử trao đổi trên.
+
+    GIỜ: mỗi request chỉ build ĐÚNG 1 TAB (`tab` query param, mặc định
+    "crawl") — 3 tab còn lại KHÔNG build, không render nội dung (client
+    thấy khung rỗng, `data-loaded="false"`). JS cuối crawl.html
+    (`loadTabIfNeeded()`) tự fetch lại ĐÚNG 1 TAB đó qua chính route
+    này (thêm header X-Requested-With để nhận diện AJAX, xem nhánh
+    `is_ajax` bên dưới) ở lần đầu người dùng bấm sang tab chưa load —
+    load xong thì giữ nguyên trong DOM, bấm qua lại các tab đã từng mở
+    không fetch lại nữa (KHÔNG mất tính "tức thời" cho tab đã xem).
+    Bảng lịch sử (tab "history") cũng đổi phân trang/lọc từ
+    `<a href>`/`<form method=get>` reload cả trang sang fetch AJAX qua
+    route này (xem _history_tab.html + JS "ajaxNavigate()") — mỗi lần
+    bấm "Trang sau" giờ chỉ tốn đúng 1 round-trip build `history_ctx`,
+    không kéo theo 3 context kia và không khởi động lại 2 vòng poll
+    nền của tab crawl/maintenance.
+
+    ĐÁNH ĐỔI đã thống nhất với người dùng (không cần giữ nguyên): tab
+    ĐẦU TIÊN mở trang (theo ?tab= hoặc mặc định "crawl") vẫn dựng sẵn
+    trong response đầu tiên như cũ — tức thời. 3 tab còn lại chỉ chậm
+    hơn ở ĐÚNG lần bấm đầu tiên trong phiên xem trang (1 round-trip nhẹ
+    build 1 context, không phải chờ tất cả) — chấp nhận được, KHÔNG cần
+    tức thời tuyệt đối, chỉ cần nhanh (mục tiêu <=1.5s).
+
+    is_ajax: request tới TỪ chính JS ở crawl.html (loadTabIfNeeded()/
+    ajaxNavigate()) — trả THẲNG fragment HTML của 1 partial (không qua
+    layout base.html), KHÔNG phải JSON (khác các route *.json khác ở
+    file này) vì phía JS chỉ cần chèn thẳng vào innerHTML của
+    `.dashboard-tab` tương ứng, không cần parse gì thêm."""
+    tab = request.args.get("tab", "crawl")
+    if tab not in _TAB_TEMPLATES:
+        tab = "crawl"
+
+    ctx = _build_tab_context(tab)
+    tab_html = render_template(_TAB_TEMPLATES[tab], **ctx)
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # Fragment thuần — không render qua crawl.html/base.html, tránh
+        # JS phải tự bóc lại đúng đoạn <div class="dashboard-tab"> từ
+        # 1 trang HTML đầy đủ (header, sidebar, script khác...).
+        return tab_html
+
+    return render_template("crawl.html", tab=tab, tab_html=tab_html)
 
 
 @crawl_bp.route("/crawl/trigger", methods=["POST"])

@@ -1,26 +1,38 @@
 {#
-  Shell 4 tab cho mục sidebar "Vận hành dữ liệu". SỬA LẠI (08/2026, xem
-  lịch sử trao đổi "sơ suất — revert mất bản gộp client-side lúc thêm
-  tab history, gộp lại theo đúng pattern cũ"): file này từng được gộp
-  client-side 1 lần (3 tab: crawl/status/maintenance) nhưng bị VÔ TÌNH
-  ghi đè về kiểu <a href="?tab=..."> full-reload khi thêm tab thứ 4
-  "history" (commit bắt đầu từ 1 bản trước khi gộp). Lần này gộp lại
-  CHO CẢ 4 TAB — không lặp lại tình trạng cũ.
+  Shell 4 tab cho mục sidebar "Vận hành dữ liệu".
 
-  Chuyển tab là JS thuần ẩn/hiện .dashboard-tab — không round-trip,
-  mirror ĐÚNG pattern templates/dashboard.html (#dashboardTabBar) và
-  templates/data_management.html.
+  SỬA 09/2026 (xem lịch sử trao đổi "load chậm mỗi lần chuyển phân
+  trang log — 76 request logs.json chạy nền dù đang đứng ở tab khác"):
+  bản trước (08/2026) RENDER CẢ 4 TAB CÙNG LÚC trong 1 response ngay
+  từ đầu — đổi lại ở LẦN NÀY: server chỉ dựng sẵn ĐÚNG 1 TAB (`tab`,
+  biến Jinja truyền từ blueprints/crawl.py::index() — xem docstring hàm
+  đó để biết lý do/đánh đổi đã thống nhất với người dùng), 3 tab còn
+  lại là khung RỖNG (`data-loaded="false"`) — JS bên dưới
+  (`loadTabIfNeeded()`) tự fetch lại đúng 1 tab đó ở LẦN ĐẦU người
+  dùng bấm sang, rồi giữ nguyên trong DOM (bấm qua lại tab đã load
+  không fetch lại nữa).
 
-  4 context (crawl_ctx/status_ctx/maintenance_ctx/history_ctx) TRÙNG
-  khá nhiều tên biến — dùng {% with %} SCOPE RIÊNG ngay trước mỗi
-  include để ánh xạ đúng tên biến từng partial đang mong đợi, KHÔNG sửa
-  1 dòng nào bên trong 4 file partial. Đáng chú ý nhất:
-  status_labels — CẢ 3 tab (crawl/maintenance/history) đều dùng tên
-  này nhưng ứng với 2 MAP NHÃN KHÁC NHAU (CRAWL_STATUS_LABELS ở
-  crawl/history, MAINTENANCE_STATUS_LABELS ở maintenance) — merge
-  phẳng sẽ khiến 1 tab hiện SAI nhãn trạng thái (không chỉ mất dữ
-  liệu, mà còn hiện nhãn của tab khác), xem docstring
-  blueprints/crawl.py::index() để biết chi tiết.
+  KHÔNG còn 4 biến crawl_ctx/status_ctx/maintenance_ctx/history_ctx +
+  4 khối {% with %} scoped-rename như bản cũ — server giờ tự render
+  SẴN đúng 1 partial thành chuỗi HTML (`tab_html`, xem
+  blueprints/crawl.py::index()) rồi chèn thẳng bằng {{ tab_html|safe }}
+  vào ĐÚNG panel tương ứng `tab`. 3 panel còn lại để trống — JS sẽ tự
+  gọi lại route `/crawl?tab=...` kèm header X-Requested-With, nhận về
+  CHÍNH XÁC 1 fragment (route trả thẳng tab_html, không qua layout
+  base.html — xem nhánh `is_ajax` ở index()), chèn vào bằng innerHTML.
+
+  Bảng lịch sử (tab "history") đổi phân trang/lọc từ <a href>/
+  <form method=get> (full-reload) sang cùng cơ chế fetch AJAX này
+  (`ajaxNavigate()` bên dưới) — xem _history_tab.html, các link/form đó
+  KHÔNG cần sửa gì (vẫn href/action bình thường), JS chỉ chặn hành vi
+  mặc định rồi fetch thay vì để trình duyệt tự điều hướng. Nếu JS lỗi/
+  tắt, link/form vẫn hoạt động bình thường qua full-reload (progressive
+  enhancement, khớp triết lý chung của public/app.js).
+
+  Chuyển tab (ẩn/hiện .dashboard-tab bằng class "active") vẫn mirror
+  ĐÚNG pattern templates/dashboard.html (#dashboardTabBar) và
+  templates/data_management.html như trước — chỉ thêm bước lazy-fetch
+  ở trên, không đổi cách ẩn/hiện.
 
   tab='crawl' (mặc định) -> _crawl_tab.html (Khu A kích hoạt + Khu B
   đang chạy — Khu C lịch sử đã chuyển sang tab='history').
@@ -51,67 +63,42 @@
   <button type="button" data-tab="history" role="tab">Lịch sử vận hành</button>
 </div>
 
-<div class="dashboard-tab" id="tab-crawl" data-tab="crawl">
-  {% with sources=crawl_ctx.sources, source_labels=crawl_ctx.source_labels,
-          active_runs=crawl_ctx.active_runs, active_batches=crawl_ctx.active_batches,
-          category_labels=crawl_ctx.category_labels,
-          status_labels=crawl_ctx.status_labels, stat_labels=crawl_ctx.stat_labels,
-          filters=crawl_ctx.filters %}
-    {% include "_crawl_tab.html" %}
-  {% endwith %}
+{# data-loaded="true" CHỈ cho đúng 1 panel khớp `tab` (đã có sẵn HTML
+   server render) — 3 panel còn lại "false" (rỗng), JS tự fetch bù khi
+   người dùng bấm sang lần đầu. data-tab-label dùng để hiện khung
+   "Đang tải…" đúng tên tab lúc fetch (xem loadTabIfNeeded()). #}
+<div class="dashboard-tab" id="tab-crawl" data-tab="crawl" data-tab-label="Crawl dữ liệu"
+     data-loaded="{{ 'true' if tab == 'crawl' else 'false' }}">
+  {% if tab == 'crawl' %}{{ tab_html|safe }}{% endif %}
 </div>
 
-<div class="dashboard-tab" id="tab-status" data-tab="status">
-  {% with company_health_rows=status_ctx.company_health_rows, company_health_total=status_ctx.company_health_total,
-          job_health_rows=status_ctx.job_health_rows, job_health_total=status_ctx.job_health_total,
-          expired_open_jobs=status_ctx.expired_open_jobs, job_health_by_source=status_ctx.job_health_by_source,
-          duplicate_job_groups=status_ctx.duplicate_job_groups,
-          company_no_contact_missing=status_ctx.company_no_contact_missing,
-          company_no_contact_total=status_ctx.company_no_contact_total %}
-    {% include "_status_tab.html" %}
-  {% endwith %}
+<div class="dashboard-tab" id="tab-status" data-tab="status" data-tab-label="Tình trạng dữ liệu"
+     data-loaded="{{ 'true' if tab == 'status' else 'false' }}">
+  {% if tab == 'status' %}{{ tab_html|safe }}{% endif %}
 </div>
 
-<div class="dashboard-tab" id="tab-maintenance" data-tab="maintenance">
-  {% with maintenance_jobs=maintenance_ctx.maintenance_jobs, job_labels=maintenance_ctx.job_labels,
-          stat_labels_by_job=maintenance_ctx.stat_labels_by_job,
-          require_limit_job_types=maintenance_ctx.require_limit_job_types,
-          check_expired_job_type=maintenance_ctx.check_expired_job_type,
-          active_runs=maintenance_ctx.active_runs, latest_log_runs=maintenance_ctx.latest_log_runs,
-          status_labels=maintenance_ctx.status_labels %}
-    {% include "_maintenance_tab.html" %}
-  {% endwith %}
+<div class="dashboard-tab" id="tab-maintenance" data-tab="maintenance" data-tab-label="Bảo trì dữ liệu"
+     data-loaded="{{ 'true' if tab == 'maintenance' else 'false' }}">
+  {% if tab == 'maintenance' %}{{ tab_html|safe }}{% endif %}
 </div>
 
-<div class="dashboard-tab" id="tab-history" data-tab="history">
-  {% with source_labels=history_ctx.source_labels, category_labels=history_ctx.category_labels,
-          status_labels=history_ctx.status_labels, stat_labels=history_ctx.stat_labels,
-          active_runs=history_ctx.active_runs, active_batches=history_ctx.active_batches,
-          active_maintenance_runs=history_ctx.active_maintenance_runs, job_labels=history_ctx.job_labels,
-          crawl_runs=history_ctx.crawl_runs, crawl_total_runs=history_ctx.crawl_total_runs,
-          crawl_page=history_ctx.crawl_page, crawl_total_pages=history_ctx.crawl_total_pages,
-          crawl_per_page=history_ctx.crawl_per_page, crawl_admin_members=history_ctx.crawl_admin_members,
-          crawl_filters=history_ctx.crawl_filters, crawl_pagination_filters=history_ctx.crawl_pagination_filters,
-          maint_jobs=history_ctx.maint_jobs, maint_job_labels=history_ctx.maint_job_labels,
-          maint_runs=history_ctx.maint_runs, maint_total_runs=history_ctx.maint_total_runs,
-          maint_page=history_ctx.maint_page, maint_total_pages=history_ctx.maint_total_pages,
-          maint_per_page=history_ctx.maint_per_page, maint_status_labels=history_ctx.maint_status_labels,
-          maint_admin_members=history_ctx.maint_admin_members, maint_filters=history_ctx.maint_filters,
-          maint_pagination_filters=history_ctx.maint_pagination_filters %}
-    {% include "_history_tab.html" %}
-  {% endwith %}
+<div class="dashboard-tab" id="tab-history" data-tab="history" data-tab-label="Lịch sử vận hành"
+     data-loaded="{{ 'true' if tab == 'history' else 'false' }}">
+  {% if tab == 'history' %}{{ tab_html|safe }}{% endif %}
 </div>
 
 <script>
 (function () {
   "use strict";
-  // Tab nội bộ trang "Vận hành dữ liệu" (08/2026) — mirror ĐÚNG cách
-  // dashboard.html đang làm (#dashboardTabBar): ẩn/hiện .dashboard-tab
-  // bằng class "active", lưu lựa chọn vào ?tab= (history.replaceState,
-  // không reload) để chia sẻ link trực tiếp tới đúng tab được. Các nút
-  // "Bắt đầu crawl"/"Chạy job" bên trong mỗi tab VẪN submit form POST
-  // bình thường (reload cả trang) — chỉ việc XEM tab là tức thì, không
-  // đổi hành vi các thao tác ghi dữ liệu.
+  // Tab nội bộ trang "Vận hành dữ liệu" (08/2026, sửa 09/2026 thêm
+  // lazy-fetch + AJAX phân trang/lọc — xem docstring đầu file) —
+  // mirror ĐÚNG cách dashboard.html đang làm (#dashboardTabBar): ẩn/
+  // hiện .dashboard-tab bằng class "active", lưu lựa chọn vào ?tab=
+  // (history.replaceState, không reload) để chia sẻ link trực tiếp
+  // tới đúng tab được. Các nút "Bắt đầu crawl"/"Chạy job" bên trong
+  // mỗi tab VẪN submit form POST bình thường (reload cả trang) — chỉ
+  // việc XEM tab/phân trang/lọc là AJAX, không đổi hành vi các thao
+  // tác ghi dữ liệu.
   var VALID_TABS = ["crawl", "status", "maintenance", "history"];
   var tabBar = document.getElementById("opsTabBar");
   if (!tabBar) return;
@@ -126,6 +113,75 @@
     for (var j = 0; j < panels.length; j++) {
       panels[j].classList.toggle("active", panels[j].getAttribute("data-tab") === tab);
     }
+    loadTabIfNeeded(tab);
+  }
+
+  // ---- Lazy-fetch nội dung 1 tab (09/2026) --------------------------
+  //
+  // Panel chưa load (data-loaded="false", xem HTML trên) chỉ có khung
+  // rỗng — gọi LẠI CHÍNH route "/crawl" (kèm ?tab=... + header
+  // X-Requested-With để backend nhận diện AJAX, xem nhánh `is_ajax` ở
+  // blueprints/crawl.py::index()) để lấy fragment HTML của đúng 1
+  // partial đó, chèn vào bằng innerHTML rồi đánh dấu data-loaded="true"
+  // — KHÔNG fetch lại các lần bấm sau (giữ tức thời cho tab đã từng
+  // mở, xem đoạn đầu hàm bên dưới).
+  //
+  // execTabScripts(): innerHTML KHÔNG tự chạy thẻ <script> bên trong
+  // (hành vi chuẩn của DOM) — _crawl_tab.html/_maintenance_tab.html có
+  // <script> riêng để khởi động poll log/trạng thái, phải tự tạo lại
+  // node <script> mới rồi append thì trình duyệt mới thực thi.
+  function execTabScripts(panel) {
+    var scripts = panel.querySelectorAll("script");
+    for (var i = 0; i < scripts.length; i++) {
+      var old = scripts[i];
+      var fresh = document.createElement("script");
+      for (var a = 0; a < old.attributes.length; a++) {
+        fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+      }
+      fresh.textContent = old.textContent;
+      old.parentNode.replaceChild(fresh, old);
+    }
+  }
+
+  function loadTabIfNeeded(tab) {
+    var panel = document.getElementById("tab-" + tab);
+    if (!panel || panel.getAttribute("data-loaded") === "true") return;
+
+    var label = panel.getAttribute("data-tab-label") || "";
+    panel.innerHTML = '<p class="muted" style="padding: 40px 0; text-align: center;">Đang tải ' + label + '…</p>';
+
+    var url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    // 3 tab lazy chưa từng có filter/pagination riêng trên URL (chỉ
+    // "history" có, nhưng "history" thường ĐÃ data-loaded=true ngay từ
+    // đầu nếu người dùng mở thẳng link đó — trường hợp fetch bù ở đây
+    // chỉ xảy ra cho tab KHÁC tab lúc load trang, nên giữ nguyên toàn
+    // bộ query string hiện có là đúng ý muốn, không cần lọc bớt).
+
+    fetch(url.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        panel.innerHTML = html;
+        panel.setAttribute("data-loaded", "true");
+        execTabScripts(panel);
+        if (tab === "status" && window.initClientListPagination) {
+          // .pagination-list-nav (phân trang CLIENT-side ở tab status,
+          // xem public/app.js::initClientListPagination) chỉ tự chạy 1
+          // LẦN lúc DOMContentLoaded — nội dung chèn SAU thời điểm đó
+          // (đúng trường hợp lazy-fetch này) cần gọi lại thủ công, xem
+          // window.initClientListPagination export ở app.js.
+          window.initClientListPagination();
+        }
+      })
+      .catch(function () {
+        // Fallback: fetch lỗi (mạng/JS) -> full reload tới đúng tab đó,
+        // KHÔNG để người dùng kẹt ở khung rỗng không bấm gì được —
+        // cùng triết lý "progressive enhancement" của public/app.js.
+        window.location.href = url.toString();
+      });
   }
 
   tabBar.addEventListener("click", function (e) {
@@ -136,6 +192,69 @@
     var url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
     history.replaceState(null, "", url);
+  });
+
+  // ---- AJAX cho phân trang/lọc TRONG 1 tab đã load (09/2026) --------
+  //
+  // Trước đây link phân trang (.page-link, "Xóa lọc" .btn-text) và
+  // form lọc (.filter-bar) ở _history_tab.html là <a href>/
+  // <form method=get> bình thường -> bấm là RELOAD CẢ TRANG (kéo theo
+  // build lại context tab khác + khởi động lại poll nền của tab crawl/
+  // maintenance dù đang không xem, xem lịch sử trao đổi). Giờ chặn lại
+  // (preventDefault), fetch đúng URL đó (route "/crawl" không đổi,
+  // chỉ thêm header X-Requested-With) rồi thay nội dung ĐÚNG panel
+  // đang chứa link/form đó — không đụng 3 tab kia, không reload trang.
+  //
+  // Dùng event delegation (addEventListener trên document, không bind
+  // trực tiếp từng phần tử) vì nội dung tab bị THAY TOÀN BỘ mỗi lần
+  // phân trang/lọc (phần tử cũ mất đi, phần tử mới không tự có
+  // listener nếu bind trực tiếp).
+  //
+  // Hiện chỉ có _history_tab.html dùng các class .page-link/
+  // .filter-bar/.pagination — 3 partial còn lại KHÔNG có (form của
+  // chúng là POST kích hoạt job, class "btn-text" của chúng nằm trên
+  // <button>, không phải <a>, nên không khớp selector bên dưới) — an
+  // toàn khi gắn handler chung ở đây, không cần if riêng theo tab.
+  function ajaxNavigate(url, panel) {
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        panel.innerHTML = html;
+        execTabScripts(panel);
+        history.replaceState(null, "", url);
+        panel.scrollIntoView({ block: "start", behavior: "smooth" });
+      })
+      .catch(function () {
+        // Cùng fallback với loadTabIfNeeded() — full reload để không
+        // kẹt UI nếu fetch lỗi.
+        window.location.href = url;
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest("a.page-link, a.btn-text");
+    if (!link) return;
+    var panel = link.closest(".dashboard-tab[data-tab]");
+    if (!panel) return; // không thuộc panel nào ở trang này -> để nguyên hành vi mặc định
+    e.preventDefault();
+    ajaxNavigate(link.href, panel);
+  });
+
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.classList || !form.classList.contains("filter-bar")) return;
+    if ((form.getAttribute("method") || "get").toLowerCase() !== "get") return;
+    var panel = form.closest(".dashboard-tab[data-tab]");
+    if (!panel) return;
+    e.preventDefault();
+    var params = new URLSearchParams(new FormData(form));
+    var base = form.getAttribute("action") || window.location.href;
+    var url = new URL(base, window.location.href);
+    url.search = params.toString();
+    ajaxNavigate(url.toString(), panel);
   });
 
   var params = new URLSearchParams(window.location.search);
