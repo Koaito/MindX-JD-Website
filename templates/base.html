@@ -51,22 +51,27 @@
       {% endif %}
 
       {% if current_user.is_authenticated and current_user.is_staff %}
-      <a href="{{ url_for('jobs.add') }}" class="{{ 'active' if request.endpoint == 'jobs.add' else '' }}" title="Thêm job">
-        <span class="nav-ic">＋</span> <span class="nav-text">Thêm job</span>
-      </a>
-
       <span class="nav-label">Doanh nghiệp</span>
       <a href="{{ url_for('companies.index') }}" class="{{ 'active' if request.endpoint in ['companies.index','companies.detail'] else '' }}" title="Danh sách công ty">
         <span class="nav-ic">☰</span> <span class="nav-text">Danh sách công ty</span>
       </a>
-      <a href="{{ url_for('companies.add') }}" class="{{ 'active' if request.endpoint == 'companies.add' else '' }}" title="Thêm công ty">
-        <span class="nav-ic">＋</span> <span class="nav-text">Thêm công ty</span>
-      </a>
       <a href="{{ url_for('contacts.index') }}" class="{{ 'active' if request.endpoint == 'contacts.index' else '' }}" title="Danh sách contact">
         <span class="nav-ic">☎</span> <span class="nav-text">Danh sách contact</span>
       </a>
-      <a href="{{ url_for('contacts.add_any') }}" class="{{ 'active' if request.endpoint == 'contacts.add_any' else '' }}" title="Thêm contact">
-        <span class="nav-ic">＋</span> <span class="nav-text">Thêm contact</span>
+
+      {# Gộp 3 link "Thêm job/Thêm công ty/Thêm contact" thành 1 (08/2026,
+         xem lịch sử trao đổi "phương án A+") — trước đây "Thêm job" đứng
+         không có nav-label riêng, rơi nhầm vào nhóm "Nhắn tin" phía trên
+         nó. class active phủ CẢ endpoint shell (add_hub.index) LẪN 3
+         endpoint POST cũ (jobs.add/companies.add/contacts.add_any) — để
+         khi nhánh lỗi validate render lại add_hub.html (URL vẫn đứng ở
+         /jobs/add chẳng hạn, KHÔNG chuyển qua /them-moi), sidebar vẫn
+         sáng đúng mục thay vì tắt ngang. #}
+      <span class="nav-label">Thêm mới</span>
+      <a href="{{ url_for('add_hub.index') }}"
+         class="{{ 'active' if request.endpoint in ['add_hub.index','jobs.add','companies.add','contacts.add_any'] else '' }}"
+         title="Thêm mới">
+        <span class="nav-ic">＋</span> <span class="nav-text">Thêm mới</span>
       </a>
 
       <span class="nav-label">Báo cáo</span>

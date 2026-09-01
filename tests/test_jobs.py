@@ -201,11 +201,15 @@ class TestResolveCompanyId:
 
 
 class TestJobsAdd:
-    def test_get_renders_form(self, staff_client, mocker):
-        mocker.patch("blueprints.jobs.db_data.list_all_companies", return_value=[])
-        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
-        resp = staff_client.get("/jobs/add")
-        assert resp.status_code == 200
+    def test_get_redirects_to_add_hub(self, staff_client):
+        """ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án A+"): GET
+        /jobs/add giờ redirect sang trang gộp /them-moi?tab=job — route
+        này chỉ còn xử lý POST. Xem tests/test_add_hub.py cho phần
+        render form thật (đã chuyển sang add_hub.html)."""
+        resp = staff_client.get("/jobs/add", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/them-moi" in resp.headers["Location"]
+        assert "tab=job" in resp.headers["Location"]
 
     def test_post_existing_company_success(self, staff_client, mocker):
         mocker.patch(
@@ -247,13 +251,17 @@ class TestJobsAdd:
         assert called_company_id == "brand-new-company-id"
 
     def test_post_missing_company_selection_rerenders_form_with_error(self, staff_client, mocker):
-        mocker.patch("blueprints.jobs.db_data.list_all_companies", return_value=[])
-        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+        # _add_hub_context() sống trong blueprints/add_hub.py (không phải
+        # blueprints/jobs.py nữa) — xem docstring jobs.add() (08/2026).
+        mocker.patch("blueprints.add_hub.db_data.list_all_companies", return_value=[])
+        mocker.patch("blueprints.add_hub.db_data.get_level_codes", return_value=["Intern"])
         resp = staff_client.post(
             "/jobs/add",
             data={"company_mode": "existing", "company_id": "", "position": "Dev"},
         )
-        assert resp.status_code == 200  # rerender form, KHÔNG redirect
+        assert resp.status_code == 200  # rerender add_hub.html, KHÔNG redirect
+        html = resp.get_data(as_text=True)
+        assert 'data-tab="job"' in html  # vẫn còn nguyên shell 3 tab, không văng ra trang riêng
 
     def test_unauthenticated_redirected_to_login(self, client):
         resp = client.get("/jobs/add", follow_redirects=False)

@@ -1,0 +1,96 @@
+{#
+  Trang gộp "Thêm mới" (08/2026, xem lịch sử trao đổi "phương án A+").
+  Thay cho 3 link sidebar riêng (Thêm job/Thêm công ty/Thêm contact) —
+  giờ 1 trang, 3 tab, chuyển tab client-side (JS ẩn/hiện .dashboard-tab,
+  không round-trip) — mirror ĐÚNG pattern templates/crawl.html.
+
+  3 form (_job_form.html/_company_form.html/_contact_form.html) mỗi
+  form vẫn POST thẳng về route CŨ (jobs.add/companies.add/
+  contacts.add_any) qua tham số action= — KHÔNG đụng logic tạo mới.
+  Nhánh lỗi validate của 3 route đó render LẠI đúng file này (qua
+  _add_hub_context(), xem blueprints/add_hub.py) nên vẫn còn tab-bar +
+  giữ nguyên dữ liệu đã nhập, KHÔNG bị "văng" ra trang riêng như
+  phương án A thuần.
+
+  KHÔNG trùng id DOM giữa 3 partial (đã rà: combobox công ty ở tab job
+  dùng input_id="company_id_select", tab contact dùng
+  input_id="contact_company_id" — khác nhau sẵn từ trước; _company_form.html
+  không có id/script riêng nào cả) — include thẳng cả 3, không cần
+  {% with %} scoped-rename như bên crawl.html.
+#}
+{% extends "base.html" %}
+{% block title %}Thêm mới — MindX Career Hub{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Career Hub / Quản trị</span>
+    <h1>Thêm mới</h1>
+    <p class="lede">Thêm job, công ty, hoặc người liên hệ HR mới vào hệ thống.</p>
+  </div>
+</header>
+
+<div class="tab-bar" id="addHubTabBar" role="tablist">
+  <button type="button" data-tab="job" role="tab">Job</button>
+  <button type="button" data-tab="company" role="tab">Công ty</button>
+  <button type="button" data-tab="contact" role="tab">Người liên hệ</button>
+</div>
+
+<div class="dashboard-tab" id="tab-job" data-tab="job">
+  {% with action = url_for('jobs.add') %}
+    {% include "_job_form.html" %}
+  {% endwith %}
+</div>
+
+<div class="dashboard-tab" id="tab-company" data-tab="company">
+  {% with action = url_for('companies.add') %}
+    {% include "_company_form.html" %}
+  {% endwith %}
+</div>
+
+<div class="dashboard-tab" id="tab-contact" data-tab="contact">
+  {% with action = url_for('contacts.add_any') %}
+    {% include "_contact_form.html" %}
+  {% endwith %}
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Tab nội bộ "Thêm mới" (08/2026) — mirror ĐÚNG cách crawl.html/
+  // data_management.html đang làm. active_tab do server truyền
+  // (?tab= lúc GET, hoặc đúng tab vừa submit lỗi lúc POST) — JS đọc
+  // ?tab= trên URL trước, không có thì fallback theo server.
+  var VALID_TABS = ["job", "company", "contact"];
+  var tabBar = document.getElementById("addHubTabBar");
+  if (!tabBar) return;
+
+  function activate(tab) {
+    if (VALID_TABS.indexOf(tab) === -1) tab = "job";
+    var buttons = tabBar.querySelectorAll("button[data-tab]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].getAttribute("data-tab") === tab);
+    }
+    var panels = document.querySelectorAll(".dashboard-tab[data-tab]");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].classList.toggle("active", panels[j].getAttribute("data-tab") === tab);
+    }
+  }
+
+  tabBar.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-tab]");
+    if (!btn) return;
+    var tab = btn.getAttribute("data-tab");
+    activate(tab);
+    var url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    history.replaceState(null, "", url);
+  });
+
+  var params = new URLSearchParams(window.location.search);
+  activate(params.get("tab") || "{{ active_tab }}" || "job");
+})();
+</script>
+
+{% endblock %}

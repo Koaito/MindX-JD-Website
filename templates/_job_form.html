@@ -1,0 +1,171 @@
+{#
+  Thân form Thêm/Sửa job — tách ra từ add_job.html (08/2026, xem lịch sử
+  trao đổi "phương án A+ — tách partial, gộp shell /them-moi"). Dùng
+  bởi 2 chỗ:
+    - add_job.html (wrapper, chỉ còn header + include) — route
+      jobs.edit(job_id), tự submit về CHÍNH route đó.
+    - templates/add_hub.html (trang gộp /them-moi) — tab "job", submit
+      về jobs.add.
+
+  Biến cần từ nơi include:
+    action       : URL form sẽ POST tới (BẮT BUỘC — trước đây form
+                   không có action=, tự submit về URL hiện tại; giờ
+                   cùng 1 partial được include từ 2 URL khác nhau nên
+                   phải khai rõ, không thể dựa "URL hiện tại" nữa).
+    job          : dict job đang sửa, hoặc None/không truyền khi thêm mới.
+    edit_id      : job_id đang sửa, hoặc None/không truyền khi thêm mới.
+    industries, levels, locations, work_types, salary_types,
+    salary_periods : các list option cố định (INDUSTRIES/LOCATIONS/...).
+
+  KHÔNG đổi field name/logic submit nào so với add_job.html gốc — chỉ
+  đổi cách xác định action và 1 chỗ querySelector (xem comment trong
+  script bên dưới) để an toàn khi trang gộp có NHIỀU <form class="form-card">
+  cùng lúc (trước đây add_job.html luôn là form-card DUY NHẤT trên
+  trang nên querySelector('form.form-card') không sao — /them-moi có
+  3 form cùng lúc, phải chọn đúng form của CHÍNH tab job).
+#}
+<form class="form-card" method="post" action="{{ action }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+
+    {% if not edit_id %}
+    {# Company CHỈ chọn được lúc TẠO job — backend không cho đổi company
+       của job đã tồn tại (PATCH /jobs/{id} không nhận company_id) #}
+    <label class="span-4">Công ty *
+      {% with input_id = "company_id_select", allow_new = true %}
+        {% include "_company_combobox.html" %}
+      {% endwith %}
+    </label>
+    <input type="hidden" name="company_mode" id="company_mode_field" value="existing">
+    <div id="new_company_fields" class="form-grid span-4" style="display:none; grid-column: 1 / -1;">
+      <label class="span-2">Tên công ty mới *
+        <input type="text" name="new_company_name">
+      </label>
+      <label class="span-2">Mã số thuế (nếu có — tránh tạo trùng công ty đã crawl)
+        <input type="text" name="new_company_tax_id">
+      </label>
+      <label class="span-2">Website
+        <input type="url" name="new_company_website" placeholder="https://">
+      </label>
+      <label class="span-1">Lĩnh vực
+        <input type="text" name="new_company_industry">
+      </label>
+      <label class="span-1">Thành phố
+        <input type="text" name="new_company_city">
+      </label>
+    </div>
+    <script>
+      (function () {
+        // company_id_select giờ là hidden input (do combobox tạo ra, xem
+        // _company_combobox.html + app.js), không còn <select> onchange
+        // trực tiếp như trước — nghe sự kiện "change" JS tự bắn ra mỗi khi
+        // người dùng chọn 1 dòng trong combobox (kể cả dòng "Tạo công ty
+        // mới…") để show/hide đúng như hành vi cũ.
+        var valueField = document.getElementById('company_id_select_value');
+        var newFields = document.getElementById('new_company_fields');
+        function sync() {
+          var isNew = valueField.value === '__new__';
+          newFields.style.display = isNew ? 'grid' : 'none';
+        }
+        valueField.addEventListener('change', sync);
+        sync();
+
+        // ĐỔI (08/2026): trước là document.querySelector('form.form-card')
+        // — chỉ đúng khi trang có DUY NHẤT 1 form.form-card. Trang gộp
+        // /them-moi có 3 form (job/company/contact) cùng class đó — dùng
+        // querySelector chung sẽ LUÔN bắt form ĐẦU TIÊN trong DOM (tab
+        // job đứng trước hay sau tuỳ thứ tự render), sai form nếu không
+        // phải form job. valueField.closest('form') luôn trả đúng form
+        // CHỨA chính input này — an toàn dù đứng ở vị trí nào trong trang.
+        valueField.closest('form').addEventListener('submit', function() {
+          document.getElementById('company_mode_field').value =
+            valueField.value === '__new__' ? 'new' : 'existing';
+        });
+      })();
+    </script>
+    {% endif %}
+
+    <label class="span-2">Vị trí tuyển dụng *
+      <input type="text" name="position" required value="{{ job.position if job else '' }}">
+    </label>
+    <label class="span-2">Ngành *
+      <select name="industry" required>
+        {% for i in industries %}<option value="{{ i }}" {{ 'selected' if job and job.industry == i }}>{{ i }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Level
+      <select name="level">
+        <option value="">— chọn —</option>
+        {% for l in levels %}<option value="{{ l }}" {{ 'selected' if job and job.level == l }}>{{ l }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Địa điểm
+      <select name="location">
+        <option value="">— chọn —</option>
+        {% for loc in locations %}<option value="{{ loc }}" {{ 'selected' if job and job.location == loc }}>{{ loc }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Hình thức làm việc
+      <select name="work_type">
+        <option value="">— chọn —</option>
+        {% for w in work_types %}<option value="{{ w }}" {{ 'selected' if job and job.work_type == w }}>{{ w }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Loại lương
+      <select name="salary_type">
+        {% for st in salary_types %}<option value="{{ st }}" {{ 'selected' if job and job.get('salary_type') == st }}>{{ st }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Chu kỳ trả lương
+      {# Mới thêm 08/2026 — trước đây KHÔNG có ô này, mọi job nhập tay
+         lương NĂM qua form bị backend mặc định hiểu nhầm là lương/tháng
+         (sai lệch 12 lần), y hệt bug từng gặp ở job crawl "/năm". Mặc
+         định "Tháng" khi tạo mới, khớp hành vi cũ trước khi có field
+         này (không đổi hành vi cho job không đụng tới ô này). #}
+      <select name="salary_period">
+        {% for sp in salary_periods %}<option value="{{ sp }}" {{ 'selected' if (job and job.get('salary_period') == sp) or (not job and sp == 'Tháng') }}>{{ sp }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="span-1">Lương tối thiểu
+      <input type="number" name="salary_min" min="0" value="{{ job.salary_min if job else '' }}">
+    </label>
+    <label class="span-1">Lương tối đa
+      <input type="number" name="salary_max" min="0" value="{{ job.salary_max if job else '' }}">
+    </label>
+    <label class="span-1">Đơn vị tiền tệ
+      <select name="currency">
+        <option value="VNĐ" {{ 'selected' if not job or job.get('currency','VNĐ') == 'VNĐ' }}>VNĐ</option>
+        <option value="USD" {{ 'selected' if job and job.get('currency') == 'USD' }}>USD</option>
+      </select>
+    </label>
+    <label class="span-1">Deadline
+      <input type="date" name="deadline" value="{{ job.deadline if job else '' }}">
+    </label>
+  </div>
+
+  <label class="span-4">Kỹ năng / công nghệ yêu cầu (cách nhau bởi dấu phẩy)
+    <input type="text" name="skills" placeholder="SQL, Python, Excel" value="{{ job.skills if job else '' }}">
+  </label>
+  <label class="span-4">Mô tả công việc
+    <textarea name="description" rows="3">{{ job.description if job else '' }}</textarea>
+  </label>
+  <label class="span-4">Yêu cầu ứng viên
+    <textarea name="requirements" rows="3">{{ job.requirements if job else '' }}</textarea>
+  </label>
+  <label class="span-4">Quyền lợi
+    <textarea name="benefits" rows="2">{{ job.benefits if job else '' }}</textarea>
+  </label>
+  {% if edit_id %}
+  <label class="span-4">Ghi chú của team SS
+    <textarea name="note" rows="2">{{ job.note if job else '' }}</textarea>
+  </label>
+  <label class="span-4">Ghi chú lịch sử thao tác (không bắt buộc)
+    <textarea name="activity_note" rows="2" placeholder="Lý do sửa job này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
+  </label>
+  {% endif %}
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu job' }}</button>
+    <a class="btn btn-text" href="{{ url_for('jobs.detail', job_id=edit_id) if edit_id else url_for('jobs.index') }}">Hủy</a>
+  </div>
+</form>

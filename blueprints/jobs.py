@@ -23,12 +23,14 @@ from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
 from utils.decorators import staff_required
 
+# Import trực tiếp (không phải import trễ) — add_hub.py KHÔNG import
+# ngược lại từ jobs.py nên không có vòng lặp import, khác trường hợp
+# crawl.py/crawl_maintenance.py (xem comment ở đó). Dùng để nhánh lỗi
+# jobs.add() render lại ĐÚNG shell "Thêm mới" (08/2026, xem lịch sử
+# trao đổi "phương án A+") thay vì trang add_job.html đứng riêng.
+from blueprints.add_hub import _add_hub_context
+
 jobs_bp = Blueprint("jobs", __name__)
-
-
-def _list_all_companies():
-    """Helper to get all companies for dropdowns"""
-    return db_data.list_all_companies()
 
 
 def _resolve_company_id(form):
@@ -156,32 +158,22 @@ def detail(job_id):
 @jobs_bp.route("/jobs/add", methods=["GET", "POST"])
 @staff_required
 def add():
-    if request.method == "POST":
-        try:
-            company_id = _resolve_company_id(request.form)
-            job = _call_authed(db_data.create_job, request.form, company_id)
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            try:
-                companies = _list_all_companies()
-            except CrawlerAPIError as exc2:
-                flash(str(exc2), "error")
-                companies = []
-            return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
-                                    locations=LOCATIONS, statuses=JOB_STATUSES,
-                                    work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
-                                    cities_vn=CITIES_VN, companies=companies, job=request.form)
-        flash(f"Đã thêm job \"{job['position']}\" tại {job['company']}.", "success")
-        return redirect(url_for("jobs.index"))
+    """Thêm job mới. ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án
+    A+"): GET giờ redirect sang /them-moi?tab=job (trang gộp 3 tab,
+    link sidebar mới trỏ thẳng vào đó) — route này CHỈ còn xử lý POST.
+    Nhánh lỗi render lại add_hub.html (giữ tab-bar + dữ liệu đã nhập)
+    qua _add_hub_context() thay vì add_job.html đứng riêng như trước.
+    Nhánh thành công KHÔNG đổi — vẫn redirect(jobs.index) như cũ."""
+    if request.method == "GET":
+        return redirect(url_for("add_hub.index", tab="job"))
     try:
-        companies = _list_all_companies()
+        company_id = _resolve_company_id(request.form)
+        job = _call_authed(db_data.create_job, request.form, company_id)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-        companies = []
-    return render_template("add_job.html", industries=INDUSTRIES, levels=db_data.get_level_codes(),
-                            locations=LOCATIONS, statuses=JOB_STATUSES,
-                            work_types=WORK_TYPES, salary_types=SALARY_TYPES, salary_periods=SALARY_PERIODS,
-                            cities_vn=CITIES_VN, companies=companies, job=None)
+        return render_template("add_hub.html", **_add_hub_context(active_tab="job", job_form=request.form))
+    flash(f"Đã thêm job \"{job['position']}\" tại {job['company']}.", "success")
+    return redirect(url_for("jobs.index"))
 
 
 @jobs_bp.route("/jobs/<string:job_id>/edit", methods=["GET", "POST"])

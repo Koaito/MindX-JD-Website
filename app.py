@@ -166,6 +166,7 @@ def inject_email_templates():
 # ---------------------------------------------------------------------------
 
 from blueprints.activity_logs import activity_logs_bp
+from blueprints.add_hub import add_hub_bp
 from blueprints.auth import auth_bp
 from blueprints.companies import companies_bp
 from blueprints.contacts import contacts_bp
@@ -181,6 +182,7 @@ from blueprints.staff_activity import staff_activity_bp
 from blueprints.students import students_bp
 
 app.register_blueprint(auth_bp)
+app.register_blueprint(add_hub_bp)
 app.register_blueprint(messages_bp)
 app.register_blueprint(my_stuff_bp)
 app.register_blueprint(profile_bp)

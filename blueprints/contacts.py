@@ -10,6 +10,9 @@ from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _io_pool as _pool
 from utils.decorators import staff_required
 
+# Import trực tiếp — không vòng lặp, xem comment tương tự ở jobs.py.
+from blueprints.add_hub import _add_hub_context
+
 contacts_bp = Blueprint("contacts", __name__)
 
 
@@ -160,27 +163,29 @@ def email_template_delete(template_id):
 @contacts_bp.route("/contacts/add", methods=["GET", "POST"])
 @staff_required
 def add_any():
-    """Add contact without company context"""
+    """Add contact without company context.
+
+    ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án A+"): GET redirect
+    sang /them-moi?tab=contact, route này chỉ còn xử lý POST. Nhánh lỗi
+    render lại add_hub.html qua _add_hub_context() — xem docstring
+    jobs.add() (cùng pattern). company LUÔN None ở đây (đúng ý nghĩa
+    "add_any" — không gắn sẵn công ty), companies list do
+    _add_hub_context() tự gọi (dùng chung với tab job luôn, không cần
+    tự gọi lại db_data.list_all_companies() ở đây nữa)."""
+    if request.method == "GET":
+        return redirect(url_for("add_hub.index", tab="contact"))
+
+    company_id = request.form.get("company_id", "")
+    if not company_id:
+        flash("Cần chọn công ty.", "error")
+        return render_template("add_hub.html", **_add_hub_context(active_tab="contact", contact_form=request.form))
     try:
-        companies = db_data.list_all_companies()
+        _call_authed(db_data.create_contact, company_id, request.form)
     except CrawlerAPIError as exc:
         flash(str(exc), "error")
-        companies = []
-
-    if request.method == "POST":
-        company_id = request.form.get("company_id", "")
-        if not company_id:
-            flash("Cần chọn công ty.", "error")
-            return render_template("add_contact.html", company=None, companies=companies, contact=request.form)
-        try:
-            _call_authed(db_data.create_contact, company_id, request.form)
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            return render_template("add_contact.html", company=None, companies=companies, contact=request.form)
-        flash("Đã thêm người liên hệ.", "success")
-        return redirect(url_for("contacts.index"))
-
-    return render_template("add_contact.html", company=None, companies=companies, contact=None)
+        return render_template("add_hub.html", **_add_hub_context(active_tab="contact", contact_form=request.form))
+    flash("Đã thêm người liên hệ.", "success")
+    return redirect(url_for("contacts.index"))
 
 
 @contacts_bp.route("/companies/<string:company_id>/contacts/add", methods=["GET", "POST"])

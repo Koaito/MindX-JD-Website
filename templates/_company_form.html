@@ -1,0 +1,83 @@
+{#
+  Thân form Thêm/Sửa công ty — tách ra từ add_company.html (08/2026,
+  xem lịch sử trao đổi "phương án A+"). Dùng bởi add_company.html
+  (wrapper, route companies.edit) và templates/add_hub.html (tab
+  "company" ở /them-moi, submit về companies.add).
+
+  Biến cần từ nơi include: action (BẮT BUỘC), company (None khi thêm
+  mới), edit_id, partnership_potentials, cities, suggestion (optional
+  — chỉ companies.edit truyền, add_hub không có nên {% if suggestion %}
+  tự false, không lỗi).
+#}
+<form class="form-card" method="post" action="{{ action }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <label class="span-2">Tên công ty *
+      <input type="text" name="company" required value="{{ company.company if company else '' }}">
+    </label>
+    <label class="span-2">Mã số thuế
+      <input type="text" name="tax_id" placeholder="Nếu điền đúng, tự khớp công ty đã crawl trước đó" value="{{ company.tax_id if company else '' }}">
+    </label>
+    <label class="span-2">Website
+      <input type="url" name="website" placeholder="https://" value="{{ company.website if company else '' }}">
+    </label>
+    <label class="span-2">Lĩnh vực hoạt động
+      <input type="text" name="industry" placeholder="VD: Fintech, E-commerce…" value="{{ company.industry if company else '' }}">
+    </label>
+    <label class="span-1">Quy mô nhân sự
+      <input type="text" name="company_size" placeholder="VD: 200-500" value="{{ company.company_size if company else '' }}" 
+             pattern="^[\d\s\-–—]+$" 
+             title="Chỉ nhập số và dấu gạch ngang (VD: 100-200, 500)">
+    </label>
+    <label class="span-1">Tỉnh/Thành
+      <select name="city">
+        <option value="">Chọn tỉnh/thành phố…</option>
+        {% for c in cities %}
+          <option value="{{ c }}" {{ 'selected' if company and company.city == c }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="span-2">Địa chỉ
+      <input type="text" name="address" value="{{ company.address if company else '' }}">
+    </label>
+    <label class="span-2">Link fanpage
+      <input type="url" name="fanpage" placeholder="https://facebook.com/..." value="{{ company.fanpage if company else '' }}">
+    </label>
+    <label class="span-2">Link LinkedIn công ty
+      <input type="url" name="linkedin_company" placeholder="https://linkedin.com/company/..." value="{{ company.linkedin_company if company else '' }}">
+    </label>
+    <label class="span-2">Tiềm năng hợp tác
+      <select name="partnership_potential">
+        {% for p in partnership_potentials %}<option value="{{ p }}" {{ 'selected' if company and company.partnership_potential == p }}>{{ p }}</option>{% endfor %}
+      </select>
+      {% if suggestion %}
+      <span class="potential-suggestion-wrap">
+        <span class="potential-suggestion potential-suggestion-{{ suggestion.level|lower }}">
+          Gợi ý: {{ suggestion.level_label }} ({{ suggestion.score }}/{{ suggestion.max_score }} tiêu chí)
+        </span>
+        <span class="potential-suggestion-tooltip" role="tooltip">
+          <strong>Tiêu chí đang xét:</strong>
+          <ul>
+            {% for c in suggestion.criteria %}
+            <li class="{{ 'is-met' if c.met else 'is-unmet' }}">
+              <span class="tick">{{ '✓' if c.met else '✗' }}</span> {{ c.label }}
+            </li>
+            {% endfor %}
+          </ul>
+        </span>
+      </span>
+      <span class="potential-suggestion-note">Chỉ là gợi ý tự động — bạn tự quyết định có chọn theo hay không. Di chuột vào để xem chi tiết tiêu chí.</span>
+      {% endif %}
+    </label>
+    {% if edit_id %}
+    <label class="span-4">Ghi chú lịch sử thao tác (không bắt buộc)
+      <textarea name="activity_note" rows="2" placeholder="Lý do sửa hồ sơ công ty này — không bắt buộc, các ss_team khác sẽ xem được ở mục Lịch sử thao tác…"></textarea>
+    </label>
+    {% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu công ty' }}</button>
+    <a class="btn btn-text" href="{{ url_for('companies.detail', company_id=edit_id) if edit_id else url_for('companies.index') }}">Hủy</a>
+  </div>
+</form>

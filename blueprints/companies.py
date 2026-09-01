@@ -11,6 +11,9 @@ from constants import COMPANIES_PER_PAGE, PARTNERSHIP_POTENTIALS, CITIES_VN, CON
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args, _io_pool as _pool
 from potential_score import suggest_partnership_potential, suggest_partnership_potential_from_signals
 
+# Import trực tiếp — không vòng lặp, xem comment tương tự ở jobs.py.
+from blueprints.add_hub import _add_hub_context
+
 companies_bp = Blueprint("companies", __name__)
 
 
@@ -87,15 +90,19 @@ def index():
 @companies_bp.route("/companies/add", methods=["GET", "POST"])
 @staff_required
 def add():
-    if request.method == "POST":
-        try:
-            company = _call_authed(db_data.create_company, request.form)
-        except CrawlerAPIError as exc:
-            flash(str(exc), "error")
-            return render_template("add_company.html", company=request.form, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
-        flash(f"Đã thêm công ty {company['company']}.", "success")
-        return redirect(url_for("companies.detail", company_id=company["id"]))
-    return render_template("add_company.html", company=None, partnership_potentials=PARTNERSHIP_POTENTIALS, cities=CITIES_VN)
+    """Thêm công ty mới. ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương
+    án A+"): GET redirect sang /them-moi?tab=company, route này chỉ
+    còn xử lý POST. Nhánh lỗi render lại add_hub.html qua
+    _add_hub_context() — xem docstring jobs.add() (cùng pattern)."""
+    if request.method == "GET":
+        return redirect(url_for("add_hub.index", tab="company"))
+    try:
+        company = _call_authed(db_data.create_company, request.form)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        return render_template("add_hub.html", **_add_hub_context(active_tab="company", company_form=request.form))
+    flash(f"Đã thêm công ty {company['company']}.", "success")
+    return redirect(url_for("companies.detail", company_id=company["id"]))
 
 
 @companies_bp.route("/companies/<string:company_id>/edit", methods=["GET", "POST"])

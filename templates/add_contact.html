@@ -1,3 +1,16 @@
+{#
+  ĐÃ ĐỔI (08/2026, xem lịch sử trao đổi "phương án A+"): thân form
+  chuyển sang _contact_form.html (dùng chung với tab "contact" ở
+  templates/add_hub.html). File này giờ CHỈ còn dùng bởi:
+    - contacts.edit(company_id, contact_id) — sửa contact.
+    - contacts.add(company_id) — thêm contact NGAY TRONG 1 công ty cụ
+      thể (mở từ trang chi tiết công ty), KHÔNG đi qua /them-moi vì
+      company đã cố định sẵn qua URL, không cần chọn từ danh sách.
+  Route contacts.add_any() (thêm contact KHÔNG gắn sẵn công ty, link
+  sidebar cũ) đã chuyển hẳn sang /them-moi.
+
+  action=request.path giữ ĐÚNG hành vi self-submit cũ.
+#}
 {% extends "base.html" %}
 {% block title %}{{ 'Sửa người liên hệ' if edit_id else 'Thêm người liên hệ' }} — MindX Career Hub{% endblock %}
 {% block content %}
@@ -14,52 +27,8 @@
   </div>
 </header>
 
-<form class="form-card" method="post">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="form-grid">
-    {% if not company %}
-    {# Giữ hành vi cũ: nếu submit lỗi (vd thiếu tên) thì công ty vừa chọn
-       không bị mất khi trang render lại — <select> cũ tự làm việc này qua
-       'selected', combobox thì cần tự tìm lại tên công ty tương ứng id đã
-       gửi lên (contact ở đây chính là request.form khi có lỗi). #}
-    {% set _preselect_id = contact.get('company_id') if contact else '' %}
-    {% set _preselect_company = (companies|selectattr('id', 'equalto', _preselect_id)|first) if _preselect_id else none %}
-    <label class="span-4">Công ty *
-      {% with input_id = "contact_company_id", selected_id = _preselect_id, selected_label = _preselect_company.company if _preselect_company else '' %}
-        {% include "_company_combobox.html" %}
-      {% endwith %}
-    </label>
-    {% endif %}
-    <label class="span-2">Tên người liên hệ *
-      <input type="text" name="contact_name" required value="{{ contact.contact_name if contact else '' }}">
-    </label>
-    <label class="span-2">Chức danh
-      <input type="text" name="title" placeholder="HR, Recruiter, Hiring Manager…" value="{{ contact.title if contact else '' }}">
-    </label>
-    <label class="span-2">Email công việc (nếu công khai)
-      <input type="email" name="email" value="{{ contact.email if contact else '' }}">
-    </label>
-    <label class="span-2">LinkedIn/Facebook công việc
-      <input type="url" name="contact_link" placeholder="https://" value="{{ contact.contact_link if contact else '' }}">
-    </label>
-    <label class="span-2">Số điện thoại công việc (nếu công khai)
-      <input type="text" name="phone" value="{{ contact.phone if contact else '' }}">
-    </label>
-    <label class="span-2">Nguồn tìm thấy
-      <input type="text" name="source" placeholder="LinkedIn, JD tuyển dụng, fanpage…" value="{{ contact.source if contact else '' }}">
-    </label>
-    <label class="span-4">
-      {% if edit_id %}Ghi chú lịch sử thao tác — <strong>bắt buộc</strong>{% else %}Ghi chú lịch sử thao tác (không bắt buộc){% endif %}
-      <textarea name="activity_note" rows="2" {{ 'required' if edit_id }}
-        placeholder="{{ 'Lý do sửa thông tin người liên hệ này (bắt buộc — các ss_team khác sẽ xem được ở mục Lịch sử thao tác)…' if edit_id else 'Ghi chú thêm nếu cần (không bắt buộc)…' }}"
-      ></textarea>
-    </label>
-  </div>
-
-  <div class="form-actions">
-    <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if edit_id else 'Lưu người liên hệ' }}</button>
-    <a class="btn btn-text" href="{{ url_for('companies.detail', company_id=company.id) if company else url_for('contacts.index') }}">Hủy</a>
-  </div>
-</form>
+{% with action = request.path %}
+  {% include "_contact_form.html" %}
+{% endwith %}
 
 {% endblock %}
