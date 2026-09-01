@@ -177,6 +177,20 @@
     return pad(d.getHours()) + ":" + pad(d.getMinutes()) + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
   }
 
+  // isThisTabActive() — 09/2026, xem lịch sử trao đổi "load chậm mỗi
+  // lần chuyển phân trang log": crawl.html giờ lazy-fetch tab này và
+  // GIỮ NGUYÊN trong DOM sau khi đã load 1 lần (không còn full-reload
+  // mỗi lần chuyển tab/phân trang như trước — xem docstring
+  // templates/crawl.html). Kéo lên top-level IIFE (thay vì lồng trong
+  // loadAndPollLatestLog() như bản đầu) để pollBatch()/pollRun() bên
+  // dưới cũng gọi được — guard bằng class "active" (crawl.html tự
+  // toggle khi chuyển tab, xem activate()), chỉ đơn giản NO-OP lúc tab
+  // ẩn, tự chạy lại bình thường lúc active trở lại (KHÔNG mất nhịp).
+  function isThisTabActive() {
+    var panel = document.getElementById("tab-crawl");
+    return !!panel && panel.classList.contains("active");
+  }
+
   function buildHistoryRow(run) {
     var tr = document.createElement("tr");
 
@@ -408,24 +422,9 @@
         if (linesEl) linesEl.textContent = "Không tải được log — thử tải lại trang.";
       });
 
-    // isThisTabActive() — 09/2026, xem lịch sử trao đổi "load chậm mỗi
-    // lần chuyển phân trang log": crawl.html giờ lazy-fetch tab này và
-    // GIỮ NGUYÊN trong DOM sau khi đã load 1 lần (không còn full-reload
-    // mỗi lần chuyển tab/phân trang như trước — xem docstring
-    // templates/crawl.html), nên 2 setInterval bên dưới có thể chạy nền
-    // VÔ THỜI HẠN suốt phiên xem trang nếu không tự kiểm tra: người
-    // dùng chỉ cần từng ghé qua tab "Crawl dữ liệu" 1 lần rồi chuyển
-    // hẳn sang tab khác, 2 vòng lặp này vẫn bắn request đều đặn dù
-    // #tab-crawl đã ẩn. Guard bằng class "active" (crawl.html tự toggle
-    // khi chuyển tab, xem activate()) — không dùng setInterval/
-    // clearInterval qua lại (phức tạp hơn không cần thiết), chỉ đơn
-    // giản NO-OP lúc tab ẩn, tự chạy lại bình thường lúc tab active trở
-    // lại (KHÔNG mất nhịp, logCard vẫn giữ nguyên data-run-id/
-    // data-log-after-id suốt lúc ẩn).
-    function isThisTabActive() {
-      var panel = document.getElementById("tab-crawl");
-      return !!panel && panel.classList.contains("active");
-    }
+    // isThisTabActive() giờ dùng bản top-level (đầu file, ngay sau
+    // formatTime()) — kéo lên đó 09/2026 để pollBatch()/pollRun() cũng
+    // gọi được, xem docstring ở đó. Giữ nguyên 2 setInterval bên dưới.
 
     // Poll log của run hiện tại — 2s/lần, đủ nhanh để cảm giác "live".
     setInterval(function () {
@@ -479,6 +478,15 @@
     var addedRunIds = {};
 
     var timer = setInterval(function () {
+      // isThisTabActive() — 09/2026, cùng lý do với 2 vòng poll log
+      // phía trên (xem docstring): tab này giờ giữ nguyên trong DOM
+      // sau khi chuyển sang tab khác, nên NO-OP lúc ẩn, tự poll lại
+      // bình thường lúc active trở lại (không mất nhịp, batchId/card
+      // vẫn nguyên). Rủi ro thấp hơn 2 poll log (batch tự dừng khi
+      // xong nhờ clearInterval trong onDone) nhưng vẫn nên chặn để
+      // không bắn request nền vô ích nếu batch chạy lâu trong lúc
+      // đang xem tab khác.
+      if (!isThisTabActive()) return;
       if (stopped || inFlight) return;
       inFlight = true;
       fetch("/crawl/batch/" + batchId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
@@ -534,6 +542,10 @@
     var inFlight = false;
 
     var statusTimer = setInterval(function () {
+      // isThisTabActive() — 09/2026, cùng lý do/cách làm với pollBatch()
+      // ở trên và 2 vòng poll log phía trên nữa (xem docstring
+      // isThisTabActive()) — chặn poll nền vô ích lúc tab này đang ẩn.
+      if (!isThisTabActive()) return;
       if (stopped || inFlight) return;
       inFlight = true;
       fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})

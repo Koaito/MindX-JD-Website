@@ -261,6 +261,37 @@ def get_maintenance_logs(access_token, run_id, after_id=0, limit=500) -> dict:
     ) or {"last_id": after_id, "items": []}
 
 
+def get_maintenance_logs_batch(access_token, run_after_ids: dict, limit=500) -> dict:
+    """GET /maintenance/logs-batch — GỘP nhiều get_maintenance_logs()
+    (mỗi job_type 1 run_id/after_id riêng) thành 1 request (09/2026, xem
+    lịch sử trao đổi "gộp 5 request logs.json thành 1"): 5 khung "Log
+    live" ở tab Bảo trì trước đây tự poll logs.json RIÊNG mỗi khung,
+    cùng chu kỳ 2s -> 5 request đồng thời mỗi lần dù chỉ cần đúng 1
+    round-trip.
+
+    `run_after_ids`: dict {run_id: after_id} — CHỈ gồm job_type nào
+    ĐANG CÓ run_id (card nào chưa từng chạy lần nào thì tự loại ở phía
+    gọi, xem _maintenance_tab.html::pollAllMaintenanceLogs()); trả về
+    dict rỗng {} ngay nếu input rỗng, KHÔNG gọi mạng (đối xứng cách
+    get_logs_batch() phía backend/db tự return {} sớm).
+
+    Backend nhận run_ids/after_ids dạng CHUỖI PHÂN CÁCH DẤU PHẨY (xem
+    docstring api/routers/maintenance.py::get_maintenance_logs_batch())
+    khớp theo VỊ TRÍ — join theo ĐÚNG thứ tự dict.items() ở đây để 2
+    chuỗi luôn khớp nhau."""
+    if not run_after_ids:
+        return {}
+    run_ids, after_ids = zip(*run_after_ids.items())
+    return _request(
+        "GET", "/maintenance/logs-batch", access_token=access_token,
+        params={
+            "run_ids": ",".join(run_ids),
+            "after_ids": ",".join(str(a) for a in after_ids),
+            "limit": limit,
+        },
+    ) or {}
+
+
 def get_maintenance_latest_log_runs(access_token) -> dict:
     """GET /maintenance/latest-log-runs — khung "Log live" của MỖI
     trong 5 card job_type gọi lúc mở trang để biết run_id GẦN NHẤT (bất

@@ -321,6 +321,8 @@
   // _crawl_tab.html nhưng lặp qua TỪNG khung .maint-log-card thay vì 1
   // khung duy nhất, dùng /crawl/maintenance/latest-log-runs.json (trả
   // đủ 5 job_type 1 lần) thay vì /crawl/latest-log-run (1 nguồn).
+  // Poll NỘI DUNG log định kỳ (khác việc PHÁT HIỆN run mới ở trên) đã
+  // gộp thành 1 request/lần từ 09/2026 — xem pollAllMaintenanceLogs().
   var LOG_LEVEL_CLASS = {"WARNING": "is-warning", "ERROR": "is-error", "CRITICAL": "is-error"};
 
   function appendLogLines(logCard, items) {
@@ -348,6 +350,51 @@
         if (data.error) return;
         appendLogLines(logCard, data.items);
         if (typeof data.last_id === "number") logCard.setAttribute("data-log-after-id", String(data.last_id));
+      })
+      .catch(function () {});
+  }
+
+  // pollAllMaintenanceLogs() — 09/2026 (xem lịch sử trao đổi "gộp 5
+  // request logs.json thành 1"): THAY cho việc lặp qua 5 khung
+  // .maint-log-card rồi gọi fetchLogsFor() RIÊNG mỗi khung (5 request
+  // logs.json đồng thời mỗi 2s dù server chỉ cần trả lời 1 lần) —
+  // gom TẤT CẢ run_id/after_id đang có thành 1 lệnh gọi duy nhất tới
+  // /crawl/maintenance/logs-batch.json (proxy GET /maintenance/logs-batch
+  // phía backend, xem blueprints/crawl_maintenance.py), rồi phân phối
+  // kết quả về ĐÚNG từng khung theo run_id.
+  //
+  // fetchLogsFor() (hàm đơn ở trên) KHÔNG bị xoá — vẫn dùng cho
+  // switchLogCardToRun() (1 khung VỪA đổi sang run mới cần tải log
+  // NGAY, không đợi tới lượt poll gộp kế tiếp — gọi lẻ hợp lý hơn ở
+  // đây vì chỉ 1 khung, không phải cả 5).
+  function pollAllMaintenanceLogs() {
+    var runAfterIds = {};
+    var cardsByRunId = {};
+    document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
+      var runId = logCard.getAttribute("data-run-id");
+      if (!runId) return; // job_type chưa từng chạy lần nào -> không có gì để poll
+      runAfterIds[runId] = logCard.getAttribute("data-log-after-id") || "0";
+      cardsByRunId[runId] = logCard;
+    });
+
+    var runIds = Object.keys(runAfterIds);
+    if (!runIds.length) return; // cả 5 job_type đều chưa từng chạy -> khỏi gọi mạng
+
+    var params = new URLSearchParams({
+      run_ids: runIds.join(","),
+      after_ids: runIds.map(function (rid) { return runAfterIds[rid]; }).join(","),
+    });
+    fetch("/crawl/maintenance/logs-batch.json?" + params.toString(), {headers: {"X-Requested-With": "XMLHttpRequest"}})
+      .then(function (res) { return res.json(); })
+      .then(function (result) {
+        if (result.error) return;
+        runIds.forEach(function (rid) {
+          var data = result[rid];
+          if (!data) return;
+          var logCard = cardsByRunId[rid];
+          appendLogLines(logCard, data.items);
+          if (typeof data.last_id === "number") logCard.setAttribute("data-log-after-id", String(data.last_id));
+        });
       })
       .catch(function () {});
   }
@@ -392,14 +439,17 @@
   }
 
   pollAllLatestLogRuns();
-  // Poll log của run hiện tại (nếu có) cho từng khung — 2s/lần.
+  // Poll log của TẤT CẢ khung — 09/2026: đổi từ lặp gọi fetchLogsFor()
+  // riêng từng khung (5 request/lần) sang pollAllMaintenanceLogs() (1
+  // request gộp/lần, xem docstring hàm đó). Giãn chu kỳ 2s -> 4s cùng
+  // đợt sửa (xem lịch sử trao đổi) — độ trễ hiển thị log tăng nhẹ
+  // (tối đa +2s so với trước) nhưng KHÔNG ảnh hưởng cảm nhận với log
+  // dạng "theo dõi tiến độ job nền" (khác chat real-time), đổi lại
+  // giảm 1 nửa tần suất round-trip.
   setInterval(function () {
     if (!isThisTabActive()) return;
-    document.querySelectorAll(".maint-log-card").forEach(function (logCard) {
-      var runId = logCard.getAttribute("data-run-id");
-      if (runId) fetchLogsFor(logCard, runId);
-    });
-  }, 2000);
+    pollAllMaintenanceLogs();
+  }, 4000);
   // Poll phát hiện run MỚI cho CẢ 5 job_type — 6s/lần, cùng chu kỳ
   // loadAndPollLatestLog() bên _crawl_tab.html.
   setInterval(function () {

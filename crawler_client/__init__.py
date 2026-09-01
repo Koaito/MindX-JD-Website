@@ -128,6 +128,7 @@ from .maintenance import (
     get_maintenance_status,
     list_maintenance_runs,
     get_maintenance_logs,
+    get_maintenance_logs_batch,
     get_maintenance_latest_log_runs,
 )
 from .import_export import (
@@ -236,6 +237,7 @@ __all__ = [
     "get_maintenance_status",
     "list_maintenance_runs",
     "get_maintenance_logs",
+    "get_maintenance_logs_batch",
     "get_maintenance_latest_log_runs",
     "IMPORT_EXPORT_ENTITY_TYPES",
     "IMPORT_EXPORT_ENTITY_LABELS",

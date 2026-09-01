@@ -143,6 +143,26 @@
     }
   }
 
+  // requestSeq — 09/2026 (theo lịch sử trao đổi "race condition":
+  // hướng #2 — đánh số thứ tự request, chỉ nhận response mới nhất).
+  // Mỗi panel giữ 1 số đếm riêng qua panel.dataset.reqSeq — TĂNG lên
+  // mỗi lần loadTabIfNeeded()/ajaxNavigate() bắn fetch cho panel đó,
+  // "chốt" giá trị tại thời điểm gọi; lúc response về, so lại với giá
+  // trị HIỆN TẠI của panel — khác nhau nghĩa là đã có thao tác mới hơn
+  // xảy ra sau đó (vd bấm "Trang sau" rồi "Trang trước" liên tiếp) ->
+  // bỏ qua, không đụng DOM. Không dùng AbortController (hướng #1) vì
+  // quy mô trang admin nội bộ, ít người dùng, request nhẹ — không đáng
+  // đánh đổi thêm phức tạp (AbortError phải bắt riêng, dễ lẫn với lỗi
+  // mạng thật ở nhánh .catch() fallback full-reload bên dưới).
+  function nextRequestSeq(panel) {
+    var seq = (parseInt(panel.dataset.reqSeq, 10) || 0) + 1;
+    panel.dataset.reqSeq = String(seq);
+    return seq;
+  }
+  function isStaleRequestSeq(panel, seq) {
+    return String(seq) !== panel.dataset.reqSeq;
+  }
+
   function loadTabIfNeeded(tab) {
     var panel = document.getElementById("tab-" + tab);
     if (!panel || panel.getAttribute("data-loaded") === "true") return;
@@ -158,12 +178,14 @@
     // chỉ xảy ra cho tab KHÁC tab lúc load trang, nên giữ nguyên toàn
     // bộ query string hiện có là đúng ý muốn, không cần lọc bớt).
 
+    var seq = nextRequestSeq(panel);
     fetch(url.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
       })
       .then(function (html) {
+        if (isStaleRequestSeq(panel, seq)) return; // đã có thao tác mới hơn xảy ra sau -> bỏ qua response trễ này
         panel.innerHTML = html;
         panel.setAttribute("data-loaded", "true");
         execTabScripts(panel);
@@ -177,6 +199,7 @@
         }
       })
       .catch(function () {
+        if (isStaleRequestSeq(panel, seq)) return; // response/lỗi trễ của 1 request đã cũ -> không can thiệp nữa
         // Fallback: fetch lỗi (mạng/JS) -> full reload tới đúng tab đó,
         // KHÔNG để người dùng kẹt ở khung rỗng không bấm gì được —
         // cùng triết lý "progressive enhancement" của public/app.js.
@@ -216,18 +239,21 @@
   // <button>, không phải <a>, nên không khớp selector bên dưới) — an
   // toàn khi gắn handler chung ở đây, không cần if riêng theo tab.
   function ajaxNavigate(url, panel) {
+    var seq = nextRequestSeq(panel);
     fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
       })
       .then(function (html) {
+        if (isStaleRequestSeq(panel, seq)) return; // đã có thao tác mới hơn (vd bấm "Trang sau" 2 lần liên tiếp) -> bỏ qua response trễ này
         panel.innerHTML = html;
         execTabScripts(panel);
         history.replaceState(null, "", url);
         panel.scrollIntoView({ block: "start", behavior: "smooth" });
       })
       .catch(function () {
+        if (isStaleRequestSeq(panel, seq)) return;
         // Cùng fallback với loadTabIfNeeded() — full reload để không
         // kẹt UI nếu fetch lỗi.
         window.location.href = url;

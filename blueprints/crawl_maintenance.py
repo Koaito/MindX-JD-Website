@@ -244,6 +244,39 @@ def maintenance_logs_json(run_id):
     return jsonify(result)
 
 
+@crawl_bp.route("/crawl/maintenance/logs-batch.json")
+@admin_required
+def maintenance_logs_batch_json():
+    """JSON — GỘP log MỚI của NHIỀU run_id (mỗi job_type 1 run_id) 1
+    lần gọi (09/2026, xem lịch sử trao đổi "gộp 5 request logs.json
+    thành 1") — thay 5 lần gọi maintenance_logs_json() riêng biệt của
+    JS (1 khung "Log live"/job_type, cùng chu kỳ poll) bằng 1 route duy
+    nhất, proxy thẳng GET /maintenance/logs-batch phía backend.
+
+    Query string: `run_ids`/`after_ids` — 2 chuỗi phân cách dấu phẩy,
+    khớp theo VỊ TRÍ (giữ nguyên định dạng phía backend, không giải mã/
+    mã hoá lại ở tầng Flask này để tránh sai lệch thứ tự)."""
+    run_ids = request.args.get("run_ids", "")
+    after_ids = request.args.get("after_ids", "")
+    run_id_list = [r for r in run_ids.split(",") if r]
+    after_id_list = [a for a in after_ids.split(",") if a]
+
+    if not run_id_list:
+        return jsonify({})
+    if len(run_id_list) != len(after_id_list):
+        return jsonify({"error": "run_ids và after_ids phải cùng số lượng."}), 400
+
+    run_after_ids = {}
+    for rid, aid in zip(run_id_list, after_id_list):
+        run_after_ids[rid] = int(aid) if aid.isdigit() else 0
+
+    try:
+        result = _call_authed(db_data.get_maintenance_logs_batch, run_after_ids)
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), (exc.status_code or 500)
+    return jsonify(result)
+
+
 @crawl_bp.route("/crawl/maintenance/latest-log-runs.json")
 @admin_required
 def maintenance_latest_log_runs_json():
