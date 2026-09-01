@@ -604,3 +604,28 @@
 .status-card-title {
   font-size: 28px;
 }
+
+/* Tab "Lịch sử vận hành" (_history_tab.html, 08/2026) — biến thể TĨNH
+   của .crawl-live-widget, đặt ở đầu tab thay vì nổi cố định góc màn
+   hình. KHÁC .crawl-live-widget gốc: position static (nằm trong luồng
+   trang bình thường), width 100% (không phải 360px cố định), không
+   max-height/overflow:hidden (hiện đủ toàn bộ, không cần cuộn riêng —
+   trang này vốn đã cho phép cuộn dài để xem lịch sử), không box-shadow/
+   z-index (không cần "nổi đè" lên nội dung vì đây LÀ 1 phần bố cục
+   bình thường, không phải overlay). Tái dùng NGUYÊN các class con
+   (.crawl-live-widget-head/-title/-count/-body, .crawl-running-list,
+   .crawl-running-card-wrap...) — chỉ ghi đè đúng phần layout khác biệt
+   ở class cha, không định nghĩa lại từ đầu. */
+.crawl-live-widget.crawl-live-widget-static {
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-shadow: none;
+  z-index: auto;
+  overflow: visible;
+}
+
+.crawl-live-widget-static .crawl-live-widget-head {
+  cursor: default;
+}

@@ -1,17 +1,19 @@
 {#
-  Shell 3 tab cho mục sidebar "Vận hành dữ liệu" (08/2026, đổi tên từ
+  Shell 4 mục cho mục sidebar "Vận hành dữ liệu" (08/2026, đổi tên từ
   "Crawl dữ liệu" — xem lịch sử trao đổi). Chỉ chọn tab + include đúng
   partial, KHÔNG tự chứa logic UI nào — mirror pattern
   templates/data_management.html (tab-nav + include theo query param).
 
-  tab='crawl' (mặc định) -> _crawl_tab.html (nội dung y hệt trang cũ).
+  tab='crawl' (mặc định) -> _crawl_tab.html (Khu A kích hoạt + Khu B
+  đang chạy — Khu C lịch sử đã CHUYỂN sang tab='history', xem dưới).
   tab='status' -> _status_tab.html (Tình trạng dữ liệu — company đang
   thiếu field gì/tỉ lệ bao nhiêu, thêm 08/2026).
-  tab='maintenance' -> _maintenance_tab.html (5 job bảo trì dữ liệu).
-  tab='history' -> _history_tab.html (08/2026, xem lịch sử trao đổi
-  "tách 2 bảng lịch sử ra tab riêng" — 2 bảng "Lịch sử crawl"/"Lịch sử
-  bảo trì" dời từ cuối 2 tab kia về đây, tách biệt rõ ràng, mỗi bảng tự
-  phân trang 6 dòng/trang).
+  tab='maintenance' -> _maintenance_tab.html (5 job bảo trì dữ liệu —
+  cũng chỉ còn Khu A/B, Khu C lịch sử đã chuyển sang tab='history').
+  tab='history' -> _history_tab.html (thêm 08/2026, mục thứ 4 "Lịch sử
+  vận hành") — 2 bảng lịch sử (crawl + bảo trì) xếp DỌC, phân trang
+  riêng 6 dòng/trang — xem lịch sử trao đổi "tách 2 bảng log crawl/bảo
+  trì sang mục thứ 4 riêng, không gộp".
 #}
 {% extends "base.html" %}
 {% block title %}Vận hành dữ liệu — MindX Career Hub{% endblock %}
@@ -26,11 +28,11 @@
       {% if tab == 'status' %}
         Xem nhanh company đang thiếu dữ liệu gì (mã số thuế, website, ngành...) và tỉ lệ bao nhiêu, không cần vào thẳng database.
       {% elif tab == 'maintenance' %}
-        Kích hoạt các job bảo trì dữ liệu (vá hồ sơ công ty, tra cứu web, dọn job hết hạn) và theo dõi tiến độ. Xem lại lịch sử các lượt đã chạy ở tab "Lịch sử".
+        Kích hoạt các job bảo trì dữ liệu (vá hồ sơ công ty, tra cứu web, dọn job hết hạn) và theo dõi tiến độ.
       {% elif tab == 'history' %}
-        Tra lại lịch sử các lượt crawl và bảo trì dữ liệu đã chạy — 2 bảng riêng biệt, lọc và phân trang độc lập nhau.
+        Tra lại lịch sử các lượt crawl và bảo trì dữ liệu đã chạy.
       {% else %}
-        Kích hoạt crawl JD từ TopCV/VietnamWorks/CareerViet và theo dõi tiến độ. Xem lại lịch sử các lượt đã chạy ở tab "Lịch sử".
+        Kích hoạt crawl JD từ TopCV/VietnamWorks/CareerViet và theo dõi tiến độ.
       {% endif %}
     </p>
   </div>
@@ -40,7 +42,7 @@
   <a href="{{ url_for('crawl.index', tab='crawl') }}" class="{{ 'active' if tab == 'crawl' else '' }}">Crawl dữ liệu</a>
   <a href="{{ url_for('crawl.index', tab='status') }}" class="{{ 'active' if tab == 'status' else '' }}">Tình trạng dữ liệu</a>
   <a href="{{ url_for('crawl.index', tab='maintenance') }}" class="{{ 'active' if tab == 'maintenance' else '' }}">Bảo trì dữ liệu</a>
-  <a href="{{ url_for('crawl.index', tab='history') }}" class="{{ 'active' if tab == 'history' else '' }}">Lịch sử</a>
+  <a href="{{ url_for('crawl.index', tab='history') }}" class="{{ 'active' if tab == 'history' else '' }}">Lịch sử vận hành</a>
 </nav>
 
 {% if tab == 'status' %}

@@ -153,15 +153,10 @@
   </div>
 </div>
 
-{# ================= Khu C — Lịch sử ================= #}
-{# 08/2026 (xem lịch sử trao đổi "tách 2 bảng lịch sử ra tab riêng") —
-   bảng "Lịch sử crawl" (filter + phân trang) đã DỜI sang tab riêng
-   "Lịch sử" (_history_tab.html, ?tab=history), không còn render ở đây
-   nữa. Các hàm JS bên dưới (buildHistoryRow/prependHistoryRow...) VẪN
-   GIỮ NGUYÊN — vô hại khi không tìm thấy #crawl-history-tbody (đã tự
-   `if (!tbody) return;`), không xoá để tránh phải sửa lại toàn bộ luồng
-   callback onDone() của pollRun()/pollBatch() bên dưới. Muốn xem lịch
-   sử, admin qua tab "Lịch sử". #}
+{# ================= Khu C: Lịch sử — CHUYỂN sang tab "history" riêng
+   (mục sidebar thứ 4 "Lịch sử vận hành") từ 08/2026. Xem
+   blueprints/crawl.py::_history_tab_context() + templates/_history_tab.html.
+   Tab "crawl" giờ chỉ còn Khu A (kích hoạt) + Khu B (đang chạy) ở trên. #}
 
 {# ================= JS: poll trạng thái + tự thêm dòng lịch sử ================= #}
 <script>
@@ -243,6 +238,14 @@
   }
 
   function prependHistoryRow(run) {
+    // TỪ 08/2026: bảng lịch sử crawl đã CHUYỂN sang tab "history" riêng
+    // (mục sidebar "Lịch sử vận hành") — #crawl-history-tbody không còn
+    // tồn tại trong tab "crawl" này nữa. Hàm này CỐ Ý giữ nguyên (không
+    // xoá) — nhánh `if (!tbody) return` bên dưới khiến nó tự thành
+    // no-op an toàn khi gọi từ onRunOrBatchDone/poll (dòng ~567/~615),
+    // không cần sửa 2 nơi gọi đó. Nếu sau này quyết định đưa preview
+    // "vừa xong" trở lại tab crawl (khác bảng lịch sử đầy đủ ở tab
+    // history), hàm build row này vẫn dùng lại được nguyên vẹn.
     var tbody = document.getElementById("crawl-history-tbody");
     var emptyState = document.getElementById("crawl-history-empty");
     if (!tbody && emptyState) {

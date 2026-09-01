@@ -121,15 +121,11 @@
   </div>
 </div>
 
-{# ================= Khu C — Lịch sử ================= #}
-{# 08/2026 (xem lịch sử trao đổi "tách 2 bảng lịch sử ra tab riêng") —
-   bảng "Lịch sử bảo trì" (filter + phân trang) đã DỜI sang tab riêng
-   "Lịch sử" (_history_tab.html, ?tab=history), không còn render ở đây
-   nữa. Các hàm JS bên dưới (buildHistoryRow/prependHistoryRow...) VẪN
-   GIỮ NGUYÊN — vô hại khi không tìm thấy #maint-history-tbody (đã tự
-   `if (!tbody) return;`), không xoá để tránh phải sửa lại toàn bộ luồng
-   callback pollMaintenanceRun() bên dưới. Muốn xem lịch sử, admin qua
-   tab "Lịch sử". #}
+{# ================= Khu C: Lịch sử — CHUYỂN sang tab "history" riêng
+   (mục sidebar thứ 4 "Lịch sử vận hành") từ 08/2026. Xem
+   blueprints/crawl_maintenance.py::_maintenance_history_context_raw() +
+   templates/_history_tab.html. Tab "maintenance" giờ chỉ còn Khu A
+   (kích hoạt) + Khu B (đang chạy) ở trên. #}
 
 {# ================= JS ================= #}
 <script>
@@ -215,6 +211,11 @@
   }
 
   function prependHistoryRow(run) {
+    // TỪ 08/2026: bảng lịch sử bảo trì đã CHUYỂN sang tab "history"
+    // riêng (mục sidebar "Lịch sử vận hành") — #maint-history-tbody
+    // không còn tồn tại trong tab "maintenance" này nữa. Cùng lý do
+    // giữ nguyên hàm này (thành no-op an toàn) như prependHistoryRow()
+    // ở _crawl_tab.html.
     var tbody = document.getElementById("maint-history-tbody");
     var emptyState = document.getElementById("maint-history-empty");
     if (!tbody && emptyState) return;  // bảng rỗng lúc tải trang — nhắc tải lại, giống crawl tab.

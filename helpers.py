@@ -138,6 +138,22 @@ def _paginate_args(default_per_page):
     return page, default_per_page
 
 
+def _paginate_args_named(param_name, default_per_page):
+    """Như _paginate_args() nhưng đọc số trang từ query param TUỲ CHỌN
+    tên (không cố định là "page") — dùng khi 2 bảng phân trang ĐỘC LẬP
+    cùng nằm trên 1 trang (thêm 08/2026, xem tab "Lịch sử vận hành" —
+    blueprints/crawl.py::_history_tab_context()). Nếu cả 2 bảng cùng
+    dùng chung tên param "page", bấm "Trang sau" ở bảng này sẽ vô tình
+    đổi luôn số trang đang xem của bảng kia (2 form GET riêng nhưng
+    cùng ghi vào 1 query param, cái sau ghi đè cái trước trên URL)."""
+    try:
+        page = int(request.args.get(param_name, 1))
+    except (TypeError, ValueError):
+        page = 1
+    page = max(page, 1)
+    return page, default_per_page
+
+
 # ---------------------------------------------------------------------------
 # Date helpers
 # ---------------------------------------------------------------------------
