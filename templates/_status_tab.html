@@ -23,7 +23,71 @@
   .dash-table-fixed + .pagination-list-nav (đã có sẵn, xem
   dashboard.html "JD sắp hết hạn cần đẩy gấp"/"JD ế") — CÙNG pattern
   bảng + phân trang phía client, không phải component mới.
+
+  KHÔI PHỤC 09/2026 (xem lịch sử trao đổi "đồng bộ widget đang chạy",
+  ĐẢO LẠI quyết định "tab status không cần widget vì đã có tab
+  History"): tab này giờ có 1 widget nổi CỦA RIÊNG NÓ (không tái dùng
+  y hệt _crawl_tab.html/_maintenance_tab.html vì tab này KHÔNG có
+  Khu A/Khu B nào sẵn — tự nó không có job riêng để trigger, nên hiện
+  CẢ 2 loại luôn thay vì "loại chính + loại chéo" như 2 tab kia). CHỈ
+  hiện, không cho bấm/huỷ gì — đúng tinh thần "CHỈ ĐỌC" của cả tab này.
+  Khác widget tĩnh ở tab History (blueprints/crawl_history.py, vẫn giữ
+  nguyên không đụng): widget ở đây POLL LIVE (tự cập nhật + tự xoá khi
+  xong) vì đó chính là mục đích Phần 2 ban đầu.
 #}
+
+{% if cross_crawl_active_runs or cross_maintenance_active_runs %}
+<div class="crawl-live-widget" id="status-live-widget">
+  <div class="crawl-live-widget-head" data-role="widget-toggle">
+    <span class="crawl-live-widget-title">
+      Đang chạy
+      <span class="crawl-live-widget-count" id="status-live-widget-count">{{ (cross_crawl_active_runs|length) + (cross_maintenance_active_runs|length) }}</span>
+    </span>
+    <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
+  </div>
+  <div class="crawl-live-widget-body">
+    {% if cross_crawl_active_runs %}
+    <p class="crawl-live-widget-group-label">Crawl</p>
+    <div class="crawl-running-list" id="status-crawl-running-zone">
+      {% for source, run in cross_crawl_active_runs.items() %}
+      <div class="dm-export-card crawl-running-card-wrap" id="status-crawl-running-{{ source }}"
+           data-run-id="{{ run.run_id }}" data-kind="crawl">
+        <div class="crawl-running-card">
+          <div>
+            <span class="badge badge-info"><span class="crawl-spinner"></span>{{ cross_crawl_status_labels.get(run.status, run.status) }}</span>
+            <p class="crawl-running-meta" style="margin-top: 8px;">
+              {{ cross_crawl_labels.get(source, source) }}<br>
+              Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if cross_maintenance_active_runs %}
+    <p class="crawl-live-widget-group-label">Bảo trì</p>
+    <div class="crawl-running-list" id="status-maint-running-zone">
+      {% for jt, run in cross_maintenance_active_runs.items() %}
+      <div class="dm-export-card crawl-running-card-wrap" id="status-maint-running-{{ jt }}"
+           data-run-id="{{ run.run_id }}" data-kind="maintenance">
+        <div class="crawl-running-card">
+          <div>
+            <span class="badge badge-info"><span class="crawl-spinner"></span>{{ cross_maintenance_status_labels.get(run.status, run.status) }}</span>
+            <p class="crawl-running-meta" style="margin-top: 8px;">
+              {{ cross_maintenance_labels.get(jt, jt) }}<br>
+              Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 <section class="card">
   <h4 class="status-card-title">Company đang thiếu dữ liệu theo từng trường</h4>
@@ -179,3 +243,82 @@
   <p class="empty-placeholder">Không có job nào nghi trùng — ổn.</p>
   {% endif %}
 </section>
+
+{% if cross_crawl_active_runs or cross_maintenance_active_runs %}
+<script>
+(function () {
+  "use strict";
+  // Widget nổi "Đang chạy" — KHÔI PHỤC 09/2026 (xem docstring khối
+  // widget ở đầu file). Tab này KHÔNG có Khu A/B nào sẵn (CHỈ ĐỌC) nên
+  // 1 hàm poll GENERIC duy nhất đọc data-kind="crawl"/"maintenance"
+  // trên từng card để tự chọn đúng endpoint — khác 2 tab kia (mỗi tab
+  // có endpoint cố định riêng cho phần "chéo" vì biết trước chỉ có 1
+  // loại). CHỈ báo trạng thái + tự xoá card khi xong, không có gì khác
+  // để cập nhật (không form/lịch sử nào ở tab này cần enable lại).
+
+  function updateWidgetCount() {
+    var countEl = document.getElementById("status-live-widget-count");
+    if (!countEl) return;
+    var n = document.querySelectorAll(
+      "#status-crawl-running-zone .crawl-running-card-wrap, #status-maint-running-zone .crawl-running-card-wrap"
+    ).length;
+    countEl.textContent = String(n);
+    var widget = document.getElementById("status-live-widget");
+    if (n === 0 && widget) widget.remove();
+  }
+
+  function pollCard(card) {
+    var runId = card.getAttribute("data-run-id");
+    var kind = card.getAttribute("data-kind");
+    var endpoint = kind === "maintenance"
+      ? "/crawl/maintenance/" + runId + "/status.json"
+      : "/crawl/" + runId + "/status.json";
+    var stopped = false;
+    var inFlight = false;
+
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch(endpoint, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          inFlight = false;
+          if (stopped) return;
+          if (run.error) {
+            stopped = true;
+            clearInterval(timer);
+            return;
+          }
+          if (run.status === "done" || run.status === "error") {
+            stopped = true;
+            clearInterval(timer);
+            var zone = card.parentNode;
+            card.remove();
+            if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+              var groupLabel = zone.previousElementSibling;
+              if (groupLabel && groupLabel.classList.contains("crawl-live-widget-group-label")) groupLabel.remove();
+              zone.remove();
+            }
+            updateWidgetCount();
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  document.querySelectorAll(
+    "#status-crawl-running-zone .crawl-running-card-wrap[data-run-id], #status-maint-running-zone .crawl-running-card-wrap[data-run-id]"
+  ).forEach(function (card) { pollCard(card); });
+
+  var liveWidget = document.getElementById("status-live-widget");
+  if (liveWidget) {
+    var widgetHead = liveWidget.querySelector('[data-role="widget-toggle"]');
+    if (widgetHead) {
+      widgetHead.addEventListener("click", function () {
+        liveWidget.classList.toggle("is-collapsed");
+      });
+    }
+  }
+})();
+</script>
+{% endif %}

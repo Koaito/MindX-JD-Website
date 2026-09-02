@@ -59,9 +59,11 @@ def staff_required(view):
 
 def admin_required(view):
     """Chỉ tài khoản role='admin' mới được vào — CHẶT HƠN
-    @staff_required (cho cả ss_team). Dùng cho trang "Crawl dữ liệu"
-    (08/2026, xem blueprints/crawl.py) — yêu cầu gốc "chỉ có quyền admin
-    mới thấy và dùng được", khớp đúng mức POST /crawl ở backend
+    @staff_required (cho cả ss_team). Dùng cho 2 route BẤM CHẠY ở
+    trang "Vận hành dữ liệu" (crawl.trigger()/trigger_batch()/
+    maintenance_trigger(), xem docstring đầu blueprints/crawl.py —
+    SỬA 09/2026: KHÔNG còn áp cho cả trang như trước, chỉ còn áp cho 2
+    route POST này) — khớp đúng mức POST /crawl ở backend
     (Depends(require_admin), chặt hơn GET /crawl/{run_id} + GET /crawl
     chỉ cần 'ss_team').
 

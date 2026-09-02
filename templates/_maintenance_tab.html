@@ -15,6 +15,10 @@
 #}
 
 {# ================= Khu A — Kích hoạt job bảo trì ================= #}
+{# KHÔI PHỤC 09/2026 — cùng lý do/cách làm với _crawl_tab.html (xem
+   docstring bên đó): route maintenance_trigger() vẫn @admin_required,
+   route index() giờ @staff_required, nên ẩn form kích hoạt nếu không
+   phải admin — ss_team chỉ thấy trạng thái job, không thấy nút bấm. #}
 <div class="crawl-sources crawl-sources--fixed-2col">
   {% for job in maintenance_jobs %}
   {% set jt = job.job_type %}
@@ -33,6 +37,7 @@
     </p>
     {% endif %}
 
+    {% if current_user.role == 'admin' %}
     <form method="post" action="{{ url_for('crawl.maintenance_trigger', job_type=jt) }}"
           class="form-grid form-card maint-trigger-form" data-job-type="{{ jt }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -64,6 +69,7 @@
         </button>
       </div>
     </form>
+    {% endif %}
 
     {# ---- Log live RIÊNG cho job_type này — xem đầu docstring file ---- #}
     {% set latest = latest_log_runs.get(jt) %}
@@ -82,22 +88,33 @@
   {% endfor %}
 </div>
 
-{# ================= Widget nổi "Đang chạy" (tối đa 5, 1/job_type) =================
+{# ================= Widget nổi "Đang chạy" (bảo trì + chéo crawl) =================
    08/2026 (theo yêu cầu thảo luận, mirror y hệt cách làm bên
    _crawl_tab.html) — nổi cố định góc dưới-phải, đi theo khi cuộn, thu
-   gọn được. TÁI DÙNG NGUYÊN #maint-running-zone + .crawl-running-card-wrap
-   như cũ -> JS polling (pollMaintenanceRun/onRunDone ở cuối file) không
-   cần sửa gì, chỉ đổi chỗ hiển thị bằng CSS (.crawl-live-widget dùng
-   chung với tab Crawl, xem 15-crawl.css). #}
-<div class="crawl-live-widget{{ '' if active_runs else ' is-collapsed' }}" id="maint-live-widget">
+   gọn được.
+
+   KHÔI PHỤC 09/2026 (xem docstring khối tương ứng ở _crawl_tab.html —
+   ĐẢO LẠI quyết định 08/2026 "chỉ hiện job của tab đang xem") — thêm
+   khối "Crawl" bên dưới khối "Bảo trì" chính, CHỈ hiện không cho bấm.
+
+   Khối "Bảo trì" TÁI DÙNG NGUYÊN #maint-running-zone +
+   .crawl-running-card-wrap như cũ -> JS polling (pollMaintenanceRun/
+   onRunDone ở cuối file) không cần sửa gì. Khối "Crawl" (chéo) dùng
+   #maint-cross-running-zone riêng + pollCrossCard() generic (cuối
+   file, cùng hàm dùng ở _crawl_tab.html/_status_tab.html) — tự gọi
+   đúng endpoint /crawl/<id>/status.json theo data-kind="crawl". #}
+<div class="crawl-live-widget{{ '' if (active_runs or cross_active_runs) else ' is-collapsed' }}" id="maint-live-widget">
   <div class="crawl-live-widget-head" data-role="widget-toggle">
     <span class="crawl-live-widget-title">
       Đang chạy
-      <span class="crawl-live-widget-count" id="maint-live-widget-count" {{ 'hidden' if not active_runs }}>{{ active_runs|length }}</span>
+      <span class="crawl-live-widget-count" id="maint-live-widget-count" {{ 'hidden' if not (active_runs or cross_active_runs) }}>{{ (active_runs|length) + (cross_active_runs|length) }}</span>
     </span>
     <button type="button" class="crawl-live-widget-toggle" aria-label="Thu gọn/mở rộng">▾</button>
   </div>
   <div class="crawl-live-widget-body">
+    {% if cross_active_runs %}
+    <p class="crawl-live-widget-group-label">Bảo trì</p>
+    {% endif %}
     <div class="crawl-running-list" id="maint-running-zone">
       {% if active_runs %}
         {% for jt, run in active_runs.items() %}
@@ -118,6 +135,26 @@
         <p class="muted crawl-running-empty">Hiện không có job bảo trì nào đang chạy.</p>
       {% endif %}
     </div>
+
+    {% if cross_active_runs %}
+    <p class="crawl-live-widget-group-label">Crawl</p>
+    <div class="crawl-running-list" id="maint-cross-running-zone">
+      {% for source, run in cross_active_runs.items() %}
+      <div class="dm-export-card crawl-running-card-wrap" id="maint-cross-running-{{ source }}"
+           data-run-id="{{ run.run_id }}" data-kind="crawl">
+        <div class="crawl-running-card">
+          <div>
+            <span class="badge badge-info"><span class="crawl-spinner"></span>{{ cross_status_labels.get(run.status, run.status) }}</span>
+            <p class="crawl-running-meta" style="margin-top: 8px;">
+              {{ cross_labels.get(source, source) }}<br>
+              Bấm bởi <strong>{{ run.triggered_by_name }}</strong> lúc {{ run.started_at|format_date('%H:%M %d/%m') }}
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -256,11 +293,16 @@
 
   // Cập nhật số đếm trên widget nổi — mirror updateWidgetCount() bên
   // _crawl_tab.html (xem docstring bên đó), chỉ đổi id cho đúng tab này.
+  //
+  // KHÔI PHỤC 09/2026 — đếm CẢ #maint-cross-running-zone (card crawl
+  // hiện chéo), không chỉ #maint-running-zone như trước.
   function updateWidgetCount() {
-    var zone = document.getElementById("maint-running-zone");
+    var ownZone = document.getElementById("maint-running-zone");
+    var crossZone = document.getElementById("maint-cross-running-zone");
     var countEl = document.getElementById("maint-live-widget-count");
-    if (!zone || !countEl) return;
-    var n = zone.querySelectorAll(".crawl-running-card-wrap").length;
+    if (!countEl) return;
+    var n = (ownZone ? ownZone.querySelectorAll(".crawl-running-card-wrap").length : 0) +
+            (crossZone ? crossZone.querySelectorAll(".crawl-running-card-wrap").length : 0);
     if (n > 0) {
       countEl.hidden = false;
       countEl.textContent = String(n);
@@ -280,6 +322,51 @@
     }
     updateWidgetCount();
   }
+
+  // KHÔI PHỤC 09/2026 — poll card CHÉO (crawl hiện trong widget tab
+  // bảo trì, xem #maint-cross-running-zone ở template) — cùng lý do
+  // pollCrossMaintenanceCard() bên _crawl_tab.html (chỉ báo trạng thái
+  // + tự biến mất, không prependHistoryRow()/reenable form nào của tab
+  // này).
+  function pollCrossCrawlCard(card) {
+    var runId = card.getAttribute("data-run-id");
+    var stopped = false;
+    var inFlight = false;
+
+    var timer = setInterval(function () {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      fetch("/crawl/" + runId + "/status.json", {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function (res) { return res.json(); })
+        .then(function (run) {
+          inFlight = false;
+          if (stopped) return;
+          if (run.error) {
+            stopped = true;
+            clearInterval(timer);
+            return;
+          }
+          if (run.status === "done" || run.status === "error") {
+            stopped = true;
+            clearInterval(timer);
+            card.remove();
+            var zone = document.getElementById("maint-cross-running-zone");
+            if (zone && !zone.querySelector(".crawl-running-card-wrap")) {
+              var wrap = zone.closest(".crawl-live-widget-body");
+              var groupLabel = wrap ? wrap.querySelector(".crawl-live-widget-group-label:last-of-type") : null;
+              if (groupLabel) groupLabel.remove();
+              zone.remove();
+            }
+            updateWidgetCount();
+          }
+        })
+        .catch(function () { inFlight = false; });
+    }, 4000);
+  }
+
+  document.querySelectorAll("#maint-cross-running-zone .crawl-running-card-wrap[data-run-id]").forEach(function (card) {
+    pollCrossCrawlCard(card);
+  });
 
   function pollMaintenanceRun(card) {
     var runId = card.getAttribute("data-run-id");

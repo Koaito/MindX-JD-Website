@@ -1,7 +1,12 @@
 """Route cho tab "Bảo trì dữ liệu" ở trang "Vận hành dữ liệu" (08/2026,
-xem lịch sử trao đổi "phương án B — generic runner dùng chung"). CHỈ
-admin bấm chạy được (@admin_required, khớp POST /maintenance/{job_type}
-chỉ admin) — xem utils/decorators.py.
+xem lịch sử trao đổi "phương án B — generic runner dùng chung").
+
+QUYỀN XEM (SỬA LẠI 09/2026, cùng đợt với blueprints/crawl.py — xem
+docstring đầu file đó): ss_team XEM/poll được (@staff_required cho mọi
+route GET/*.json) — khớp GET /maintenance/... chỉ Depends(require_role
+("ss_team")) phía backend. CHỈ maintenance_trigger() (bấm chạy job) mới
+@admin_required, khớp POST /maintenance/{job_type} chỉ admin — xem
+utils/decorators.py + api/routers/maintenance.py phía scrap-jd-api.
 
 TÁCH FILE RIÊNG (khác gộp thẳng vào crawl.py) để crawl.py không phình
 to quá — 2 domain (crawl nguồn ngoài / bảo trì dữ liệu nội bộ) đủ khác
@@ -27,10 +32,10 @@ from backend_auth import BackendAuthError
 # Import trễ để tránh vòng lặp import thật sự (crawl.py import module
 # này ở CUỐI file, sau khi crawl_bp đã tồn tại) — xem docstring cuối
 # blueprints/crawl.py.
-from blueprints.crawl import crawl_bp
+from blueprints.crawl import _SOURCE_LABELS, _all_active_crawl_runs_raw, crawl_bp
 from crawler_client import CrawlerAPIError
-from helpers import _call_authed
-from utils.decorators import admin_required
+from helpers import _auth_tokens_from_session, _call_authed
+from utils.decorators import admin_required, staff_required
 
 
 def _active_maintenance_runs() -> dict:
@@ -144,6 +149,20 @@ def _maintenance_tab_context() -> dict:
         flash(str(exc), "error")
         latest_log_runs = {j["job_type"]: None for j in db_data.MAINTENANCE_JOBS}
 
+    # WIDGET CHÉO (KHÔI PHỤC 09/2026, xem docstring đầu file
+    # blueprints/crawl.py) — tab 'maintenance' tự thêm dữ liệu CRAWL
+    # đang chạy (loại nó KHÔNG tự có), mirror cách _crawl_tab_context()
+    # thêm cross_active_runs của maintenance. access_token lấy riêng ở
+    # đây (KHÔNG qua _call_authed()) vì _all_active_crawl_runs_raw()
+    # nhận token truyền tay, không tự refresh — refresh (nếu 401) chỉ
+    # ảnh hưởng phần hiện chéo này, không chặn phần chính của tab.
+    try:
+        access_token, _ = _auth_tokens_from_session()
+        cross_active_runs = _all_active_crawl_runs_raw(access_token)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        cross_active_runs = {}
+
     return {
         "maintenance_jobs": db_data.MAINTENANCE_JOBS,
         "job_labels": db_data.MAINTENANCE_JOB_LABELS,
@@ -152,6 +171,12 @@ def _maintenance_tab_context() -> dict:
         "check_expired_job_type": db_data.MAINTENANCE_CHECK_EXPIRED_JOB_TYPE,
         "active_runs": active_runs,
         "latest_log_runs": latest_log_runs,
+        # cross_active_runs/cross_labels: dữ liệu CRAWL đang chạy
+        # (source -> run) + nhãn hiển thị — widget nổi
+        # (_maintenance_tab.html) dùng để hiện thêm 1 khối "Crawl" bên
+        # dưới khối "Bảo trì" chính.
+        "cross_active_runs": cross_active_runs, "cross_labels": _SOURCE_LABELS,
+        "cross_status_labels": db_data.CRAWL_STATUS_LABELS,
         # status_labels: KHÔNG còn dùng để render Khu C ở đây (đã
         # chuyển sang tab "history") nhưng JS Khu B (script cuối
         # _maintenance_tab.html, biến STATUS_LABELS) vẫn cần để hiện
@@ -216,7 +241,7 @@ def maintenance_trigger(job_type):
 
 
 @crawl_bp.route("/crawl/maintenance/<string:run_id>/status.json")
-@admin_required
+@staff_required
 def maintenance_status_json(run_id):
     """JSON polling — JS ở _maintenance_tab.html gọi định kỳ tới khi
     status 'done'/'error', cùng cách hoạt động status_json() bên
@@ -231,7 +256,7 @@ def maintenance_status_json(run_id):
 
 
 @crawl_bp.route("/crawl/maintenance/<string:run_id>/logs.json")
-@admin_required
+@staff_required
 def maintenance_logs_json(run_id):
     """JSON polling khu "Xem log live" tab Bảo trì — cùng cách hoạt
     động logs_json() bên crawl.py."""
@@ -245,7 +270,7 @@ def maintenance_logs_json(run_id):
 
 
 @crawl_bp.route("/crawl/maintenance/logs-batch.json")
-@admin_required
+@staff_required
 def maintenance_logs_batch_json():
     """JSON — GỘP log MỚI của NHIỀU run_id (mỗi job_type 1 run_id) 1
     lần gọi (09/2026, xem lịch sử trao đổi "gộp 5 request logs.json
@@ -278,7 +303,7 @@ def maintenance_logs_batch_json():
 
 
 @crawl_bp.route("/crawl/maintenance/latest-log-runs.json")
-@admin_required
+@staff_required
 def maintenance_latest_log_runs_json():
     """JSON — 5 khung "Log live" (mỗi card 1 khung, LUÔN HIỆN cố định)
     gọi lúc tải trang để biết run_id GẦN NHẤT của TỪNG job_type — khác

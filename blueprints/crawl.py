@@ -1,8 +1,19 @@
 """Crawl blueprint — trang "Vận hành dữ liệu" (08/2026, đổi tên từ
 "Crawl dữ liệu" — xem lịch sử trao đổi "1 mục, 2 tab như
-data_management.py"). CHỈ admin thấy và dùng được (khớp yêu cầu gốc,
-chặt hơn @staff_required cho ss_team đang dùng ở hầu hết trang quản trị
-khác) — xem utils/decorators.py::admin_required.
+data_management.py").
+
+QUYỀN XEM (SỬA LẠI 09/2026, xem lịch sử trao đổi "khôi phục ss_team xem
+được"): ss_team XEM được cả trang (mọi route GET/polling dùng
+@staff_required) — khớp đúng mức backend thật sự yêu cầu
+(Depends(require_role("ss_team")) cho GET /crawl, GET /crawl/{run_id},
+... xem api/routers/crawl.py phía scrap-jd-api). CHỈ 2 route BẤM CHẠY
+(trigger()/trigger_batch() bên dưới) mới @admin_required — khớp POST
+/crawl chỉ Depends(require_admin) phía backend. Bản trước đó từng khoá
+@admin_required trên MỌI route (kể cả index()) — chặt hơn backend cần,
+khiến ss_team thấy mục "Vận hành dữ liệu" ở sidebar nhưng bấm vào bị
+chặn/redirect. Template (_crawl_tab.html/_maintenance_tab.html) tự ẩn
+form/nút bấm kích hoạt nếu current_user không phải admin — ss_team xem
+được tiến độ/lịch sử nhưng không thấy nút bấm chạy job.
 
 TAB "crawl" (mặc định) — Khu A (kích hoạt) + Khu B (đang chạy), context
 build ngay trong index() bên dưới.
@@ -46,7 +57,7 @@ from backend_auth import BackendAuthError
 from blueprints.crawl_status import _status_tab_context
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _store_auth_tokens, _io_pool as _pool
-from utils.decorators import admin_required
+from utils.decorators import admin_required, staff_required
 
 crawl_bp = Blueprint("crawl", __name__)
 
@@ -139,6 +150,26 @@ def _source_active_state(source, access_token):
     return source, run, batch, None
 
 
+def _all_active_crawl_runs_raw(token) -> dict:
+    """Trả {source: run} cho MỌI nguồn đang có 1 lượt 'queued'/'running'
+    — CHỈ 2 lần gọi GET /crawl TỔNG CỘNG (không lặp per-source như
+    _source_active_state(), vốn cần chạy song song ở tab 'crawl' vì còn
+    phải lấy thêm batch status). Mirror
+    crawl_maintenance.py::_active_maintenance_runs_raw() — dùng để hiện
+    dữ liệu crawl ở WIDGET của TAB KHÁC (maintenance/status), nơi chỉ
+    cần biết "đang chạy gì" chứ không cần checklist batch chi tiết.
+
+    Nhận token truyền tay (không tự gọi _auth_tokens_from_session()) —
+    nơi gọi tự lấy token 1 lần rồi có thể dùng lại cho nhiều lệnh gọi
+    khác trong cùng request, cùng lý do _active_maintenance_runs_raw()."""
+    active = {}
+    for status in ("queued", "running"):
+        result = db_data.list_crawl_runs(token, source="", status=status, limit=10)
+        for run in result["items"]:
+            active[run["source"]] = run
+    return active
+
+
 def _crawl_tab_context() -> dict:
     """Build TOÀN BỘ context cho tab='crawl' (Khu A kích hoạt + Khu B
     đang chạy) — tách hàm riêng (09/2026, xem lịch sử trao đổi "load
@@ -221,9 +252,30 @@ def _crawl_tab_context() -> dict:
         for src, cats in sources.items() for cat, label in cats.items()
     }
 
+    # WIDGET CHÉO (KHÔI PHỤC 09/2026, xem lịch sử trao đổi "đồng bộ
+    # widget đang chạy") — tab 'crawl' tự thêm dữ liệu MAINTENANCE đang
+    # chạy (loại nó KHÔNG tự có) để widget nổi hiện được CẢ 2 loại job
+    # nền, không chỉ crawl. Import trễ (không ở đầu file) vì
+    # blueprints.crawl_maintenance import ngược crawl_bp từ file này —
+    # đặt ở đầu file sẽ vỡ vòng lặp lúc app khởi động (xem docstring
+    # cuối file). Lỗi ở đây KHÔNG chặn render tab (mất mỗi phần hiện
+    # chéo, tab vẫn hoạt động bình thường).
+    try:
+        from blueprints.crawl_maintenance import _active_maintenance_runs_raw
+        cross_active_runs = _active_maintenance_runs_raw(access_token)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        cross_active_runs = {}
+
     return {
         "sources": sources, "source_labels": _SOURCE_LABELS,
         "active_runs": active_runs, "active_batches": active_batches, "category_labels": category_labels,
+        # cross_active_runs/cross_labels: dữ liệu MAINTENANCE đang chạy
+        # (job_type -> run) + nhãn hiển thị — widget nổi
+        # (_crawl_tab.html) dùng để hiện thêm 1 khối "Bảo trì" bên dưới
+        # khối "Crawl" chính, xem docstring khối widget trong template.
+        "cross_active_runs": cross_active_runs, "cross_labels": db_data.MAINTENANCE_JOB_LABELS,
+        "cross_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
         # status_labels/stat_labels: KHÔNG còn dùng để render Khu C ở
         # đây (đã chuyển sang tab "history") nhưng JS Khu B
         # (buildHistoryRow(), xem _crawl_tab.html) vẫn cần 2 biến này để
@@ -267,7 +319,7 @@ def _build_tab_context(tab: str) -> dict:
 
 
 @crawl_bp.route("/crawl")
-@admin_required
+@staff_required
 def index():
     """Trang chính "Vận hành dữ liệu" — 4 tab (crawl/status/maintenance/
     history).
@@ -405,10 +457,10 @@ def trigger_batch():
 
 
 @crawl_bp.route("/crawl/<string:run_id>/status.json")
-@admin_required
+@staff_required
 def status_json(run_id):
     """JSON polling — JS ở crawl.html gọi định kỳ tới khi status
-    'done'/'error'. @admin_required tự trả JSON lỗi (không redirect
+    'done'/'error'. @staff_required tự trả JSON lỗi (không redirect
     HTML) khi bị chặn quyền, xem docstring decorator."""
     try:
         run = _call_authed(db_data.get_crawl_status, run_id)
@@ -420,12 +472,12 @@ def status_json(run_id):
 
 
 @crawl_bp.route("/crawl/<string:run_id>/logs.json")
-@admin_required
+@staff_required
 def logs_json(run_id):
     """JSON polling khu "Xem log live" — JS ở crawl.html gọi định kỳ
     (song song với status.json) kèm ?after_id=N để chỉ lấy dòng log MỚI
     (xem docstring crawler_client/crawl.py::get_crawl_logs). Cùng cách
-    xử lý lỗi như status_json() ở trên (@admin_required tự trả JSON,
+    xử lý lỗi như status_json() ở trên (@staff_required tự trả JSON,
     không redirect HTML)."""
     after_id = request.args.get("after_id", "0")
     after_id = int(after_id) if after_id.isdigit() else 0
@@ -437,7 +489,7 @@ def logs_json(run_id):
 
 
 @crawl_bp.route("/crawl/batch/<string:batch_id>/status.json")
-@admin_required
+@staff_required
 def batch_status_json(batch_id):
     """JSON polling cho card batch ở Khu B — JS ở crawl.html gọi định
     kỳ (khác hẳn status.json ở trên vốn poll 1 run đơn lẻ) tới khi
@@ -454,7 +506,7 @@ def batch_status_json(batch_id):
 
 
 @crawl_bp.route("/crawl/latest-log-run")
-@admin_required
+@staff_required
 def latest_log_run():
     """JSON — khung "Log live" (LUÔN HIỆN cố định trên trang, 08/2026,
     xem lịch sử trao đổi) gọi lúc tải trang để biết run_id GẦN NHẤT

@@ -585,6 +585,25 @@
   font-size: 13px;
 }
 
+/* Nhãn nhóm "Crawl"/"Bảo trì" bên trong widget nổi — KHÔI PHỤC 09/2026
+   (xem docstring _crawl_tab.html/_maintenance_tab.html "khôi phục
+   widget đồng bộ") — widget giờ có thể xếp 2 khối (loại job của chính
+   tab + loại job hiện CHÉO từ tab kia), cần 1 tiêu đề nhỏ phân tách 2
+   khối cho rõ, KHÔNG dùng lại .status-card-title (to hơn nhiều, dành
+   cho tiêu đề cả 1 <section class="card">, không hợp trong widget nhỏ
+   góc màn hình). Khối đầu tiên (loại chính của tab) không có label vì
+   không cần thiết — chỉ khối CHÉO mới có, xem {% if cross_active_runs %}
+   ở template. */
+.crawl-live-widget-group-label {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.crawl-live-widget-group-label:first-child { margin-top: 0; }
+
 @media (max-width: 720px) {
   .crawl-live-widget {
     left: 16px;

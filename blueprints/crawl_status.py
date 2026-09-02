@@ -46,8 +46,35 @@ def _status_tab_context() -> dict:
     phần còn lại hiển thị, giống hành vi cũ. get_company_data_health()
     cần access_token (backend route require_role("ss_team") vì JOIN qua
     contact — thông tin nhạy cảm), khác get_job_data_health() (public,
-    chỉ cần API_KEY, giống GET /jobs)."""
+    chỉ cần API_KEY, giống GET /jobs).
+
+    WIDGET CHÉO (KHÔI PHỤC 09/2026, xem docstring đầu
+    blueprints/crawl.py "khôi phục ss_team xem được" — cùng đợt sửa):
+    tab 'status' TỰ NÓ không có job nền nào, nên hiện CẢ 2 loại (crawl
+    lẫn bảo trì) đang chạy — khác 2 tab kia chỉ cần hiện thêm ĐÚNG 1
+    loại còn thiếu. Import 2 hàm *_raw() TRỄ (không ở đầu file) vì lúc
+    module này được import (ở ĐẦU blueprints/crawl.py, TRƯỚC khi
+    crawl_bp/các hàm khác trong file đó tồn tại — xem docstring phần
+    trên) mà import ngược blueprints.crawl/blueprints.crawl_maintenance
+    ở đây sẽ vỡ vòng lặp ngay lúc khởi động app. Để trong hàm này thì an
+    toàn vì nó chỉ CHẠY lúc có request, lúc đó cả 2 module kia đã load
+    xong hoàn toàn."""
+    from blueprints.crawl import _SOURCE_LABELS, _all_active_crawl_runs_raw
+    from blueprints.crawl_maintenance import _active_maintenance_runs_raw
+
     access_token, _ = _auth_tokens_from_session()
+
+    try:
+        cross_crawl_active_runs = _all_active_crawl_runs_raw(access_token)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        cross_crawl_active_runs = {}
+
+    try:
+        cross_maintenance_active_runs = _active_maintenance_runs_raw(access_token)
+    except CrawlerAPIError as exc:
+        flash(str(exc), "error")
+        cross_maintenance_active_runs = {}
 
     try:
         company_health = db_data.get_company_data_health(access_token)
@@ -86,4 +113,13 @@ def _status_tab_context() -> dict:
         # chủ động liên hệ hợp tác.
         "company_no_contact_missing": company_health["company_no_contact_missing"],
         "company_no_contact_total": company_health["company_no_contact_total"],
+        # cross_crawl_active_runs/cross_maintenance_active_runs + nhãn —
+        # widget nổi (_status_tab.html, MỚI thêm 09/2026) dùng để hiện
+        # CẢ 2 loại job nền đang chạy, xem docstring ở trên.
+        "cross_crawl_active_runs": cross_crawl_active_runs,
+        "cross_maintenance_active_runs": cross_maintenance_active_runs,
+        "cross_crawl_labels": _SOURCE_LABELS,
+        "cross_maintenance_labels": db_data.MAINTENANCE_JOB_LABELS,
+        "cross_crawl_status_labels": db_data.CRAWL_STATUS_LABELS,
+        "cross_maintenance_status_labels": db_data.MAINTENANCE_STATUS_LABELS,
     }
