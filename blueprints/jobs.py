@@ -3,7 +3,7 @@
 import math
 from types import SimpleNamespace
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 
 import backend_auth
@@ -21,7 +21,7 @@ from constants import (
 )
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _call_authed, _paginate_args
-from utils.decorators import staff_required
+from utils.decorators import _wants_json, staff_required
 
 # Import trực tiếp (không phải import trễ) — add_hub.py KHÔNG import
 # ngược lại từ jobs.py nên không có vòng lặp import, khác trường hợp
@@ -202,17 +202,39 @@ def edit(job_id):
 @jobs_bp.route("/jobs/<string:job_id>/status", methods=["POST"])
 @staff_required
 def update_status(job_id):
+    """Đổi trạng thái 1 job (dropdown ở trang chi tiết job — form thường,
+    reload cả trang) HOẶC gọi qua AJAX (fetch, header X-Requested-With)
+    từ nơi khác không muốn rời trang hiện tại.
+
+    THÊM 09/2026 (xem lịch sử trao đổi "job nghi trùng lặp — thêm nút
+    thao tác được"): bảng "Job nghi trùng lặp" ở tab "Tình trạng dữ
+    liệu" (_status_tab.html) giờ có nút "Đóng job này" ngay tại chỗ,
+    gọi ĐÚNG route này qua fetch() thay vì <form> thường — bấm xong
+    muốn XOÁ RIÊNG dòng đó khỏi bảng (JS tự làm), KHÔNG redirect sang
+    trang chi tiết job như hành vi gốc (sẽ rời mất tab đang xem, mất
+    ngữ cảnh các nhóm trùng khác). is_ajax nhánh này trả JSON gọn
+    {"ok": true, "status": ...}/{"error": "..."}, KHÔNG đổi hành vi
+    nhánh form thường (vẫn flash + redirect y hệt trước giờ)."""
     job = db_data.get_job(job_id)
     if not job:
+        if _wants_json():
+            return jsonify({"error": "Không tìm thấy job."}), 404
         abort(404)
+    new_status = request.form.get("status", job["status"])
     try:
         _call_authed(
-            db_data.update_job_status, job_id, request.form.get("status", job["status"]),
+            db_data.update_job_status, job_id, new_status,
             request.form.get("activity_note", ""),
         )
-        flash("Đã cập nhật trạng thái job.", "success")
     except CrawlerAPIError as exc:
+        if _wants_json():
+            return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
+        return redirect(url_for("jobs.detail", job_id=job_id))
+
+    if _wants_json():
+        return jsonify({"ok": True, "job_id": job_id, "status": new_status})
+    flash("Đã cập nhật trạng thái job.", "success")
     return redirect(url_for("jobs.detail", job_id=job_id))
 
 

@@ -33,7 +33,39 @@ from flask import flash
 
 import crawler_client as db_data
 from crawler_client import CrawlerAPIError
-from helpers import _auth_tokens_from_session
+from helpers import _auth_tokens_from_session, _parse_any_date
+
+
+def _annotate_duplicate_keep_suggestion(groups):
+    """THÊM 09/2026 (xem lịch sử trao đổi "job nghi trùng lặp — thêm
+    nút thao tác được", hướng 2 "gợi ý nên giữ job nào") — gán thêm
+    key 'suggest_keep' (True/False/None) vào TỪNG job trong mỗi nhóm
+    duplicate_job_groups (sửa tại chỗ, group['jobs'] là list dict).
+
+    Cả 2 job trong 1 nhóm đều đang "Đang tuyển" (OPEN) nên KHÔNG thể
+    dựa vào status để phân biệt — chỉ còn deadline là tín hiệu sẵn có
+    (không cần gọi thêm API nào): deadline thường = ngày crawl + N ngày
+    cố định theo từng nguồn, nên bản crawl SAU sẽ có deadline XA HƠN.
+    Coi job có deadline xa nhất trong nhóm là bản "mới hơn, nên giữ".
+
+    CHỈ gợi ý khi có CĂN CỨ RÕ RÀNG: ít nhất 2 job parse được deadline
+    VÀ các deadline đó không trùng nhau hết — nếu không, mọi job trong
+    nhóm nhận suggest_keep=None (không hiện badge gì, để ss_team tự
+    xem xét) thay vì đoán bừa. True chỉ gán cho ĐÚNG 1 job (deadline xa
+    nhất, duy nhất) — các job còn lại (kể cả job không parse được
+    deadline) nhận False."""
+    for group in groups:
+        jobs = group.get("jobs") or []
+        parsed = [(_parse_any_date(j.get("deadline")), j) for j in jobs]
+        valid_dates = {d for d, _ in parsed if d is not None}
+        if len(valid_dates) < 2:
+            for _, j in parsed:
+                j["suggest_keep"] = None
+            continue
+        latest = max(valid_dates)
+        for d, j in parsed:
+            j["suggest_keep"] = (d == latest)
+    return groups
 
 
 def _status_tab_context() -> dict:
@@ -94,6 +126,8 @@ def _status_tab_context() -> dict:
             "expired_open_jobs": [], "job_health_by_source": [],
             "duplicate_job_groups": [],
         }
+    else:
+        _annotate_duplicate_keep_suggestion(job_health["duplicate_job_groups"])
 
     return {
         "company_health_rows": company_health["company_health_rows"],
@@ -107,7 +141,10 @@ def _status_tab_context() -> dict:
         # VietnamWorks/CareerViet/MANUAL/Không rõ nguồn) — biết nguồn
         # nào cần ưu tiên sửa parser.
         "job_health_by_source": job_health["job_health_by_source"],
-        # Nhóm job nghi trùng (cùng company + cùng vị trí, đang OPEN).
+        # Nhóm job nghi trùng (cùng company + cùng vị trí, đang OPEN) —
+        # mỗi job trong group['jobs'] đã có thêm 'suggest_keep'
+        # (True/False/None, xem _annotate_duplicate_keep_suggestion()
+        # ở trên) để template hiện badge gợi ý + nút "Đóng job này".
         "duplicate_job_groups": job_health["duplicate_job_groups"],
         # Company active chưa có contact HR nào — team không có cách
         # chủ động liên hệ hợp tác.

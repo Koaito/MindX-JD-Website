@@ -216,22 +216,37 @@
   <h4 class="status-card-title">Job nghi trùng lặp <span class="muted" style="font-weight: 400; color: var(--muted);">({{ duplicate_job_groups|length }} nhóm)</span></h4>
   <p class="muted" style="font-size: 12px; margin: 4px 0 14px; color: var(--muted);">
     Cùng công ty + cùng tên vị trí, cả 2 job đều đang "Đang tuyển" — có thể do crawl trùng, kiểm tra lại trước khi đóng bớt job cũ.
+    {% if duplicate_job_groups %}
+    Job có nhãn <span class="badge badge-success" style="vertical-align: middle;">Đề xuất giữ</span> là bản có deadline xa hơn (nhiều khả năng crawl gần đây hơn) — chỉ là GỢI Ý, tự kiểm tra lại trước khi đóng.
+    {% endif %}
   </p>
 
   {% if duplicate_job_groups %}
     {% for group in duplicate_job_groups %}
-    <div style="margin-bottom: 14px;">
+    <div class="dup-job-group" data-group-key="{{ loop.index }}" style="margin-bottom: 14px;">
       <div style="font-weight: 600; margin-bottom: 6px;">{{ group.company }} — {{ group.position }} <span class="muted" style="font-weight: 400; color: var(--muted);">({{ group.jobs|length }} job)</span></div>
       <div class="contact-table-wrap">
         <table class="contact-table dash-table-fixed">
-          <colgroup><col style="width: 46%;"><col style="width: 27%;"><col style="width: 27%;"></colgroup>
-          <thead><tr><th>Vị trí</th><th>Deadline</th><th>Nguồn</th></tr></thead>
+          <colgroup><col style="width: 38%;"><col style="width: 18%;"><col style="width: 16%;"><col style="width: 28%;"></colgroup>
+          <thead><tr><th>Vị trí</th><th>Deadline</th><th>Nguồn</th><th>Hành động</th></tr></thead>
           <tbody>
             {% for j in group.jobs %}
-            <tr>
-              <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a></td>
+            <tr class="dup-job-row" data-job-id="{{ j.id }}">
+              <td>
+                <a href="{{ url_for('jobs.detail', job_id=j.id) }}" style="color: var(--accent);">{{ j.position }}</a>
+                {% if j.suggest_keep == true %}
+                <span class="badge badge-success" style="margin-left: 6px;">Đề xuất giữ</span>
+                {% elif j.suggest_keep == false %}
+                <span class="badge badge-warning" style="margin-left: 6px;">Có thể dư</span>
+                {% endif %}
+              </td>
               <td>{{ j.deadline | format_date }}</td>
               <td>{{ j.source or '—' }}</td>
+              <td>
+                <button type="button" class="btn btn-text dup-close-btn" data-job-id="{{ j.id }}" data-position="{{ j.position }}">
+                  Đóng job này
+                </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -243,6 +258,63 @@
   <p class="empty-placeholder">Không có job nào nghi trùng — ổn.</p>
   {% endif %}
 </section>
+
+{% if duplicate_job_groups %}
+<script>
+(function () {
+  "use strict";
+  // THÊM 09/2026 (xem docstring khối "Job nghi trùng lặp" ở trên +
+  // blueprints/jobs.py::update_status()) — nút "Đóng job này" gọi
+  // ĐÚNG route jobs.update_status qua fetch() (header X-Requested-With
+  // để route trả JSON thay vì redirect, xem docstring route đó) thay
+  // vì <form> thường (sẽ rời khỏi tab đang xem). Đóng xong XOÁ RIÊNG
+  // dòng đó khỏi bảng — không tự đóng/xoá luôn dòng còn lại trong
+  // nhóm (job kia có thể vẫn hợp lệ, để ss_team tự quyết tiếp).
+  var CSRF_TOKEN = {{ csrf_token()|tojson }};
+
+  document.querySelectorAll(".dup-close-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var jobId = btn.getAttribute("data-job-id");
+      var position = btn.getAttribute("data-position") || "job này";
+      if (!window.confirm('Đóng "' + position + '"? Job đóng vẫn xem được, chỉ ẩn khỏi tìm kiếm mặc định.')) return;
+
+      btn.disabled = true;
+      btn.textContent = "Đang đóng…";
+
+      var body = new URLSearchParams();
+      body.set("csrf_token", CSRF_TOKEN);
+      body.set("status", "CLOSED");
+      body.set("activity_note", "Đóng do nghi trùng lặp (tab Vận hành dữ liệu — Tình trạng dữ liệu)");
+
+      fetch("/jobs/" + jobId + "/status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: body.toString(),
+      })
+        .then(function (res) { return res.json().then(function (data) { return {ok: res.ok, data: data}; }); })
+        .then(function (result) {
+          var row = btn.closest(".dup-job-row");
+          if (!result.ok) {
+            btn.disabled = false;
+            btn.textContent = "Đóng job này";
+            window.alert((result.data && result.data.error) || "Không đóng được job, thử lại.");
+            return;
+          }
+          if (row) row.remove();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = "Đóng job này";
+          window.alert("Lỗi mạng — thử lại.");
+        });
+    });
+  });
+})();
+</script>
+{% endif %}
 
 {% if cross_crawl_active_runs or cross_maintenance_active_runs %}
 <script>

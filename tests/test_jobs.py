@@ -18,6 +18,8 @@ File blueprint phức tạp nhất trong 10 blueprint (234 dòng). Trọng tâm:
 
 import pytest
 
+from crawler_client import CrawlerAPIError
+
 from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
 
@@ -295,6 +297,49 @@ class TestJobsUpdateStatus:
         )
         assert resp.status_code == 302
         assert "/jobs/job-1" in resp.headers["Location"]
+
+    def test_ajax_success_returns_json_not_redirect(self, staff_client, mocker):
+        """THÊM 09/2026 (xem lịch sử trao đổi "job nghi trùng lặp —
+        thêm nút thao tác được") — nút "Đóng job này" ở tab "Tình
+        trạng dữ liệu" gọi route này qua fetch() (X-Requested-With),
+        cần trả JSON thay vì redirect để không rời khỏi tab đang xem."""
+        mocker.patch(
+            "blueprints.jobs.db_data.get_job",
+            return_value={"id": "job-1", "status": "Đang tuyển"},
+        )
+        mocker.patch("blueprints.jobs.db_data.update_job_status", return_value={})
+        resp = staff_client.post(
+            "/jobs/job-1/status", data={"status": "CLOSED"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data == {"ok": True, "job_id": "job-1", "status": "CLOSED"}
+
+    def test_ajax_job_not_found_returns_json_404(self, staff_client, mocker):
+        mocker.patch("blueprints.jobs.db_data.get_job", return_value=None)
+        resp = staff_client.post(
+            "/jobs/does-not-exist/status", data={"status": "CLOSED"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 404
+        assert "error" in resp.get_json()
+
+    def test_ajax_backend_failure_returns_json_error(self, staff_client, mocker):
+        mocker.patch(
+            "blueprints.jobs.db_data.get_job",
+            return_value={"id": "job-1", "status": "Đang tuyển"},
+        )
+        mocker.patch(
+            "blueprints.jobs.db_data.update_job_status",
+            side_effect=CrawlerAPIError("backend lỗi"),
+        )
+        resp = staff_client.post(
+            "/jobs/job-1/status", data={"status": "CLOSED"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 400
+        assert "error" in resp.get_json()
 
 
 class TestJobsDelete:
