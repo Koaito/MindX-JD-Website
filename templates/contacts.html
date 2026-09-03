@@ -1,3 +1,23 @@
+{#
+  Shell trang "Danh sách contact" — SỬA 09/2026 (xem lịch sử trao đổi
+  "chuyển hẳn sang AJAX như crawl.html/activity_logs"): mirror ĐÚNG
+  kiến trúc activity_logs.html — header + tab-nav LUÔN render sẵn,
+  #contacts-body chứa fragment (_contact_list.html hoặc
+  _email_template_manager.html tuỳ tab).
+
+  KHÁC activity_logs Ở CHỖ: "Quản lý mẫu email" có link "Sửa"/"Hủy"
+  đổi state CÙNG TRANG (?edit=<id>) qua <a href>, KHÔNG PHẢI chỉ tab/
+  lọc/phân trang — các link này (+ "Xóa lọc" bên tab "Danh sách
+  contact") được đánh dấu class "ajax-nav" RIÊNG (không dùng chung
+  ".btn-text" như activity_logs) vì "Danh sách contact" còn có link
+  "Sửa" MỘT contact dùng CHUNG class "btn-text" nhưng trỏ sang route
+  KHÁC HẲN (contacts.edit) — chặn nhầm link đó thành fetch fragment sẽ
+  hỏng luồng sửa contact. Xem docstring script bên dưới.
+
+  KHÔNG cache theo tab (giống activity_logs, khác crawl.html) — lý do
+  tương tự: "Danh sách contact" có filter riêng có thể đổi bất cứ lúc
+  nào, cache phức tạp hơn lợi ích.
+#}
 {% extends "base.html" %}
 {% block title %}{{ 'Quản lý mẫu email' if tab == 'quan-ly' else 'Danh sách contact' }} — MindX Career Hub{% endblock %}
 {% block content %}
@@ -20,19 +40,121 @@
   {% endif %}
 </header>
 
-<nav class="tab-nav">
-  <a href="{{ url_for('contacts.index', tab='danh-sach') }}" class="{{ 'active' if tab != 'quan-ly' else '' }}">
+<nav class="tab-nav" id="contactsTabNav">
+  <a href="{{ url_for('contacts.index', tab='danh-sach') }}" class="{{ 'active' if tab != 'quan-ly' else '' }}" data-view="danh-sach">
     Danh sách contact
   </a>
-  <a href="{{ url_for('contacts.index', tab='quan-ly') }}" class="{{ 'active' if tab == 'quan-ly' else '' }}">
+  <a href="{{ url_for('contacts.index', tab='quan-ly') }}" class="{{ 'active' if tab == 'quan-ly' else '' }}" data-view="quan-ly">
     Quản lý mẫu email
   </a>
 </nav>
 
-{% if tab == 'quan-ly' %}
-  {% include "_email_template_manager.html" %}
-{% else %}
-  {% include "_contact_list.html" %}
-{% endif %}
+<div id="contacts-body">
+{{ body_html|safe }}
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // AJAX cho tab/lọc/sửa-mẫu-email (09/2026, xem docstring đầu file) —
+  // mirror kỹ thuật activity_logs.html (execBodyScripts, requestSeq
+  // chống race condition, fallback full-reload nếu fetch lỗi).
+  var body = document.getElementById("contacts-body");
+  var tabNav = document.getElementById("contactsTabNav");
+  if (!body) return;
+
+  var VIEW_LABELS = { "danh-sach": "Danh sách contact", "quan-ly": "Quản lý mẫu email" };
+
+  function execBodyScripts() {
+    var scripts = body.querySelectorAll("script");
+    for (var i = 0; i < scripts.length; i++) {
+      var old = scripts[i];
+      var fresh = document.createElement("script");
+      for (var a = 0; a < old.attributes.length; a++) {
+        fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+      }
+      fresh.textContent = old.textContent;
+      old.parentNode.replaceChild(fresh, old);
+    }
+  }
+
+  var reqSeq = 0;
+  function nextRequestSeq() { return ++reqSeq; }
+  function isStaleRequestSeq(seq) { return seq !== reqSeq; }
+
+  function currentViewFromUrl(url) {
+    var v = new URL(url, window.location.href).searchParams.get("tab");
+    return (v === "danh-sach" || v === "quan-ly") ? v : "danh-sach";
+  }
+
+  function updateTabNavActive(view) {
+    if (!tabNav || !view) return;
+    tabNav.querySelectorAll("a[data-view]").forEach(function (a) {
+      a.classList.toggle("active", a.getAttribute("data-view") === view);
+    });
+  }
+
+  function ajaxNavigate(url) {
+    var view = currentViewFromUrl(url);
+    var label = VIEW_LABELS[view] || "nội dung";
+    body.innerHTML = '<p class="muted" style="padding: 40px 0; text-align: center;">Đang tải ' + label + '…</p>';
+
+    var seq = nextRequestSeq();
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        if (isStaleRequestSeq(seq)) return; // đã có thao tác mới hơn xảy ra sau -> bỏ qua response trễ này
+        body.innerHTML = html;
+        execBodyScripts();
+        updateTabNavActive(view);
+        history.replaceState(null, "", url);
+
+        // Link "Sửa" mẫu email có kèm hash (#et-manager-form) — cuộn
+        // tới ĐÚNG form đó thay vì lên đầu trang, khớp hành vi <a
+        // href="#...">  bình thường của trình duyệt (mà preventDefault()
+        // ở dưới đã chặn mất).
+        var hash = new URL(url, window.location.href).hash;
+        var target = hash ? document.getElementById(hash.slice(1)) : null;
+        (target || body).scrollIntoView({ block: "start", behavior: "smooth" });
+      })
+      .catch(function () {
+        if (isStaleRequestSeq(seq)) return;
+        window.location.href = url;
+      });
+  }
+
+  if (tabNav) {
+    tabNav.addEventListener("click", function (e) {
+      var a = e.target.closest("a[data-view]");
+      if (!a) return;
+      if (a.classList.contains("active")) { e.preventDefault(); return; }
+      e.preventDefault();
+      ajaxNavigate(a.href);
+    });
+  }
+
+  // "Xóa lọc" + "Sửa"/"Hủy" mẫu email — class "ajax-nav" RIÊNG (xem
+  // docstring đầu file để biết vì sao KHÔNG dùng chung ".btn-text").
+  body.addEventListener("click", function (e) {
+    var link = e.target.closest("a.ajax-nav");
+    if (!link) return;
+    e.preventDefault();
+    ajaxNavigate(link.href);
+  });
+
+  body.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.classList || !form.classList.contains("filter-bar")) return;
+    e.preventDefault();
+    var params = new URLSearchParams(new FormData(form));
+    var url = new URL(window.location.href);
+    url.search = params.toString();
+    ajaxNavigate(url.toString());
+  });
+})();
+</script>
 
 {% endblock %}

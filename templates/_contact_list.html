@@ -22,7 +22,12 @@
 
   <button type="submit" class="btn btn-ghost">Lọc</button>
   {% if filters.q or filters.company_id or filters.status %}
-    <a class="btn btn-text" href="{{ url_for('contacts.index', tab='danh-sach') }}">Xóa lọc</a>
+    {# class "ajax-nav" (THÊM 09/2026, xem docstring script cuối
+       contacts.html) — KHÔNG dùng ".btn-text" để bắt AJAX vì "Sửa"
+       contact bên dưới CŨNG dùng class đó nhưng điều hướng sang route
+       KHÁC hẳn (contacts.edit), không được chặn nhầm thành fetch
+       fragment. #}
+    <a class="btn btn-text ajax-nav" href="{{ url_for('contacts.index', tab='danh-sach') }}">Xóa lọc</a>
   {% endif %}
 </form>
 

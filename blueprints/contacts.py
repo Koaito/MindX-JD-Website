@@ -26,14 +26,29 @@ def index():
 
     Chỉ tab "danh-sach" mới cần load contacts/companies/staff — tab
     "quan-ly" tự load riêng ở _email_templates_tab() bên dưới, tránh
-    gọi API thừa không dùng tới khi đang ở tab kia."""
+    gọi API thừa không dùng tới khi đang ở tab kia.
+
+    SỬA 09/2026 (xem lịch sử trao đổi "chuyển hẳn sang AJAX như
+    crawl.html/activity_logs"): mỗi nhánh (danh-sach/quan-ly) giờ chỉ
+    lo build CONTEXT + render body_html (không tự return template full
+    nữa) — quyết định trả fragment (AJAX) hay trang đầy đủ dồn về ĐÚNG
+    1 chỗ cuối route này, mirror activity_logs.py::logs()."""
     tab = request.args.get("tab", "danh-sach")
     if tab not in ("danh-sach", "quan-ly"):
         tab = "danh-sach"
 
     if tab == "quan-ly":
-        return _email_templates_tab()
+        body_html, extra_ctx = _email_templates_tab()
+    else:
+        body_html, extra_ctx = _contact_list_tab()
 
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return body_html
+
+    return render_template("contacts.html", tab=tab, body_html=body_html, **extra_ctx)
+
+
+def _contact_list_tab():
     status_vn = request.args.get("status", "")
     company_id = request.args.get("company_id", "")
     search = request.args.get("q", "").strip()
@@ -77,18 +92,25 @@ def index():
         staff_members = []
     staff_by_id = {u["ss_user_id"]: u for u in staff_members}
 
-    return render_template(
-        "contacts.html", tab=tab, contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
+    ctx = dict(
+        contacts=contacts, companies=companies, statuses=CONTACT_STATUSES,
         staff_members=staff_members, staff_by_id=staff_by_id,
         filters={"status": status_vn, "company_id": company_id, "q": search},
     )
+    return render_template("_contact_list.html", **ctx), {}
 
 
 def _email_templates_tab():
     """Tab "Quản lý mẫu email" (/contacts?tab=quan-ly) — danh sách mẫu +
     2 form thêm/sửa render trực tiếp trong _email_template_manager.html
     (không route riêng /contacts/email-templates/add, giữ mọi thao tác
-    trong 1 trang, giống style _dm_import.html gộp nhiều bước 1 chỗ)."""
+    trong 1 trang, giống style _dm_import.html gộp nhiều bước 1 chỗ).
+
+    SỬA 09/2026: trả (body_html, extra_ctx) thay vì tự render/return
+    hẳn "contacts.html" — extra_ctx rỗng (không có gì thêm ngoài
+    tab/body_html mà index() đã tự truyền) nhưng giữ lại để khớp chữ ký
+    chung với _contact_list_tab(), lỡ sau này cần thêm biến riêng cho
+    shell ở nhánh này."""
     access_token, _ = _auth_tokens_from_session()
     try:
         templates = db_data.list_email_templates(access_token)
@@ -111,11 +133,11 @@ def _email_templates_tab():
         if editing is None and edit_id:
             flash("Không tìm thấy mẫu email cần sửa (có thể đã bị xoá).", "error")
 
-    return render_template(
-        "contacts.html", tab="quan-ly", templates=templates,
-        placeholder_help=placeholder_help, editing=editing,
+    ctx = dict(
+        templates=templates, placeholder_help=placeholder_help, editing=editing,
         status_choices=db_data.CONTACT_STATUS_CHOICES, status_map=db_data.CONTACT_STATUS_MAP,
     )
+    return render_template("_email_template_manager.html", **ctx), {}
 
 
 @contacts_bp.route("/contacts/email-templates/add", methods=["POST"])

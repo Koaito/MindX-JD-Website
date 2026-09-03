@@ -69,7 +69,7 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if editing else 'Lưu mẫu email' }}</button>
-      <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly') }}">Hủy</a>
+      <a class="btn btn-text ajax-nav" href="{{ url_for('contacts.index', tab='quan-ly') }}">Hủy</a>
     </div>
   </form>
 </div>
@@ -92,7 +92,7 @@
     {% endif %}
     <p class="et-manager-body-preview">{{ tpl.body[:160] }}{{ '…' if tpl.body|length > 160 }}</p>
     <div class="et-manager-card-actions">
-      <a class="btn btn-text" href="{{ url_for('contacts.index', tab='quan-ly', edit=tpl.id) }}#et-manager-form">Sửa</a>
+      <a class="btn btn-text ajax-nav" href="{{ url_for('contacts.index', tab='quan-ly', edit=tpl.id) }}#et-manager-form">Sửa</a>
       <form method="post" action="{{ url_for('contacts.email_template_delete', template_id=tpl.id) }}" onsubmit="return et_confirmDelete(this);" style="display:inline;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="note" value="">
