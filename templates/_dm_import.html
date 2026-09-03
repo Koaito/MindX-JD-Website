@@ -8,14 +8,15 @@
     </p>
 
     <form method="post" enctype="multipart/form-data"
-          action="{{ url_for('data_mgmt.import_preview', entity_type=entity_type) }}">
+          action="{{ url_for('data_mgmt.import_preview', entity_type=entity_type) }}"
+          id="dm-import-upload-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="dm-file-label">
         <span>Chọn file (.csv, .xlsx)</span>
         <input type="file" name="file" accept=".csv,.xlsx" required>
       </label>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Tải lên &amp; xem trước</button>
+        <button type="submit" class="btn btn-primary" id="dm-import-upload-btn">Tải lên &amp; xem trước</button>
       </div>
     </form>
 
@@ -25,6 +26,37 @@
     </p>
   </div>
 </div>
+
+<script>
+(function () {
+  "use strict";
+  // THÊM 09/2026 (xem lịch sử trao đổi "loading cho Xuất/Nhập dữ
+  // liệu") — bấm "Tải lên & xem trước" xong là POST form thường (VẪN
+  // reload cả trang như trước, KHÔNG đổi sang AJAX — đọc/parse tới
+  // 5.000 dòng + check trùng lặp có thể mất vài giây, người dùng
+  // không biết đang chờ gì vì browser lúc đó chỉ hiện loading trắng ở
+  // tab, không có gì trong trang). Đây là bản "nhẹ": chỉ đổi trạng
+  // thái nút BẤM NGAY LÚC submit (disable + đổi label) để có phản hồi
+  // tức thì trước khi trình duyệt bắt đầu điều hướng — KHÔNG cần sửa
+  // route/backend gì, không có nguy cơ phá luồng 2 bước preview/xác
+  // nhận hiện có (xem #dm-preview-root bên dưới).
+  var form = document.getElementById("dm-import-upload-form");
+  var btn = document.getElementById("dm-import-upload-btn");
+  if (!form || !btn) return;
+
+  form.addEventListener("submit", function (e) {
+    var fileInput = form.querySelector('input[type="file"]');
+    // required attribute đã chặn submit rỗng ở hầu hết trình duyệt,
+    // nhưng vẫn tự kiểm tra lại — không muốn khoá nút "Đang xử lý…"
+    // mãi nếu trình duyệt nào đó vẫn cho submit thiếu file (form
+    // validation bị JS khác can thiệp chẳng hạn).
+    if (fileInput && !fileInput.files.length) return;
+
+    btn.disabled = true;
+    btn.textContent = "Đang tải lên & xử lý…";
+  });
+})();
+</script>
 
 {% else %}
 <div class="dm-panel" id="dm-preview-root"
@@ -993,6 +1025,21 @@
       return;
     }
     document.getElementById("dm-resolutions-input").value = JSON.stringify(buildResolutionsPayload());
+
+    // THÊM 09/2026 (xem lịch sử trao đổi "chốt loading Import/Export")
+    // — đây là bước GHI THẬT vào DB (rủi ro cao nhất trong cả luồng
+    // import), trước giờ bấm xong KHÔNG có phản hồi gì trong lúc chờ
+    // — vừa thiếu UX, vừa có lỗ hổng double-submit thật (bấm 2 lần lúc
+    // đang chờ vẫn gửi request thứ 2 bình thường, có thể ghi trùng nếu
+    // backend không tự chống trùng). disable nút NGAY TẠI ĐÂY (sau khi
+    // đã validate xong, KHÔNG disable ở nhánh preventDefault() phía
+    // trên — disable sớm hơn sẽ chặn luôn lần bấm sửa lại sau khi bị
+    // báo lỗi thiếu ghi chú/dòng chưa xử lý).
+    var btn = document.getElementById("dm-confirm-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Đang ghi dữ liệu…";
+    }
   });
 
   renderPage();

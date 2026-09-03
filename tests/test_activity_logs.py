@@ -95,6 +95,26 @@ class TestActivityLogsIndex:
         resp = staff_client.get("/activity-logs")
         assert resp.status_code == 200
 
+    def test_entity_type_dropdown_value_is_enum_key_not_label(self, staff_client, mocker):
+        """FIX 09/2026 (xem lịch sử trao đổi "lỗi 400 khi lọc entity_type
+        'Công ty' ở tab Lịch sử thao tác") — <option value> phải là key
+        viết hoa backend chấp nhận (COMPANY), KHÔNG phải nhãn tiếng Việt
+        (Công ty) — trước đây gửi nhầm nhãn lên backend -> 400."""
+        _mock_logs_deps(mocker)
+        resp = staff_client.get("/activity-logs")
+        html = resp.get_data(as_text=True)
+        assert 'value="COMPANY"' in html
+        assert 'value="Công ty"' not in html
+        # Vẫn phải HIỂN THỊ nhãn tiếng Việt cho người dùng đọc (chỉ đổi
+        # value, không đổi text hiển thị trong <option>...</option>).
+        assert ">Công ty</option>" in html
+
+    def test_selected_entity_type_filter_matches_by_key(self, staff_client, mocker):
+        _mock_logs_deps(mocker)
+        resp = staff_client.get("/activity-logs?entity_type=COMPANY")
+        html = resp.get_data(as_text=True)
+        assert 'value="COMPANY" selected' in html
+
     def test_page_beyond_total_pages_clamped(self, staff_client, mocker):
         """page=99 nhưng chỉ có 1 trang dữ liệu -> phải tự kẹp về trang
         cuối cùng, không redirect/lỗi."""

@@ -20,13 +20,26 @@
   </a>
 </nav>
 
+{# THÊM 09/2026 (xem lịch sử trao đổi "loading khi chuyển tab Tự động/
+   Thủ công") — overlay ẩn sẵn (hidden), JS ở cuối file hiện nó NGAY
+   lúc bấm 1 trong 2 tab TRƯỚC KHI trình duyệt bắt đầu điều hướng thật
+   (KHÔNG preventDefault() — vẫn để <a href> chuyển trang full-reload
+   như cũ, đúng quyết định "phương án 2" đã chốt, xem docstring script
+   prefetch bên dưới). CHỈ che được khoảnh khắc ngắn trước khi trang
+   rời đi — KHÔNG phải loading mượt suốt quá trình chờ network như
+   crawl.html (cái đó cần AJAX thật, đã cân nhắc và không đáng làm ở
+   trang này, xem docstring script prefetch). #}
+<div class="activity-nav-loading-overlay" id="activity-nav-loading" hidden>
+  <span class="activity-nav-loading-text">Đang tải nhật ký…</span>
+</div>
+
 <form class="filter-bar" method="get">
   <input type="hidden" name="view" value="{{ view }}">
 
   <select name="entity_type">
     <option value="">Mọi đối tượng</option>
-    {% for et in entity_types %}
-      <option value="{{ et }}" {{ 'selected' if filters.entity_type == et }}>{{ et }}</option>
+    {% for key, label in entity_types %}
+      <option value="{{ key }}" {{ 'selected' if filters.entity_type == key }}>{{ label }}</option>
     {% endfor %}
   </select>
 
@@ -257,6 +270,16 @@
     a.addEventListener("mouseenter", function () { prefetch(a.href); }, {passive: true});
     a.addEventListener("focus", function () { prefetch(a.href); });
     a.addEventListener("touchstart", function () { prefetch(a.href); }, {passive: true});
+
+    // THÊM 09/2026 — hiện overlay "Đang tải nhật ký…" NGAY lúc click,
+    // KHÔNG chặn điều hướng (không preventDefault) — xem docstring
+    // #activity-nav-loading ở trên. Không click vào tab ĐANG active
+    // (đứng yên tại chỗ, không có gì để "tải").
+    a.addEventListener("click", function () {
+      if (a.classList.contains("active")) return;
+      var overlay = document.getElementById("activity-nav-loading");
+      if (overlay) overlay.hidden = false;
+    });
   });
 })();
 </script>

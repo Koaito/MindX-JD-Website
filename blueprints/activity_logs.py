@@ -79,7 +79,16 @@ def logs():
         flash(str(exc), "error")
         staff_members = []
 
-    entity_types = list(db_data.ENTITY_TYPE_MAP.values())  # ["JD", "Công ty", "Người liên hệ"]
+    # FIX 09/2026 (xem lịch sử trao đổi "lỗi 400 khi lọc entity_type
+    # 'Công ty' ở tab Lịch sử thao tác") — TRƯỚC ĐÂY chỉ lấy .values()
+    # (nhãn tiếng Việt: "JD"/"Công ty"/...) làm option value CHO CẢ
+    # value LẪN label hiển thị -> dropdown gửi thẳng "Công ty" làm
+    # entity_type lên backend, trong khi backend chỉ nhận đúng key viết
+    # hoa (APPLICATION/COMPANY/CONTACT/JOB, xem ENTITY_TYPE_MAP ở
+    # crawler_client/audit_logs.py) -> backend trả 400. Giờ truyền
+    # NGUYÊN CẶP (key, label) — value option = key (đúng cái backend
+    # cần), text hiển thị = label (đúng cái người dùng cần đọc).
+    entity_types = list(db_data.ENTITY_TYPE_MAP.items())  # [("JOB", "JD"), ("COMPANY", "Công ty"), ...]
 
     return render_template(
         "activity_logs.html", logs=logs, view=view,
