@@ -1,0 +1,225 @@
+{#
+  Nội dung "thân" trang Lịch sử thao tác — TÁCH RA 09/2026 (xem lịch sử
+  trao đổi "chuyển hẳn sang AJAX như crawl.html") từ activity_logs.html.
+
+  Dùng CHUNG cho 2 trường hợp (mirror đúng cách crawl.py dùng tab_html):
+  1. Load trang lần đầu — activity_logs.html chèn thẳng bằng
+     {{ body_html|safe }} vào #activity-logs-body.
+  2. Fetch AJAX (đổi tab/lọc/phân trang) — route activity_logs.logs()
+     trả THẲNG fragment này (không qua layout base.html) khi request có
+     header X-Requested-With, xem nhánh is_ajax ở blueprints/
+     activity_logs.py::logs().
+
+  KHÁC crawl.html Ở CHỖ: không cache theo tab (không có data-loaded).
+  2 view (auto/manual) ở trang này mỗi cái có filter+phân trang RIÊNG
+  và có thể đổi độc lập bất cứ lúc nào — cache "load 1 lần rồi giữ
+  nguyên trong DOM" như crawl.html sẽ phải tự invalidate lại mỗi khi
+  lọc/phân trang đổi, phức tạp hơn lợi ích mang lại cho 1 trang admin
+  nội bộ ít người dùng. Đơn giản hơn: MỌI lần đổi tab/lọc/trang đều
+  fetch lại, luôn hiện "Đang tải…" — đổi lại đúng cái người dùng muốn
+  thấy (xem ảnh ví dụ trong lịch sử trao đổi), không phải nhược điểm.
+#}
+<form class="filter-bar" method="get">
+  <input type="hidden" name="view" value="{{ view }}">
+
+  <select name="entity_type">
+    <option value="">Mọi đối tượng</option>
+    {% for key, label in entity_types %}
+      <option value="{{ key }}" {{ 'selected' if filters.entity_type == key }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="company_id">
+    <option value="">Mọi công ty</option>
+    {% for c in companies %}
+      <option value="{{ c.id }}" {{ 'selected' if filters.company_id == c.id }}>{{ c.company }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="actor_id">
+    <option value="">Mọi người thực hiện</option>
+    {% for s in staff_members %}
+      <option value="{{ s.ss_user_id }}" {{ 'selected' if filters.actor_id == s.ss_user_id }}>{{ s.full_name }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn btn-ghost">Lọc</button>
+  {% if filters.entity_type or filters.company_id or filters.actor_id %}
+    <a class="btn btn-text" href="{{ url_for('activity_logs.logs', view=view) }}">Xóa lọc</a>
+  {% endif %}
+</form>
+
+<p class="result-count">{{ total_logs }} log phù hợp</p>
+
+{% if logs %}
+<div class="activity-table-wrap">
+  <table class="activity-table">
+    <thead>
+      <tr>
+        <th style="width: 140px;">Thời gian</th>
+        <th style="width: 150px;">Người thực hiện</th>
+        <th style="width: 120px;">Hành động</th>
+        <th>Đối tượng</th>
+        <th style="width: 200px;">Công ty liên quan</th>
+        <!-- Ghi chú/Actions LUÔN hiển thị (không chỉ view=manual) — từ
+             08/2026 vài action "tự động" (vd WITHDRAW_JOB_APPLICATION)
+             vẫn có thể có note do CHÍNH học viên ghi lúc huỷ ứng tuyển,
+             ẩn cột này ở tab "Tự động" sẽ làm mất note đó luôn. -->
+        <th style="min-width: 250px;">Ghi chú</th>
+        <th style="width: 100px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr {% if log.note_required and not log.note %}class="highlight-required"{% endif %}>
+        <td class="muted">{{ log.created_at|format_date('%d/%m/%Y %H:%M') if log.created_at else '—' }}</td>
+        <td>{{ log.actor_name }}</td>
+        <td>
+          <span class="badge badge-{{ 'success' if 'Thêm' in log.action_label else ('warning' if 'Sửa' in log.action_label else 'danger') }}">
+            {{ log.action_label }}
+          </span>
+        </td>
+        <td>
+          <strong>{{ log.entity_label_type }}:</strong>
+          {% if log.entity_type == 'JOB' and log.entity_id %}
+            <a href="{{ url_for('jobs.detail', job_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+          {% elif log.entity_type == 'COMPANY' and log.entity_id %}
+            <a href="{{ url_for('companies.detail', company_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
+          {% elif log.entity_type == 'CONTACT' and log.entity_id %}
+            <span>{{ log.entity_label or log.entity_id }}</span>
+          {% else %}
+            <span class="muted">{{ log.entity_label or '—' }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if log.company_id %}
+            <a href="{{ url_for('companies.detail', company_id=log.company_id) }}">{{ log.company_name or '—' }}</a>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if log.note %}
+            <div class="note-text">{{ log.note }}</div>
+            {% if log.note_updated_at %}
+              <small class="muted">(Sửa: {{ log.note_updated_at|format_date('%d/%m %H:%M') }})</small>
+            {% endif %}
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="actions-cell">
+          {% if log.actor_id == current_user.id and not log.note_required %}
+            <button
+              type="button"
+              class="btn btn-text js-edit-note-btn"
+              data-update-url="{{ url_for('activity_logs.update_note', log_id=log.id, view=view) }}"
+              data-note="{{ log.note or '' }}"
+            >
+              Sửa note
+            </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Phân trang">
+  {% if page > 1 %}
+    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page-1, **pagination_filters) }}">‹ Trang trước</a>
+  {% endif %}
+  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page+1, **pagination_filters) }}">Trang sau ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <p>Chưa có log nào khớp bộ lọc.</p>
+</div>
+{% endif %}
+
+{# Modal "Sửa ghi chú" — thay cho window.prompt() cũ (hộp thoại thô của
+   trình duyệt, không style được, không hợp giao diện trang, không xuống
+   dòng được cho ghi chú dài). Chỉ 1 bản markup DÙNG CHUNG cho mọi dòng
+   (giống pattern .dm-modal ở tab Import data-management, .et-modal ở
+   popup mẫu email) — JS đọc data-update-url/data-note của nút "Sửa note"
+   vừa bấm để bơm vào <form> bên trong, KHÔNG render N modal ẩn sẵn cho
+   N dòng.
+
+   Vẫn là <form method="post">
+   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> submit thật (không AJAX) — giữ NGUYÊN
+   hành vi backend hiện có (route update_note() trả redirect + flash,
+   không trả JSON) để không phải sửa gì phía blueprints/activity_logs.py.
+   Submit form này VẪN full-reload — CHỈ đổi tab/lọc/phân trang sang
+   AJAX, không đổi hành vi ghi dữ liệu (đúng nguyên tắc đã áp dụng ở
+   crawl.html: "chỉ việc XEM là AJAX, thao tác GHI vẫn submit thường").
+   Textarea (thay vì input 1 dòng như prompt() cũ) — note vốn đã hỗ trợ
+   xuống dòng ở phía hiển thị (.note-text có white-space: pre-wrap) chỉ
+   là trước đây prompt() không cho gõ nhiều dòng để tận dụng. #}
+<div class="note-modal-overlay" id="note-modal-overlay" hidden>
+  <div class="note-modal" role="dialog" aria-modal="true" aria-labelledby="note-modal-title">
+    <div class="note-modal-head">
+      <h3 id="note-modal-title">Sửa ghi chú</h3>
+      <button type="button" class="note-modal-close" id="note-modal-close" aria-label="Đóng">×</button>
+    </div>
+    <form method="post" id="note-modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <textarea name="note" id="note-modal-textarea" rows="5" placeholder="Nhập ghi chú…"></textarea>
+      <div class="note-modal-actions">
+        <button type="button" class="btn btn-ghost" id="note-modal-cancel">Huỷ</button>
+        <button type="submit" class="btn btn-primary">Lưu ghi chú</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var overlay = document.getElementById("note-modal-overlay");
+  if (!overlay) return;
+  var form = document.getElementById("note-modal-form");
+  var textarea = document.getElementById("note-modal-textarea");
+  var closeBtn = document.getElementById("note-modal-close");
+  var cancelBtn = document.getElementById("note-modal-cancel");
+
+  function openNoteModal(updateUrl, currentNote) {
+    form.action = updateUrl;
+    textarea.value = currentNote;
+    overlay.hidden = false;
+    // Focus + đặt con trỏ cuối chuỗi (thay vì chọn hết) — khớp cảm giác
+    // "sửa tiếp" của prompt() cũ, không phải gõ đè lại từ đầu.
+    textarea.focus();
+    var len = textarea.value.length;
+    textarea.setSelectionRange(len, len);
+  }
+
+  function closeNoteModal() {
+    overlay.hidden = true;
+  }
+
+  document.querySelectorAll(".js-edit-note-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      openNoteModal(btn.getAttribute("data-update-url"), btn.getAttribute("data-note") || "");
+    });
+  });
+
+  closeBtn.addEventListener("click", closeNoteModal);
+  cancelBtn.addEventListener("click", closeNoteModal);
+  // Bấm ra ngoài overlay (không phải bên trong .note-modal) -> đóng,
+  // giống hệt hành vi .dm-modal-overlay/.et-modal đang có.
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeNoteModal();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !overlay.hidden) closeNoteModal();
+  });
+})();
+</script>

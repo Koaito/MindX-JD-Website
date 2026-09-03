@@ -25,7 +25,16 @@ def logs():
     """Trang lịch sử thao tác — 2 tab ?view=auto (tự động) / ?view=manual
     (thủ công), filter theo entity_type/company/actor. Khác /staff-activity
     (tổng hợp JD/công ty/contact theo người tạo) — đây là nhật ký TỪNG thao
-    tác chi tiết theo thời gian, có note."""
+    tác chi tiết theo thời gian, có note.
+
+    SỬA 09/2026 (xem lịch sử trao đổi "chuyển hẳn sang AJAX như
+    crawl.html"): route này giờ phục vụ CẢ 2 kiểu response — full page
+    (activity_logs.html, có header/sidebar/tab-nav) lúc load trang bình
+    thường, VÀ fragment thuần (_activity_logs_body.html, không qua
+    layout base.html) khi request có header X-Requested-With — xem
+    nhánh is_ajax bên dưới, mirror đúng cách blueprints/crawl.py::
+    index() đang làm. Logic build dữ liệu (query backend, phân trang,
+    filter) KHÔNG đổi gì — chỉ đổi phần render cuối route."""
     view = request.args.get("view", "auto")
     if view not in ("auto", "manual"):
         view = "auto"
@@ -90,14 +99,26 @@ def logs():
     # cần), text hiển thị = label (đúng cái người dùng cần đọc).
     entity_types = list(db_data.ENTITY_TYPE_MAP.items())  # [("JOB", "JD"), ("COMPANY", "Công ty"), ...]
 
-    return render_template(
-        "activity_logs.html", logs=logs, view=view,
+    ctx = dict(
+        logs=logs, view=view,
         entity_types=entity_types, companies=companies, staff_members=staff_members,
         filters={"entity_type": entity_type, "company_id": company_id, "actor_id": actor_id},
         pagination_filters={k: v for k, v in
                              {"entity_type": entity_type, "company_id": company_id, "actor_id": actor_id}.items() if v},
         total_logs=total_logs, page=page, total_pages=total_pages, per_page=per_page,
     )
+    body_html = render_template("_activity_logs_body.html", **ctx)
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # THÊM 09/2026 (xem lịch sử trao đổi "chuyển hẳn sang AJAX như
+        # crawl.html") — request tới TỪ chính JS ở activity_logs.html
+        # (ajaxNavigate(), đổi tab/lọc/phân trang): trả THẲNG fragment
+        # (không qua layout base.html), y hệt nhánh is_ajax ở
+        # blueprints/crawl.py::index() — JS chỉ cần chèn thẳng vào
+        # innerHTML của #activity-logs-body, không cần parse gì thêm.
+        return body_html
+
+    return render_template("activity_logs.html", view=view, filters=ctx["filters"], body_html=body_html)
 
 
 @activity_logs_bp.route("/activity-logs/<string:log_id>/note", methods=["POST"])

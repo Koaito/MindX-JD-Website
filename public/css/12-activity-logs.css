@@ -276,32 +276,3 @@
   gap: 10px;
   margin-top: 14px;
 }
-
-/* THÊM 09/2026 (xem docstring #activity-nav-loading ở activity_logs.html)
-   — overlay ngắn hiện lúc bấm tab Tự động/Thủ công, TRƯỚC KHI trang
-   full-reload. Fixed inset:0 giống .dm-modal-overlay (13-data-
-   management.css) nhưng KHÔNG có khối modal trắng ở giữa — chỉ 1 dòng
-   chữ nhỏ, vì đây chỉ là phản hồi tức thì lúc click, không phải hộp
-   thoại cần người dùng đọc kỹ. */
-.activity-nav-loading-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(16, 30, 26, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-.activity-nav-loading-overlay[hidden] {
-  display: none;
-}
-.activity-nav-loading-text {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-  box-shadow: 0 8px 24px rgba(16, 30, 26, 0.18);
-}

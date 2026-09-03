@@ -128,6 +128,49 @@ class TestActivityLogsIndex:
         assert "/login" in resp.headers["Location"]
 
 
+class TestActivityLogsAjaxFragment:
+    """THÊM 09/2026 (xem lịch sử trao đổi "chuyển hẳn sang AJAX như
+    crawl.html") — route /activity-logs giờ trả fragment thuần
+    (_activity_logs_body.html, không qua layout base.html) khi request
+    có header X-Requested-With, mirror đúng nhánh is_ajax ở
+    blueprints/crawl.py::index()."""
+
+    def test_ajax_request_returns_fragment_not_full_page(self, staff_client, mocker):
+        _mock_logs_deps(mocker)
+        resp = staff_client.get(
+            "/activity-logs", headers={"X-Requested-With": "XMLHttpRequest"}
+        )
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        # Fragment KHÔNG có header/sidebar/tab-nav của layout — chỉ có
+        # nội dung bên trong #activity-logs-body.
+        assert "Career Hub" not in html
+        assert 'id="activityTabNav"' not in html
+        assert "result-count" in html
+
+    def test_non_ajax_request_returns_full_page(self, staff_client, mocker):
+        _mock_logs_deps(mocker)
+        resp = staff_client.get("/activity-logs")
+        html = resp.get_data(as_text=True)
+        assert 'id="activityTabNav"' in html
+        assert 'id="activity-logs-body"' in html
+
+    def test_ajax_fragment_still_respects_view_and_filters(self, staff_client, mocker):
+        list_audit_logs_mock = mocker.patch(
+            "blueprints.activity_logs.db_data.list_audit_logs",
+            return_value={"items": [], "total": 0},
+        )
+        mocker.patch("blueprints.activity_logs.db_data.list_all_companies", return_value=[])
+        mocker.patch("blueprints.activity_logs.backend_auth.list_users", return_value=[])
+        resp = staff_client.get(
+            "/activity-logs?view=manual&entity_type=COMPANY",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 200
+        assert list_audit_logs_mock.call_args.kwargs["view"] == "manual"
+        assert list_audit_logs_mock.call_args.kwargs["entity_type"] == "COMPANY"
+
+
 class TestActivityLogsUpdateNote:
     """update_note() dùng _call_authed — route THẬT nơi từng dính bug
     _call_authed cũ (thiếu refresh token, crash 500 sau 401)."""

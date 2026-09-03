@@ -1,3 +1,25 @@
+{#
+  Shell trang "Lịch sử thao tác" — SỬA 09/2026 (xem lịch sử trao đổi
+  "chuyển hẳn sang AJAX như crawl.html"): trước đây (08/2026, "phương
+  án 2") trang này CHỦ Ý giữ full-reload cho cả đổi tab lẫn lọc/phân
+  trang + chỉ thêm prefetch-khi-hover, với lý do "2 view có filter +
+  phân trang riêng, gộp vào 1 cơ chế AJAX như crawl.html không đáng".
+  Lý do đó VẪN ĐÚNG cho việc gộp-render-cả-2-view-cùng-lúc — nhưng
+  không có nghĩa PHẢI full-reload: giờ áp NGUYÊN cơ chế AJAX-fragment
+  của crawl.html (fetch + swap DOM, có "Đang tải…") cho MỌI tương tác
+  xem (đổi tab, lọc, phân trang) — KHÔNG gộp 2 view vào 1 response,
+  mỗi request AJAX vẫn chỉ build ĐÚNG 1 view như route đã làm từ
+  trước, chỉ khác chỗ trả fragment thay vì full page.
+
+  KHÁC crawl.html: KHÔNG cache theo tab (không data-loaded) — mọi lần
+  đổi tab/lọc/trang đều fetch lại (xem docstring đầu
+  _activity_logs_body.html để biết lý do không cache).
+
+  Cấu trúc: header + tab-nav (2 view) LUÔN render sẵn (không đổi) +
+  #activity-logs-body chứa fragment (_activity_logs_body.html) — route
+  activity_logs.logs() trả fragment này khi header X-Requested-With có
+  mặt (is_ajax), y hệt nhánh is_ajax ở blueprints/crawl.py::index().
+#}
 {% extends "base.html" %}
 {% block title %}Lịch sử thao tác — MindX Career Hub{% endblock %}
 {% block content_class %}content-full{% endblock %}
@@ -11,275 +33,124 @@
   </div>
 </header>
 
-<nav class="tab-nav">
-  <a href="{{ url_for('activity_logs.logs', view='auto', **filters) }}" class="{{ 'active' if view == 'auto' else '' }}">
+<nav class="tab-nav" id="activityTabNav">
+  <a href="{{ url_for('activity_logs.logs', view='auto', **filters) }}" class="{{ 'active' if view == 'auto' else '' }}" data-view="auto">
     Tự động
   </a>
-  <a href="{{ url_for('activity_logs.logs', view='manual', **filters) }}" class="{{ 'active' if view == 'manual' else '' }}">
+  <a href="{{ url_for('activity_logs.logs', view='manual', **filters) }}" class="{{ 'active' if view == 'manual' else '' }}" data-view="manual">
     Thủ công
   </a>
 </nav>
 
-{# THÊM 09/2026 (xem lịch sử trao đổi "loading khi chuyển tab Tự động/
-   Thủ công") — overlay ẩn sẵn (hidden), JS ở cuối file hiện nó NGAY
-   lúc bấm 1 trong 2 tab TRƯỚC KHI trình duyệt bắt đầu điều hướng thật
-   (KHÔNG preventDefault() — vẫn để <a href> chuyển trang full-reload
-   như cũ, đúng quyết định "phương án 2" đã chốt, xem docstring script
-   prefetch bên dưới). CHỈ che được khoảnh khắc ngắn trước khi trang
-   rời đi — KHÔNG phải loading mượt suốt quá trình chờ network như
-   crawl.html (cái đó cần AJAX thật, đã cân nhắc và không đáng làm ở
-   trang này, xem docstring script prefetch). #}
-<div class="activity-nav-loading-overlay" id="activity-nav-loading" hidden>
-  <span class="activity-nav-loading-text">Đang tải nhật ký…</span>
-</div>
-
-<form class="filter-bar" method="get">
-  <input type="hidden" name="view" value="{{ view }}">
-
-  <select name="entity_type">
-    <option value="">Mọi đối tượng</option>
-    {% for key, label in entity_types %}
-      <option value="{{ key }}" {{ 'selected' if filters.entity_type == key }}>{{ label }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="company_id">
-    <option value="">Mọi công ty</option>
-    {% for c in companies %}
-      <option value="{{ c.id }}" {{ 'selected' if filters.company_id == c.id }}>{{ c.company }}</option>
-    {% endfor %}
-  </select>
-
-  <select name="actor_id">
-    <option value="">Mọi người thực hiện</option>
-    {% for s in staff_members %}
-      <option value="{{ s.ss_user_id }}" {{ 'selected' if filters.actor_id == s.ss_user_id }}>{{ s.full_name }}</option>
-    {% endfor %}
-  </select>
-
-  <button type="submit" class="btn btn-ghost">Lọc</button>
-  {% if filters.entity_type or filters.company_id or filters.actor_id %}
-    <a class="btn btn-text" href="{{ url_for('activity_logs.logs', view=view) }}">Xóa lọc</a>
-  {% endif %}
-</form>
-
-<p class="result-count">{{ total_logs }} log phù hợp</p>
-
-{% if logs %}
-<div class="activity-table-wrap">
-  <table class="activity-table">
-    <thead>
-      <tr>
-        <th style="width: 140px;">Thời gian</th>
-        <th style="width: 150px;">Người thực hiện</th>
-        <th style="width: 120px;">Hành động</th>
-        <th>Đối tượng</th>
-        <th style="width: 200px;">Công ty liên quan</th>
-        <!-- Ghi chú/Actions LUÔN hiển thị (không chỉ view=manual) — từ
-             08/2026 vài action "tự động" (vd WITHDRAW_JOB_APPLICATION)
-             vẫn có thể có note do CHÍNH học viên ghi lúc huỷ ứng tuyển,
-             ẩn cột này ở tab "Tự động" sẽ làm mất note đó luôn. -->
-        <th style="min-width: 250px;">Ghi chú</th>
-        <th style="width: 100px;"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for log in logs %}
-      <tr {% if log.note_required and not log.note %}class="highlight-required"{% endif %}>
-        <td class="muted">{{ log.created_at|format_date('%d/%m/%Y %H:%M') if log.created_at else '—' }}</td>
-        <td>{{ log.actor_name }}</td>
-        <td>
-          <span class="badge badge-{{ 'success' if 'Thêm' in log.action_label else ('warning' if 'Sửa' in log.action_label else 'danger') }}">
-            {{ log.action_label }}
-          </span>
-        </td>
-        <td>
-          <strong>{{ log.entity_label_type }}:</strong>
-          {% if log.entity_type == 'JOB' and log.entity_id %}
-            <a href="{{ url_for('jobs.detail', job_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
-          {% elif log.entity_type == 'COMPANY' and log.entity_id %}
-            <a href="{{ url_for('companies.detail', company_id=log.entity_id) }}">{{ log.entity_label or log.entity_id }}</a>
-          {% elif log.entity_type == 'CONTACT' and log.entity_id %}
-            <span>{{ log.entity_label or log.entity_id }}</span>
-          {% else %}
-            <span class="muted">{{ log.entity_label or '—' }}</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if log.company_id %}
-            <a href="{{ url_for('companies.detail', company_id=log.company_id) }}">{{ log.company_name or '—' }}</a>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if log.note %}
-            <div class="note-text">{{ log.note }}</div>
-            {% if log.note_updated_at %}
-              <small class="muted">(Sửa: {{ log.note_updated_at|format_date('%d/%m %H:%M') }})</small>
-            {% endif %}
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
-        <td class="actions-cell">
-          {% if log.actor_id == current_user.id and not log.note_required %}
-            <button
-              type="button"
-              class="btn btn-text js-edit-note-btn"
-              data-update-url="{{ url_for('activity_logs.update_note', log_id=log.id, view=view) }}"
-              data-note="{{ log.note or '' }}"
-            >
-              Sửa note
-            </button>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-{% if total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang">
-  {% if page > 1 %}
-    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page-1, **pagination_filters) }}">‹ Trang trước</a>
-  {% endif %}
-  <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
-  {% if page < total_pages %}
-    <a class="page-link" href="{{ url_for('activity_logs.logs', view=view, page=page+1, **pagination_filters) }}">Trang sau ›</a>
-  {% endif %}
-</nav>
-{% endif %}
-
-{% else %}
-<div class="empty-state">
-  <p>Chưa có log nào khớp bộ lọc.</p>
-</div>
-{% endif %}
-
-{# Modal "Sửa ghi chú" — thay cho window.prompt() cũ (hộp thoại thô của
-   trình duyệt, không style được, không hợp giao diện trang, không xuống
-   dòng được cho ghi chú dài). Chỉ 1 bản markup DÙNG CHUNG cho mọi dòng
-   (giống pattern .dm-modal ở tab Import data-management, .et-modal ở
-   popup mẫu email) — JS đọc data-update-url/data-note của nút "Sửa note"
-   vừa bấm để bơm vào <form> bên trong, KHÔNG render N modal ẩn sẵn cho
-   N dòng.
-
-   Vẫn là <form method="post">
-   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> submit thật (không AJAX) — giữ NGUYÊN
-   hành vi backend hiện có (route update_note() trả redirect + flash,
-   không trả JSON) để không phải sửa gì phía blueprints/activity_logs.py.
-   Textarea (thay vì input 1 dòng như prompt() cũ) — note vốn đã hỗ trợ
-   xuống dòng ở phía hiển thị (.note-text có white-space: pre-wrap) chỉ
-   là trước đây prompt() không cho gõ nhiều dòng để tận dụng. #}
-<div class="note-modal-overlay" id="note-modal-overlay" hidden>
-  <div class="note-modal" role="dialog" aria-modal="true" aria-labelledby="note-modal-title">
-    <div class="note-modal-head">
-      <h3 id="note-modal-title">Sửa ghi chú</h3>
-      <button type="button" class="note-modal-close" id="note-modal-close" aria-label="Đóng">×</button>
-    </div>
-    <form method="post" id="note-modal-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <textarea name="note" id="note-modal-textarea" rows="5" placeholder="Nhập ghi chú…"></textarea>
-      <div class="note-modal-actions">
-        <button type="button" class="btn btn-ghost" id="note-modal-cancel">Huỷ</button>
-        <button type="submit" class="btn btn-primary">Lưu ghi chú</button>
-      </div>
-    </form>
-  </div>
+<div id="activity-logs-body">
+{{ body_html|safe }}
 </div>
 
 <script>
 (function () {
   "use strict";
+  // AJAX cho tab/lọc/phân trang (09/2026, xem docstring đầu file) —
+  // mirror ĐÚNG kỹ thuật ở crawl.html (execTabScripts, requestSeq
+  // chống race condition khi bấm liên tiếp, fallback full-reload nếu
+  // fetch lỗi) nhưng ĐƠN GIẢN HƠN vì chỉ có 1 vùng nội dung duy nhất
+  // cần swap (#activity-logs-body), không phải 4 panel riêng.
+  var body = document.getElementById("activity-logs-body");
+  var tabNav = document.getElementById("activityTabNav");
+  if (!body) return;
 
-  var overlay = document.getElementById("note-modal-overlay");
-  if (!overlay) return;
-  var form = document.getElementById("note-modal-form");
-  var textarea = document.getElementById("note-modal-textarea");
-  var closeBtn = document.getElementById("note-modal-close");
-  var cancelBtn = document.getElementById("note-modal-cancel");
+  var VIEW_LABELS = { auto: "Tự động", manual: "Thủ công" };
 
-  function openNoteModal(updateUrl, currentNote) {
-    form.action = updateUrl;
-    textarea.value = currentNote;
-    overlay.hidden = false;
-    // Focus + đặt con trỏ cuối chuỗi (thay vì chọn hết) — khớp cảm giác
-    // "sửa tiếp" của prompt() cũ, không phải gõ đè lại từ đầu.
-    textarea.focus();
-    var len = textarea.value.length;
-    textarea.setSelectionRange(len, len);
+  function execBodyScripts() {
+    var scripts = body.querySelectorAll("script");
+    for (var i = 0; i < scripts.length; i++) {
+      var old = scripts[i];
+      var fresh = document.createElement("script");
+      for (var a = 0; a < old.attributes.length; a++) {
+        fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+      }
+      fresh.textContent = old.textContent;
+      old.parentNode.replaceChild(fresh, old);
+    }
   }
 
-  function closeNoteModal() {
-    overlay.hidden = true;
+  // requestSeq — chống race condition khi bấm liên tiếp (vd "Trang
+  // sau" 2 lần liền, hay đổi tab rồi đổi lại ngay) — CHỈ nhận response
+  // của request MỚI NHẤT, bỏ qua response trễ của request đã cũ. Cùng
+  // kỹ thuật/lý do đã dùng ở crawl.html (không dùng AbortController,
+  // xem docstring bên đó).
+  var reqSeq = 0;
+  function nextRequestSeq() { return ++reqSeq; }
+  function isStaleRequestSeq(seq) { return seq !== reqSeq; }
+
+  function currentViewFromUrl(url) {
+    var v = new URL(url, window.location.href).searchParams.get("view");
+    return (v === "auto" || v === "manual") ? v : null;
   }
 
-  document.querySelectorAll(".js-edit-note-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      openNoteModal(btn.getAttribute("data-update-url"), btn.getAttribute("data-note") || "");
+  function updateTabNavActive(view) {
+    if (!tabNav || !view) return;
+    tabNav.querySelectorAll("a[data-view]").forEach(function (a) {
+      a.classList.toggle("active", a.getAttribute("data-view") === view);
     });
-  });
-
-  closeBtn.addEventListener("click", closeNoteModal);
-  cancelBtn.addEventListener("click", closeNoteModal);
-  // Bấm ra ngoài overlay (không phải bên trong .note-modal) -> đóng,
-  // giống hệt hành vi .dm-modal-overlay/.et-modal đang có.
-  overlay.addEventListener("click", function (e) {
-    if (e.target === overlay) closeNoteModal();
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !overlay.hidden) closeNoteModal();
-  });
-})();
-</script>
-
-<script>
-(function () {
-  "use strict";
-  // Prefetch khi hover tab Tự động/Thủ công (08/2026, phương án 2 — xem
-  // lịch sử trao đổi "phương án 1 vs 2 cho từng trang"). KHÁC crawl.html/
-  // data_management.html (client-side tab, không round-trip) — trang
-  // này mỗi view có filter + phân trang RIÊNG theo query string, gộp cả
-  // 2 view vào 1 lần render sẽ nhân đôi dữ liệu mỗi lần đổi trang/lọc,
-  // không đáng. Vẫn giữ <a href> full-reload như cũ, chỉ thêm: hover/
-  // focus vào tab kia -> trình duyệt ÂM THẦM tải sẵn trang đó
-  // (<link rel="prefetch">) trước khi người dùng thật sự click.
-  //
-  // LƯU Ý HIỆU QUẢ THỰC TẾ (nói rõ, không phóng đại): đây là click điều
-  // hướng bình thường (không tự swap DOM bằng tay), nên chỉ có ích nếu
-  // trình duyệt tái sử dụng được response đã prefetch từ HTTP cache lúc
-  // điều hướng thật — phụ thuộc trình duyệt + cache-control của response
-  // Flask trả về (mặc định Flask không set cache header cho HTML). Coi
-  // đây là "cải thiện một phần khi may mắn cache được", KHÔNG phải giải
-  // pháp tức thì như 2 trang kia — chấp nhận được vì trang log không ai
-  // chuyển tab liên tục như dashboard.
-  var prefetched = {};
-
-  function prefetch(url) {
-    if (!url || prefetched[url]) return;
-    prefetched[url] = true;
-    var link = document.createElement("link");
-    link.rel = "prefetch";
-    link.href = url;
-    document.head.appendChild(link);
   }
 
-  document.querySelectorAll(".tab-nav a[href]").forEach(function (a) {
-    a.addEventListener("mouseenter", function () { prefetch(a.href); }, {passive: true});
-    a.addEventListener("focus", function () { prefetch(a.href); });
-    a.addEventListener("touchstart", function () { prefetch(a.href); }, {passive: true});
+  function ajaxNavigate(url) {
+    var view = currentViewFromUrl(url);
+    var label = (view && VIEW_LABELS[view]) || "nhật ký";
+    body.innerHTML = '<p class="muted" style="padding: 40px 0; text-align: center;">Đang tải ' + label + '…</p>';
 
-    // THÊM 09/2026 — hiện overlay "Đang tải nhật ký…" NGAY lúc click,
-    // KHÔNG chặn điều hướng (không preventDefault) — xem docstring
-    // #activity-nav-loading ở trên. Không click vào tab ĐANG active
-    // (đứng yên tại chỗ, không có gì để "tải").
-    a.addEventListener("click", function () {
-      if (a.classList.contains("active")) return;
-      var overlay = document.getElementById("activity-nav-loading");
-      if (overlay) overlay.hidden = false;
+    var seq = nextRequestSeq();
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        if (isStaleRequestSeq(seq)) return; // đã có thao tác mới hơn xảy ra sau -> bỏ qua response trễ này
+        body.innerHTML = html;
+        execBodyScripts();
+        updateTabNavActive(view);
+        history.replaceState(null, "", url);
+        body.scrollIntoView({ block: "start", behavior: "smooth" });
+      })
+      .catch(function () {
+        if (isStaleRequestSeq(seq)) return;
+        // Fetch lỗi (mạng/JS) -> full reload, KHÔNG để kẹt ở khung
+        // "Đang tải…" không bấm gì được — cùng triết lý crawl.html.
+        window.location.href = url;
+      });
+  }
+
+  // Tab Tự động/Thủ công — giữ nguyên <a href> (khác crawl.html dùng
+  // <button>, xem docstring shell) để vẫn hoạt động nếu JS lỗi/tắt.
+  if (tabNav) {
+    tabNav.addEventListener("click", function (e) {
+      var a = e.target.closest("a[data-view]");
+      if (!a) return;
+      if (a.classList.contains("active")) { e.preventDefault(); return; } // đang ở view này -> không có gì để tải lại
+      e.preventDefault();
+      ajaxNavigate(a.href);
     });
+  }
+
+  // Lọc + phân trang + "Xóa lọc" — event delegation trên #activity-logs-body
+  // (nội dung bị THAY TOÀN BỘ mỗi lần fetch, bind trực tiếp từng phần
+  // tử sẽ mất tác dụng sau lần swap đầu).
+  body.addEventListener("click", function (e) {
+    var link = e.target.closest("a.page-link, a.btn-text");
+    if (!link) return;
+    e.preventDefault();
+    ajaxNavigate(link.href);
+  });
+
+  body.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.classList || !form.classList.contains("filter-bar")) return;
+    e.preventDefault();
+    var params = new URLSearchParams(new FormData(form));
+    var url = new URL(window.location.href);
+    url.search = params.toString();
+    ajaxNavigate(url.toString());
   });
 })();
 </script>
