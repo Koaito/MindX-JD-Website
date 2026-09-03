@@ -194,17 +194,13 @@
 </div>
 
 {% if crawl_total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang lịch sử crawl">
-  {% if crawl_page > 1 %}
-    {# maint_page=maint_page: GIỮ nguyên trang bảng bảo trì đang xem —
-       thiếu tham số này URL sẽ rơi về mặc định trang 1 của bảng kia. #}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='history', crawl_page=crawl_page-1, maint_page=maint_page, **crawl_pagination_filters) }}">‹ Trang trước</a>
-  {% endif %}
-  <span class="page-info">Trang {{ crawl_page }} / {{ crawl_total_pages }}</span>
-  {% if crawl_page < crawl_total_pages %}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='history', crawl_page=crawl_page+1, maint_page=maint_page, **crawl_pagination_filters) }}">Trang sau ›</a>
-  {% endif %}
-</nav>
+  {% set page = crawl_page %}
+  {% set total_pages = crawl_total_pages %}
+  {% set pagination_filters = crawl_pagination_filters %}
+  {% set page_param = 'crawl_page' %}
+  {% set id_prefix = 'crawl_' %}
+  {% set nav_label = 'Phân trang lịch sử crawl' %}
+  {% include "_pagination.html" %}
 {% endif %}
 
 {% else %}
@@ -306,17 +302,13 @@
 </div>
 
 {% if maint_total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang lịch sử bảo trì">
-  {% if maint_page > 1 %}
-    {# crawl_page=crawl_page: GIỮ nguyên trang bảng crawl đang xem —
-       cùng lý do bảng trên (thiếu -> rơi về mặc định trang 1). #}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='history', maint_page=maint_page-1, crawl_page=crawl_page, **maint_pagination_filters) }}">‹ Trang trước</a>
-  {% endif %}
-  <span class="page-info">Trang {{ maint_page }} / {{ maint_total_pages }}</span>
-  {% if maint_page < maint_total_pages %}
-    <a class="page-link" href="{{ url_for('crawl.index', tab='history', maint_page=maint_page+1, crawl_page=crawl_page, **maint_pagination_filters) }}">Trang sau ›</a>
-  {% endif %}
-</nav>
+  {% set page = maint_page %}
+  {% set total_pages = maint_total_pages %}
+  {% set pagination_filters = maint_pagination_filters %}
+  {% set page_param = 'maint_page' %}
+  {% set id_prefix = 'maint_' %}
+  {% set nav_label = 'Phân trang lịch sử bảo trì' %}
+  {% include "_pagination.html" %}
 {% endif %}
 
 {% else %}

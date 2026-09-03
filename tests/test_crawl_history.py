@@ -217,6 +217,42 @@ class TestHistoryTabPagination:
         assert resp.status_code == 200
         assert b"maint_page=3" in resp.data
 
+    def test_uses_shared_pagination_component_with_distinct_param_names(self, admin_client, mocker):
+        """SỬA 09/2026 (xem lịch sử trao đổi "phân trang giống bên JD +
+        loading khi chuyển trang") — cả 2 bảng giờ dùng chung
+        _pagination.html (trước đây markup <nav> viết tay riêng) —
+        khoá lại: mỗi bảng phải có input "Tới trang" TÊN ĐÚNG param của
+        MÌNH (crawl_page/maint_page), không lẫn lộn, và id không trùng
+        nhau trong cùng 1 trang."""
+        mocker.patch(
+            "blueprints.crawl_history.db_data.list_crawl_runs",
+            return_value={"items": [{"run_id": f"r{i}", "source": "topcv",
+                                      "category": "it", "status": "done",
+                                      "status_label": "Hoàn tất", "status_badge": "badge-success",
+                                      "triggered_by_name": "Admin", "started_at": "2026-08-31T10:00:00",
+                                      "stat_items": []} for i in range(6)],
+                           "total": 20},
+        )
+        mocker.patch(
+            "blueprints.crawl_history.db_data.list_maintenance_runs",
+            return_value={"items": [{"run_id": "m1", "job_type": "backfill_company_profiles",
+                                      "job_label": "Vá hồ sơ công ty", "status": "done",
+                                      "status_label": "Hoàn tất", "status_badge": "badge-success",
+                                      "triggered_by_name": "Admin", "started_at": "2026-08-31T10:00:00",
+                                      "stat_items": []} for _ in range(6)],
+                           "total": 20},
+        )
+        resp = admin_client.get("/crawl?tab=history")
+        html = resp.get_data(as_text=True)
+        assert 'id="crawl_page-jump-input"' in html
+        assert 'id="maint_page-jump-input"' in html
+        assert 'name="crawl_page"' in html
+        assert 'name="maint_page"' in html
+        # tab='history' phải giữ lại trên mọi link phân trang (kể cả
+        # bấm sang trang khác không được văng khỏi tab).
+        assert html.count("tab=history") >= 2
+        assert "page-btn" in html
+
 
 class TestHistoryTabRefreshOnce:
     """Trọng tâm: rà điểm 2 — 1 request tới tab 'history' phải chỉ

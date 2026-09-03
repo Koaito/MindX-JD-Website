@@ -1,14 +1,33 @@
-{# Partial phân trang dùng chung — cần truyền vào (từ view, qua render_template):
+{# Partial phân trang dùng chung — cần truyền vào (từ view, qua render_template
+   hoặc {% set %} trước khi {% include %}):
    page              : trang hiện tại (int, bắt đầu từ 1)
    total_pages       : tổng số trang (int, luôn >= 1)
    pagination_filters: dict filter hiện tại ĐÃ bỏ field rỗng, để giữ khi đổi trang
+                        (đủ để tự đứng 1 mình — nếu trang có NHIỀU bảng phân
+                        trang độc lập, dict này phải TỰ chứa cả state của
+                        bảng KHÁC cần giữ nguyên, xem blueprints/
+                        crawl_history.py::_history_tab_context() làm ví dụ)
+   page_param        : optional, tên query param cho số trang — mặc định
+                        'page'. CẦN đổi khi 1 trang có NHIỀU bảng phân trang
+                        (vd tab "Lịch sử vận hành": crawl_page/maint_page).
+   id_prefix         : optional, tiền tố id phần tử — mặc định rỗng. CẦN đổi
+                        khi include partial này NHIỀU LẦN trên cùng 1 trang,
+                        tránh trùng id (id phải duy nhất trong DOM).
+   nav_label         : optional, aria-label cho <nav> — mặc định "Phân trang".
    Route đích lấy tự động từ request.endpoint (Flask đưa sẵn vào Jinja
    context) — không cần truyền tay, tránh gõ nhầm tên route.
    Chỉ hiện khi total_pages > 1 — 1 trang duy nhất thì không cần render gì. #}
 {% if total_pages > 1 %}
-<nav class="pagination" aria-label="Phân trang">
+{% set _pp = page_param if page_param is defined and page_param else 'page' %}
+{% set _prefix = id_prefix if id_prefix is defined and id_prefix else '' %}
+{% set _label = nav_label if nav_label is defined and nav_label else 'Phân trang' %}
+{% set _prev_params = pagination_filters.copy() %}
+{% set _ = _prev_params.update({_pp: page - 1}) %}
+{% set _next_params = pagination_filters.copy() %}
+{% set _ = _next_params.update({_pp: page + 1}) %}
+<nav class="pagination" aria-label="{{ _label }}">
   {% if page > 1 %}
-    <a class="page-btn page-prev" href="{{ url_for(request.endpoint, page=page - 1, **pagination_filters) }}">‹ Trước</a>
+    <a class="page-btn page-prev" href="{{ url_for(request.endpoint, **_prev_params) }}">‹ Trước</a>
   {% else %}
     <span class="page-btn page-prev is-disabled">‹ Trước</span>
   {% endif %}
@@ -16,7 +35,7 @@
   <span class="page-status">Trang {{ page }} / {{ total_pages }}</span>
 
   {% if page < total_pages %}
-    <a class="page-btn page-next" href="{{ url_for(request.endpoint, page=page + 1, **pagination_filters) }}">Sau ›</a>
+    <a class="page-btn page-next" href="{{ url_for(request.endpoint, **_next_params) }}">Sau ›</a>
   {% else %}
     <span class="page-btn page-next is-disabled">Sau ›</span>
   {% endif %}
@@ -25,16 +44,16 @@
      Flask nhận qua query string y hệt bấm link, filter hiện tại giữ nguyên
      nhờ hidden input (không dùng url_for vì action cần trỏ đúng route hiện
      tại kèm querystring do trình duyệt tự build từ input name="page"). #}
-  <form class="page-jump" action="{{ url_for(request.endpoint) }}" method="get">
+  <form class="page-jump filter-bar" action="{{ url_for(request.endpoint) }}" method="get">
     {% for key, value in pagination_filters.items() %}
       <input type="hidden" name="{{ key }}" value="{{ value }}">
     {% endfor %}
-    <label class="page-jump-label" for="page-jump-input">Tới trang</label>
+    <label class="page-jump-label" for="{{ _prefix }}page-jump-input">Tới trang</label>
     <input
-      id="page-jump-input"
+      id="{{ _prefix }}page-jump-input"
       class="page-jump-input"
       type="number"
-      name="page"
+      name="{{ _pp }}"
       min="1"
       max="{{ total_pages }}"
       value="{{ page }}"

@@ -205,6 +205,34 @@ def _history_tab_context() -> dict:
         had_error=bool(wave_error),
     )
 
+    # SỬA 09/2026 (xem lịch sử trao đổi "phân trang giống bên JD +
+    # loading khi chuyển trang") — 2 dict pagination_filters giờ TỰ
+    # CHỨA ĐỦ state (kể cả tab='history' + state của bảng KIA) vì
+    # _pagination.html (dùng chung với trang JD/company) chỉ nhận đúng
+    # 1 dict pagination_filters, không có chỗ truyền thêm params rời
+    # rạc như maint_page=... kiểu markup cũ ở _history_tab.html.
+    crawl_pagination_filters = {k: v for k, v in
+                                 {"source": f_source, "status": f_status,
+                                  "triggered_by": f_triggered_by}.items() if v}
+    crawl_pagination_filters["tab"] = "history"
+    crawl_pagination_filters["maint_page"] = maint_ctx["page"]
+    if maint_ctx["filters"].get("job_type"):
+        crawl_pagination_filters["m_job_type"] = maint_ctx["filters"]["job_type"]
+    if maint_ctx["filters"].get("status"):
+        crawl_pagination_filters["m_status"] = maint_ctx["filters"]["status"]
+    if maint_ctx["filters"].get("triggered_by"):
+        crawl_pagination_filters["m_triggered_by"] = maint_ctx["filters"]["triggered_by"]
+
+    maint_pagination_filters = dict(maint_ctx["pagination_filters"])
+    maint_pagination_filters["tab"] = "history"
+    maint_pagination_filters["crawl_page"] = crawl_page
+    if f_source:
+        maint_pagination_filters["source"] = f_source
+    if f_status:
+        maint_pagination_filters["status"] = f_status
+    if f_triggered_by:
+        maint_pagination_filters["triggered_by"] = f_triggered_by
+
     return {
         "source_labels": _SOURCE_LABELS,
         "category_labels": category_labels,
@@ -218,9 +246,7 @@ def _history_tab_context() -> dict:
         "crawl_per_page": crawl_per_page,
         "crawl_admin_members": crawl_admin_members,
         "crawl_filters": {"source": f_source, "status": f_status, "triggered_by": f_triggered_by},
-        "crawl_pagination_filters": {k: v for k, v in
-                                      {"source": f_source, "status": f_status,
-                                       "triggered_by": f_triggered_by}.items() if v},
+        "crawl_pagination_filters": crawl_pagination_filters,
         # maint_* — trực tiếp từ _maintenance_history_context_raw(), đã đúng
         # tên field cần cho _history_tab.html (xem template).
         "maint_jobs": maint_ctx["maintenance_jobs"],
@@ -231,5 +257,5 @@ def _history_tab_context() -> dict:
         "maint_status_labels": maint_ctx["status_labels"],
         "maint_admin_members": maint_ctx["admin_members"],
         "maint_filters": maint_ctx["filters"],
-        "maint_pagination_filters": maint_ctx["pagination_filters"],
+        "maint_pagination_filters": maint_pagination_filters,
     }

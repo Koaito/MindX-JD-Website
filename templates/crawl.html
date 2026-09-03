@@ -239,6 +239,19 @@
   // <button>, không phải <a>, nên không khớp selector bên dưới) — an
   // toàn khi gắn handler chung ở đây, không cần if riêng theo tab.
   function ajaxNavigate(url, panel) {
+    // THÊM 09/2026 (xem lịch sử trao đổi "chuyển trang lịch sử
+    // crawl/bảo trì không có gì báo hiệu đang tải") — TRƯỚC ĐÂY hàm
+    // này fetch ÂM THẦM, không đổi gì trong panel cho tới khi có
+    // response -> người dùng bấm "Trang sau" xong màn hình đứng yên
+    // (dễ tưởng bấm hụt, bấm thêm lần nữa). Giờ hiện placeholder NGAY
+    // (mirror loadTabIfNeeded() ở trên) trước khi fetch — dùng
+    // panel.dataset.tabLabel làm nhãn chung (vd "Lịch sử vận hành"),
+    // KHÔNG cần phân biệt riêng bảng crawl/bảo trì hay lọc/phân trang —
+    // panel đủ nhỏ (đây là toàn bộ nội dung 1 tab) nên placeholder
+    // dùng chung không gây khó hiểu.
+    var label = panel.getAttribute("data-tab-label") || "";
+    panel.innerHTML = '<p class="muted" style="padding: 40px 0; text-align: center;">Đang tải ' + label + '…</p>';
+
     var seq = nextRequestSeq(panel);
     fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
       .then(function (res) {
@@ -261,7 +274,11 @@
   }
 
   document.addEventListener("click", function (e) {
-    var link = e.target.closest("a.page-link, a.btn-text");
+    // SỬA 09/2026 (xem lịch sử trao đổi "phân trang giống bên JD") —
+    // thêm "a.page-btn" (_pagination.html dùng chung với trang JD/
+    // company, class khác .page-link cũ) — giữ nguyên "a.page-link" để
+    // không phá phân trang ở bất kỳ chỗ nào khác lỡ còn dùng class cũ.
+    var link = e.target.closest("a.page-link, a.page-btn, a.btn-text");
     if (!link) return;
     var panel = link.closest(".dashboard-tab[data-tab]");
     if (!panel) return; // không thuộc panel nào ở trang này -> để nguyên hành vi mặc định
