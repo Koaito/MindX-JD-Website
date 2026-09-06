@@ -40,17 +40,75 @@ class BackendAuthError(Exception):
     cùng 1 message "sai email/mật khẩu" gây hiểu nhầm.
     """
 
-    def __init__(self, message: str, status_code: int | None = None, wrong_credentials: bool = False):
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        wrong_credentials: bool = False,
+        error_code: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.wrong_credentials = wrong_credentials
+        # error_code — thêm 09/2026 cùng đợt sửa i18n phía Scrap_JD (xem
+        # api/error_codes.py bên đó): backend giờ trả detail dạng
+        # {"error_code": ..., "message": ...} thay vì string thuần cho
+        # phần lớn lỗi auth/session. Lưu lại error_code THÔ (không dịch ở
+        # đây — Flask hiện flash thẳng message tiếng Việt backend trả về,
+        # message vẫn đúng dù có/không error_code) để dùng làm điều kiện
+        # phân loại lỗi CHÍNH XÁC thay vì so khớp chuỗi con tiếng Việt
+        # (xem email_not_verified bên dưới — anti-pattern CŨ đã bị xoá).
+        self.error_code = error_code
 
     @property
     def email_not_verified(self) -> bool:
         """True nếu lỗi này là do tài khoản chưa bấm link xác thực email
         (login() backend trả 403 kèm câu này) — app.py dùng để hiện nút
-        'Gửi lại email xác thực' thay vì chỉ báo lỗi suông."""
-        return self.status_code == 403 and "xác thực" in str(self).lower()
+        'Gửi lại email xác thực' thay vì chỉ báo lỗi suông.
+
+        SỬA 09/2026 (anti-pattern): bản CŨ check
+        `"xác thực" in str(self).lower()` — so khớp CHUỖI CON tiếng Việt
+        của message hiển thị cho user. Nguy hiểm vì message hiển thị có
+        thể đổi bất cứ lúc nào (sửa văn phong, thêm i18n tiếng Anh...) mà
+        logic phân loại lỗi này sẽ VỠ NGẦM, không báo lỗi rõ ràng — sai sẽ
+        chỉ lộ ra khi có người report "sao không thấy nút gửi lại email
+        xác thực". Giờ so khớp theo error_code ổn định do Scrap_JD trả về
+        (api/error_codes.py::AUTH_EMAIL_NOT_VERIFIED bên FastAPI) — độc
+        lập hoàn toàn với câu chữ message, đổi văn phong/dịch ngôn ngữ
+        khác không ảnh hưởng logic này."""
+        return self.status_code == 403 and self.error_code == "auth_email_not_verified"
+
+
+def _format_detail(raw_detail) -> tuple[str, str | None]:
+    """Chuẩn hoá field "detail" trong response lỗi của FastAPI về
+    (message, error_code) — sửa cùng đợt với formatErrorDetail() bên
+    Next.js (client.ts, Giai đoạn 0 kế hoạch i18n, 09/2026), vì backend
+    Scrap_JD giờ trả "detail" ở nhiều dạng khác nhau tuỳ loại lỗi:
+
+      - string thuần (số Ít route raise thủ công còn lại) -> (string, None)
+      - {"error_code": ..., "message": ...} (PHẦN LỚN lỗi auth/session,
+        sau Giai đoạn 1 kế hoạch i18n) -> đọc đúng 2 field, KHÔNG để lộ
+        dict thô ra flash() (đây CHÍNH XÁC là bug đã gặp bên Next.js
+        trước khi sửa — nếu không xử lý ở đây, Flask sẽ flash nguyên
+        "{'error_code': ..., 'message': ...}" cho user).
+      - list [{"loc": [...], "msg": ..., "type": ...}, ...] (lỗi
+        validate tự động của Pydantic, vd body sai kiểu dữ liệu — FastAPI
+        trả 422) -> nối các "msg" lại, error_code=None (không có 1 mã lỗi
+        đơn nào đại diện cho nhiều lỗi field cùng lúc).
+      - dạng khác/rỗng -> ("", None), caller tự có message mặc định.
+    """
+    if isinstance(raw_detail, str):
+        return raw_detail, None
+    if isinstance(raw_detail, dict):
+        message = raw_detail.get("message")
+        error_code = raw_detail.get("error_code")
+        if isinstance(message, str):
+            return message, error_code if isinstance(error_code, str) else None
+        return "", None
+    if isinstance(raw_detail, list):
+        msgs = [str(item.get("msg", item)) if isinstance(item, dict) else str(item) for item in raw_detail]
+        return "; ".join(msgs), None
+    return "", None
 
 
 def _headers(access_token: str | None = None) -> dict:
@@ -77,27 +135,35 @@ def _request(method: str, path: str, access_token: str | None = None, **kwargs):
     if res.status_code in (200, 201, 204):
         return {} if not res.content else res.json()
 
-    # Cố lấy field "detail" (FastAPI trả lỗi dạng {"detail": "..."})
+    # Cố lấy field "detail" (FastAPI trả lỗi dạng {"detail": "..."} —
+    # xem docstring _format_detail() ở trên cho các dạng "detail" có thể gặp).
     try:
-        detail = res.json().get("detail", "") or ""
+        raw_detail = res.json().get("detail")
     except Exception:
-        detail = res.text[:300]
+        raw_detail = res.text[:300]
+    message, error_code = _format_detail(raw_detail)
 
     if res.status_code == 401 and path == "/auth/login":
-        raise BackendAuthError(detail or "Email hoặc mật khẩu không đúng.", status_code=401, wrong_credentials=True)
+        raise BackendAuthError(
+            message or "Email hoặc mật khẩu không đúng.",
+            status_code=401, wrong_credentials=True, error_code=error_code,
+        )
 
     if res.status_code == 401:
         raise BackendAuthError(
-            detail or "Phiên đăng nhập backend đã hết hạn — vui lòng đăng nhập lại.",
-            status_code=401,
+            message or "Phiên đăng nhập backend đã hết hạn — vui lòng đăng nhập lại.",
+            status_code=401, error_code=error_code,
         )
     if res.status_code == 403:
-        raise BackendAuthError(detail or "Tài khoản không có quyền hoặc đã bị khoá.", status_code=403)
+        raise BackendAuthError(
+            message or "Tài khoản không có quyền hoặc đã bị khoá.", status_code=403, error_code=error_code,
+        )
     if res.status_code == 404:
-        raise BackendAuthError(detail or "Không tìm thấy.", status_code=404)
+        raise BackendAuthError(message or "Không tìm thấy.", status_code=404, error_code=error_code)
 
     raise BackendAuthError(
-        f"Backend lỗi {res.status_code} khi {method} {path}: {detail}", status_code=res.status_code
+        f"Backend lỗi {res.status_code} khi {method} {path}: {message}",
+        status_code=res.status_code, error_code=error_code,
     )
 
 
@@ -475,27 +541,33 @@ def send_message(access_token: str, receiver_id: str, content: str) -> dict:
         return res.json()
 
     try:
-        detail = res.json().get("detail", "") or ""
+        raw_detail = res.json().get("detail")
     except Exception:
-        detail = res.text[:300]
+        raw_detail = res.text[:300]
+    message, error_code = _format_detail(raw_detail)
 
     if res.status_code == 429:
         raise BackendAuthError(
-            detail or "Bạn đang gửi quá nhanh, vui lòng thử lại sau ít phút.", status_code=429,
+            message or "Bạn đang gửi quá nhanh, vui lòng thử lại sau ít phút.",
+            status_code=429, error_code=error_code,
         )
     if res.status_code == 409:
         raise BackendAuthError(
-            detail or "Không thể gửi — trạng thái hội thoại vừa thay đổi, tải lại trang để xem mới nhất.",
-            status_code=409,
+            message or "Không thể gửi — trạng thái hội thoại vừa thay đổi, tải lại trang để xem mới nhất.",
+            status_code=409, error_code=error_code,
         )
     if res.status_code == 403:
-        raise BackendAuthError(detail or "Bạn không có quyền nhắn tin với người này.", status_code=403)
+        raise BackendAuthError(
+            message or "Bạn không có quyền nhắn tin với người này.", status_code=403, error_code=error_code,
+        )
     if res.status_code == 404:
-        raise BackendAuthError(detail or "Không tìm thấy người nhận.", status_code=404)
+        raise BackendAuthError(message or "Không tìm thấy người nhận.", status_code=404, error_code=error_code)
     if res.status_code == 400:
-        raise BackendAuthError(detail or "Nội dung tin nhắn không hợp lệ.", status_code=400)
+        raise BackendAuthError(message or "Nội dung tin nhắn không hợp lệ.", status_code=400, error_code=error_code)
 
-    raise BackendAuthError(detail or f"Lỗi khi gửi tin nhắn ({res.status_code})", status_code=res.status_code)
+    raise BackendAuthError(
+        message or f"Lỗi khi gửi tin nhắn ({res.status_code})", status_code=res.status_code, error_code=error_code,
+    )
 
 
 def accept_message_request(access_token: str, relationship_id: str) -> dict:
