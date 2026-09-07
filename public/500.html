@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Có lỗi xảy ra — MindX Career Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Fallback tĩnh của Vercel cho các mã lỗi platform 501-503/505-511
+     (xem bảng routing trong docs Custom Error Pages — 500.html là
+     fallback chung khi không có trang riêng cho mã lỗi đó). File
+     TĨNH độc lập, không qua app.py — token màu/font copy từ
+     00-tokens.css, xem ghi chú tương tự ở public/504.html. Lỗi 500
+     "thật" do code Flask raise ra đã có templates/error.html xử lý
+     đẹp hơn (còn sidebar, còn nav); trang này chỉ lộ ra khi bản thân
+     Flask app không khởi động được để render error.html. */
+  :root {
+    --bg: #EEF2F0;
+    --surface: #FFFFFF;
+    --ink: #101E1A;
+    --ink-soft: #52625C;
+    --muted: #8A968F;
+    --border: #DCE4DF;
+    --accent: #FF5A36;
+    --radius: 14px;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    height: 100%;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .wake-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 480px;
+    width: 100%;
+    padding: 40px 36px 32px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(16, 30, 26, 0.04);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--ink);
+    color: #fff;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+  }
+
+  .brand-text strong { font-family: var(--font-display); font-size: 15px; }
+  .brand-text span { font-size: 11px; color: var(--muted); }
+
+  .error-code {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 72px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #B23A22;
+    margin: 4px 0 14px;
+  }
+
+  .eyebrow {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    line-height: 1.55;
+    margin: 0 auto 26px;
+    max-width: 380px;
+  }
+
+  .btn {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .btn-primary { background: var(--accent); color: #16130E; }
+  .btn-primary:hover { background: #E64D28; }
+
+  .fine-print {
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+  <div class="wake-card">
+    <div class="brand">
+      <span class="brand-mark">MX</span>
+      <div class="brand-text">
+        <strong>Career Hub</strong>
+        <span>Student Success</span>
+      </div>
+    </div>
+
+    <span class="eyebrow">Career Hub / Lỗi hệ thống</span>
+    <div class="error-code">500</div>
+    <h1>Có lỗi xảy ra phía máy chủ</h1>
+    <p class="lede">
+      Hệ thống đang gặp sự cố tạm thời. Vui lòng tải lại trang sau
+      ít phút — nếu tình trạng vẫn tiếp diễn, hãy báo lại cho team
+      Student Success để được hỗ trợ.
+    </p>
+
+    <a class="btn btn-primary" href="/">Về trang chủ</a>
+
+    <p class="fine-print">Mã lỗi: ::vercel:ERROR_CODE:: · Request ID: ::vercel:REQUEST_ID::</p>
+  </div>
+
+</body>
+</html>

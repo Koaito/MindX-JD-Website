@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Đang khởi động — MindX Career Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Trang này KHÔNG dùng style.css / base.html — nó phải là 1 file tĩnh
+     100% để Vercel serve trực tiếp mà không đụng tới app.py, vì lúc
+     backend Render đang cold-start thì bản thân Flask app còn chưa
+     chạy được. Vì vậy toàn bộ token màu/font/bo góc bên dưới COPY
+     nguyên giá trị từ public/css/00-tokens.css + 03-layout.css — nếu
+     đổi bảng màu gốc, nhớ đồng bộ lại tay ở đây (không import được
+     file build vì trang phải đứng độc lập, xem README trong repo). */
+  :root {
+    --bg: #EEF2F0;
+    --surface: #FFFFFF;
+    --ink: #101E1A;
+    --ink-soft: #52625C;
+    --muted: #8A968F;
+    --border: #DCE4DF;
+    --accent: #FF5A36;
+    --accent-soft: #FFE6DC;
+    --teal: #0F766E;
+    --teal-soft: #D9F0EB;
+    --amber: #B9790A;
+    --amber-soft: #FBEBD0;
+    --radius: 14px;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    height: 100%;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .wake-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 480px;
+    width: 100%;
+    padding: 40px 36px 32px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(16, 30, 26, 0.04);
+  }
+
+  /* Brand mark — giữ đúng nguyên bản .brand-mark/.brand-text ở
+     sidebar (base.html) để nhìn phát biết ngay vẫn đang ở Career Hub,
+     không phải trang lỗi lạc thương hiệu. */
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--ink);
+    color: #fff;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+  }
+
+  .brand-text strong {
+    font-family: var(--font-display);
+    font-size: 15px;
+  }
+
+  .brand-text span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Vòng xoay dùng conic-gradient thay vì icon/emoji — nhẹ, không phụ
+     thuộc font icon nào, và không gợi cảm giác "báo lỗi" như dấu ⚠. */
+  .spinner {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 22px;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent) 0deg, var(--accent-soft) 300deg, var(--accent-soft) 360deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 6px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 6px));
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .eyebrow {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    line-height: 1.55;
+    margin: 0 auto 22px;
+    max-width: 380px;
+  }
+
+  .wake-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--amber-soft);
+    color: var(--amber);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 24px;
+  }
+
+  .wake-chip::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .progress-track {
+    height: 6px;
+    background: var(--accent-soft);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 26px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 8%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.6s ease;
+  }
+
+  .wake-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: -18px;
+    margin-bottom: 26px;
+  }
+
+  .btn {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .btn-primary { background: var(--accent); color: #16130E; }
+  .btn-primary:hover { background: #E64D28; }
+  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .btn-ghost { background: var(--surface); border-color: var(--border); color: var(--ink); }
+  .btn-ghost:hover { border-color: var(--ink); }
+
+  .wake-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .fine-print {
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+  <div class="wake-card">
+    <div class="brand">
+      <span class="brand-mark">MX</span>
+      <div class="brand-text">
+        <strong>Career Hub</strong>
+        <span>Student Success</span>
+      </div>
+    </div>
+
+    <div class="spinner" aria-hidden="true"></div>
+
+    <span class="eyebrow">Career Hub / Đang khởi động</span>
+    <h1>Máy chủ đang được đánh thức</h1>
+    <p class="lede">
+      Hệ thống đang tạm nghỉ để tiết kiệm tài nguyên và cần khoảng
+      <strong id="etaText">10–30 giây</strong> để khởi động lại.
+      Trang sẽ tự động chuyển tiếp ngay khi máy chủ sẵn sàng — bạn
+      không cần thao tác gì thêm.
+    </p>
+
+    <span class="wake-chip" id="wakeChip">Đang chờ phản hồi…</span>
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="wake-meta">
+      <span id="elapsedText">0s trôi qua</span>
+      <span id="attemptText">Lần thử 1</span>
+    </div>
+
+    <div class="wake-actions">
+      <button type="button" class="btn btn-primary" id="retryBtn">Thử lại ngay</button>
+      <a class="btn btn-ghost" href="/" id="homeLink">Về trang chủ</a>
+    </div>
+
+    <p class="fine-print">Nếu quá 1 phút vẫn chưa vào được, hãy tải lại trang hoặc quay lại sau ít phút.</p>
+    <p class="fine-print" style="margin-top:6px;">Mã lỗi: ::vercel:ERROR_CODE:: · Request ID: ::vercel:REQUEST_ID::</p>
+  </div>
+
+  <script>
+    (function () {
+      // Đích đến sau khi backend tỉnh — mặc định quay lại chính URL
+      // gốc user định vào (redirect param), rơi về "/" nếu không có.
+      var params = new URLSearchParams(window.location.search);
+      var target = params.get("redirect") || "/";
+      // Chỉ chấp nhận path nội bộ, chặn open-redirect ra domain khác.
+      if (!target.startsWith("/")) target = "/";
+
+      var elapsedEl = document.getElementById("elapsedText");
+      var attemptEl = document.getElementById("attemptText");
+      var progressEl = document.getElementById("progressFill");
+      var chipEl = document.getElementById("wakeChip");
+      var retryBtn = document.getElementById("retryBtn");
+      var homeLink = document.getElementById("homeLink");
+      homeLink.href = target;
+
+      var startedAt = Date.now();
+      var attempt = 0;
+      var pollTimer = null;
+      var tickTimer = null;
+
+      function setElapsed() {
+        var s = Math.floor((Date.now() - startedAt) / 1000);
+        elapsedEl.textContent = s + "s trôi qua";
+        // Tiến trình thanh chỉ mang tính trấn an thị giác (server không
+        // báo % thật) — tiệm cận 92% rồi dừng, tránh cảm giác "đứng hình
+        // ở 100%" nếu backend tỉnh chậm hơn ETA hiển thị.
+        var pct = Math.min(92, 8 + s * 3);
+        progressEl.style.width = pct + "%";
+      }
+
+      function poll() {
+        attempt += 1;
+        attemptEl.textContent = "Lần thử " + attempt;
+        chipEl.textContent = "Đang chờ phản hồi…";
+
+        fetch(target, { method: "HEAD", cache: "no-store" })
+          .then(function (res) {
+            // Bất kỳ phản hồi hợp lệ nào (kể cả 3xx/4xx do cần đăng
+            // nhập) đều chứng tỏ Flask app đã tỉnh và đang xử lý được
+            // request — chỉ 502/504/lỗi mạng mới coi là "còn đang ngủ".
+            if (res.status < 500 || res.status === 501 || res.status === 503) {
+              chipEl.textContent = "Đã sẵn sàng, đang chuyển trang…";
+              progressEl.style.width = "100%";
+              clearInterval(pollTimer);
+              clearInterval(tickTimer);
+              setTimeout(function () {
+                window.location.href = target;
+              }, 500);
+            }
+          })
+          .catch(function () {
+            // Lỗi mạng/504 — vẫn đang cold start, chờ vòng poll kế tiếp.
+          });
+      }
+
+      function manualRetry() {
+        retryBtn.disabled = true;
+        retryBtn.textContent = "Đang thử…";
+        poll();
+        setTimeout(function () {
+          retryBtn.disabled = false;
+          retryBtn.textContent = "Thử lại ngay";
+        }, 1500);
+      }
+
+      retryBtn.addEventListener("click", manualRetry);
+
+      tickTimer = setInterval(setElapsed, 1000);
+      pollTimer = setInterval(poll, 4000);
+      poll();
+    })();
+  </script>
+
+</body>
+</html>
