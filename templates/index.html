@@ -59,10 +59,11 @@
    đầu danh sách (không cố giữ vị trí đang xem/cuộn — xem plan, mục
    "khi bấm nút chuyển chế độ, có giữ vị trí đang xem không?"). #}
 <div class="view-toggle">
+  <span class="view-toggle-label">Chế độ xem:</span>
   <a class="view-toggle-btn {{ 'is-active' if view != 'infinite' }}"
-     href="{{ url_for('jobs.index', **pagination_filters) }}">📄 Phân trang</a>
+     href="{{ url_for('jobs.index', **pagination_filters) }}">Phân trang</a>
   <a class="view-toggle-btn {{ 'is-active' if view == 'infinite' }}"
-     href="{{ url_for('jobs.index', view='infinite', **pagination_filters) }}">⏬ Cuộn liên tục</a>
+     href="{{ url_for('jobs.index', view='infinite', **pagination_filters) }}">Cuộn liên tục</a>
 </div>
 
 {# Chế độ trang có page/per_page để tính khoảng "Hiển thị X–Y / Z" —

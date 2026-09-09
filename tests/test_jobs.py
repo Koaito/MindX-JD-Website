@@ -540,6 +540,20 @@ class TestJobsIndexInfiniteMode:
         assert b'id="load-more-btn"' not in resp.data
         assert "Đã hết job phù hợp".encode() in resp.data
 
+    def test_view_toggle_shows_label_not_icons(self, client, mocker):
+        """Toggle "Phân trang"/"Cuộn liên tục" phải có nhãn "Chế độ
+        xem:" đứng trước để rõ nghĩa, KHÔNG còn icon 📄/⏬ (đổi 09/2026
+        theo phản hồi UI — icon đơn thuần không đủ rõ ràng)."""
+        mocker.patch("blueprints.jobs.db_data.list_jobs", return_value=[])
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs")
+        assert resp.status_code == 200
+        assert "Chế độ xem:".encode() in resp.data
+        assert "📄".encode() not in resp.data
+        assert "⏬".encode() not in resp.data
+
 
 class TestJobsMoreRoute:
     def test_missing_cursor_returns_empty_without_calling_backend(self, client, mocker):

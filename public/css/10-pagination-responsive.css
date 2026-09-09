@@ -87,11 +87,19 @@
 /* Toggle "Phân trang" / "Cuộn liên tục" — 2 link thường (full page
    reload khi đổi mode), style giống .page-btn ở trên nhưng gộp cặp lại
    sát nhau (border-radius chỉ bo góc ngoài) để rõ là 1 cụm 2 lựa chọn,
-   không phải 2 nút rời rạc. */
+   không phải 2 nút rời rạc. Có thêm nhãn "Chế độ xem:" đứng trước (bỏ
+   icon 📄/⏬ cũ — chữ rõ nghĩa hơn icon, xem phản hồi UI 09/2026). */
 .view-toggle {
   display: inline-flex;
-  gap: 0;
+  align-items: center;
+  gap: 10px;
   margin: 4px 0 18px;
+}
+
+.view-toggle-label {
+  font-size: 13.5px;
+  color: var(--ink-soft, var(--muted, #6b7280));
+  white-space: nowrap;
 }
 
 .view-toggle-btn {
