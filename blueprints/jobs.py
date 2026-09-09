@@ -55,23 +55,70 @@ def _resolve_company_id(form):
     return company_id
 
 
-@jobs_bp.route("/")
-@jobs_bp.route("/jobs")
-def index():
+# Batch size cho mỗi lần "Tải thêm" ở chế độ cuộn vô hạn — KHÁC
+# JOBS_PER_PAGE (20, dùng cho chế độ trang) vì 2 mục đích khác nhau,
+# nhưng hiện đang chọn CÙNG giá trị 20 làm điểm khởi đầu hợp lý (xem
+# plan Phase 2, mục "batch size mặc định cho chế độ cursor") — tách
+# hằng số riêng để sau này tinh chỉnh độc lập mà không ảnh hưởng chế
+# độ trang.
+JOBS_INFINITE_BATCH = 20
+
+
+def _index_filters():
+    """Đọc bộ filter (q/industry/level/location/status) dùng CHUNG cho
+    cả 2 chế độ hiển thị (trang / cuộn vô hạn) — tách ra khỏi index()
+    và more() để 2 route luôn đọc filter giống hệt nhau, tránh lệch
+    kết quả khi chuyển qua lại giữa 2 chế độ (xem plan, mục "dùng
+    chung 1 lớp filter cho cả 2 query")."""
     q = request.args.get("q", "").strip()
     industry = request.args.get("industry", "")
     level = request.args.get("level", "")
     location = request.args.get("location", "")
     status = request.args.get("status", "")
-    page, per_page = _paginate_args(JOBS_PER_PAGE)
-
     if status == "ALL":
         status_filter = ""
     elif status:
         status_filter = status
     else:
         status_filter = "Đang tuyển"
+    return q, industry, level, location, status, status_filter
 
+
+@jobs_bp.route("/")
+@jobs_bp.route("/jobs")
+def index():
+    q, industry, level, location, status, status_filter = _index_filters()
+
+    # view=infinite (thêm 09/2026): chế độ "cuộn vô hạn" song song với
+    # chế độ trang mặc định — xem lịch sử trao đổi "2 chế độ phân
+    # trang + toggle chuyển qua lại". Lưu ở query string (không chỉ
+    # JS) để F5 lại trang không mất chế độ đang chọn, và chia sẻ được
+    # link (xem plan, mục "trạng thái chế độ nên lưu ở đâu").
+    view = request.args.get("view", "page")
+    if view not in ("page", "infinite"):
+        view = "page"
+
+    filters = {"q": q, "industry": industry, "level": level, "location": location, "status": status}
+    pagination_filters = {k: v for k, v in filters.items() if v}
+
+    if view == "infinite":
+        try:
+            jobs, next_cursor = db_data.list_jobs_cursor(
+                q=q, industry=industry, level=level, location=location, status=status_filter,
+                limit=JOBS_INFINITE_BATCH,
+            )
+            total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status_filter)
+        except CrawlerAPIError as exc:
+            flash(str(exc), "error")
+            jobs, total_jobs, next_cursor = [], 0, None
+        return render_template(
+            "index.html", jobs=jobs, industries=INDUSTRIES, levels=db_data.get_level_codes(),
+            locations=LOCATIONS, statuses=JOB_STATUSES, filters=filters,
+            pagination_filters=pagination_filters, total_jobs=total_jobs,
+            view=view, next_cursor=next_cursor,
+        )
+
+    page, per_page = _paginate_args(JOBS_PER_PAGE)
     try:
         total_jobs = db_data.count_jobs(q=q, industry=industry, level=level, location=location, status=status_filter)
         total_pages = max(1, math.ceil(total_jobs / per_page))
@@ -86,13 +133,37 @@ def index():
 
     return render_template(
         "index.html", jobs=jobs, industries=INDUSTRIES, levels=db_data.get_level_codes(),
-        locations=LOCATIONS, statuses=JOB_STATUSES,
-        filters={"q": q, "industry": industry, "level": level, "location": location, "status": status},
-        pagination_filters={k: v for k, v in
-                             {"q": q, "industry": industry, "level": level,
-                              "location": location, "status": status}.items() if v},
+        locations=LOCATIONS, statuses=JOB_STATUSES, filters=filters,
+        pagination_filters=pagination_filters,
         total_jobs=total_jobs, page=page, total_pages=total_pages, per_page=per_page,
+        view=view,
     )
+
+
+@jobs_bp.route("/jobs/more")
+def more():
+    """AJAX-only — trả fragment HTML (chỉ các job-card mới) cho chế độ
+    "cuộn vô hạn" khi bấm nút "Tải thêm" (xem templates/_job_card.html
+    + JS trong index.html). Nhận `cursor` (bắt buộc, rỗng thì coi như
+    hết job) + toàn bộ filter hiện có qua query string, y hệt filter
+    của index() — dùng _index_filters() để đảm bảo luôn khớp nhau.
+
+    Trả JSON {html, next_cursor} thay vì HTML thuần để JS dễ lấy cả
+    next_cursor mới lẫn markup card trong 1 lần fetch, không cần đọc
+    lại header/data-attribute riêng."""
+    q, industry, level, location, status, status_filter = _index_filters()
+    cursor = request.args.get("cursor") or None
+    if not cursor:
+        return jsonify({"html": "", "next_cursor": None})
+    try:
+        jobs, next_cursor = db_data.list_jobs_cursor(
+            q=q, industry=industry, level=level, location=location, status=status_filter,
+            limit=JOBS_INFINITE_BATCH, cursor=cursor,
+        )
+    except CrawlerAPIError as exc:
+        return jsonify({"error": str(exc)}), 400
+    html = render_template("_job_card.html", jobs=jobs)
+    return jsonify({"html": html, "next_cursor": next_cursor})
 
 
 @jobs_bp.route("/jobs/<string:job_id>")

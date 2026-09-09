@@ -149,6 +149,46 @@ def list_jobs(q="", industry="", level="", location="", status="", created_by=""
     return [_normalize_job(j) for j in items]
 
 
+def list_jobs_cursor(q="", industry="", level="", location="", status="", created_by="",
+                      limit=20, cursor=None):
+    """Thêm 09/2026 (chế độ "cuộn vô hạn" ở trang chủ, xem lịch sử trao
+    đổi "2 chế độ phân trang + toggle chuyển qua lại") — bản
+    keyset-cursor SONG SONG với list_jobs() ở trên, KHÔNG sửa hàm cũ
+    (chế độ phân trang offset/limit vẫn dùng list_jobs() y hệt trước
+    giờ, không bị chạm).
+
+    cursor: chuỗi opaque base64 lấy từ `next_cursor` của lần gọi
+    TRƯỚC (None ở lần gọi đầu tiên) — truyền thẳng cho backend qua
+    query param `cursor`, không tự giải mã ở đây (backend tự validate/
+    giải mã, xem api/routers/jobs.py::_decode_cursor() bên scrap-jd-api).
+
+    limit mặc định 20 (thay vì 200 như list_jobs()) — batch vừa phải
+    cho mỗi lần "Tải thêm", tránh chạm rate limit 60/phút áp cho GET
+    /jobs khi người dùng bấm liên tục (xem plan Phase 2, mục "batch
+    size mặc định cho chế độ cursor").
+
+    Trả về (jobs, next_cursor) — next_cursor là None khi đã hết dữ
+    liệu, JS phía template dựa vào đó để ẩn nút "Tải thêm"."""
+    params = {"limit": limit}
+    if cursor:
+        params["cursor"] = cursor
+    if q:
+        params["keyword"] = q
+    if industry:
+        params["industry"] = industry
+    if level:
+        params["level"] = level
+    if location:
+        params["province"] = location
+    if status:
+        params["status"] = JOB_STATUS_MAP_REV.get(status, status)
+    if created_by:
+        params["created_by"] = created_by
+    data = _request("GET", "/jobs", params=params) or {}
+    items = data.get("items", data if isinstance(data, list) else [])
+    return [_normalize_job(j) for j in items], data.get("next_cursor")
+
+
 def count_jobs(q="", industry="", level="", location="", status="", created_by=""):
     """Dùng field `total` backend trả sẵn trong response phân trang —
     KHÔNG cố lấy limit=1000 rồi đếm len() (backend chặn limit tối đa

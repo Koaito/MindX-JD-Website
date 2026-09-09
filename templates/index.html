@@ -52,6 +52,19 @@
   {% endif %}
 </form>
 
+{# Toggle 2 chế độ hiển thị — thêm 09/2026 (xem lịch sử trao đổi "2 chế
+   độ phân trang + toggle chuyển qua lại"). Link thường (<a href>), full
+   page reload khi đổi mode — KHÔNG đồng bộ trạng thái JS phức tạp, giữ
+   nguyên mọi filter khác qua pagination_filters. Đổi mode LUÔN reset về
+   đầu danh sách (không cố giữ vị trí đang xem/cuộn — xem plan, mục
+   "khi bấm nút chuyển chế độ, có giữ vị trí đang xem không?"). #}
+<div class="view-toggle">
+  <a class="view-toggle-btn {{ 'is-active' if view != 'infinite' }}"
+     href="{{ url_for('jobs.index', **pagination_filters) }}">📄 Phân trang</a>
+  <a class="view-toggle-btn {{ 'is-active' if view == 'infinite' }}"
+     href="{{ url_for('jobs.index', view='infinite', **pagination_filters) }}">⏬ Cuộn liên tục</a>
+</div>
+
 {% if jobs %}
 <p class="result-count">
   Hiển thị {{ (page - 1) * per_page + 1 }}–{{ (page - 1) * per_page + jobs|length }} / {{ total_jobs }} job phù hợp
@@ -88,59 +101,90 @@
 {% endif %}
 
 {% if jobs %}
-<div class="job-grid job-grid-3col">
-  {% for job in jobs %}
-  <article class="ticket">
-    <div class="ticket-stub">
-      <span class="ticket-code">JOB-{{ job.id[:8]|upper }}</span>
-      <span class="ticket-industry {{ job.industry|industry_class }}">{{ job.industry }}</span>
-      <span class="ticket-level">{{ job.level }}</span>
-    </div>
-    <div class="ticket-body">
-      <div class="ticket-top">
-        <h3><a href="{{ url_for('jobs.detail', job_id=job.id) }}">{{ job.position }}</a></h3>
-        <span class="status-chip status-{{ job.status|replace(' ', '-') }}">{{ job.status }}</span>
-      </div>
-      <p class="ticket-company">{{ job.company }} · {{ job.location }}</p>
-      {% if job.skills %}
-      <div class="skill-row">
-        {% for sk in job.skills.split(',') %}
-          <span class="skill-tag">{{ sk.strip() }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <div class="ticket-meta">
-        {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
-        {% if job.deadline %}<span>⏳ Hạn: {{ job.deadline|format_date }}</span>{% endif %}
-        {% if job.source and job.source != 'MANUAL' %}<span>Nguồn: {{ job.source }}</span>{% endif %}
-      </div>
-      <div class="ticket-actions">
-        {% if job.jd_link and job.source != 'MANUAL' %}
-        <a class="btn btn-text" href="{{ job.jd_link }}" target="_blank" rel="noopener">Xem JD gốc ↗</a>
-        {% endif %}
-        {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('my_stuff.job_toggle_save', job_id=job.id) }}"
-              class="save-job-form" data-json-action="{{ url_for('my_stuff.job_toggle_save_json', job_id=job.id) }}"
-              data-saved-label="🔖 Đã lưu" data-unsaved-label="🔖 Lưu job">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="save-btn {{ 'saved' if job.id in saved_job_ids }}" type="submit">
-            {{ '🔖 Đã lưu' if job.id in saved_job_ids else '🔖 Lưu job' }}
-          </button>
-        </form>
-        {% else %}
-        <a class="save-btn" href="{{ url_for('auth.login') }}">🔖 Đăng nhập để lưu</a>
-        {% endif %}
-      </div>
-    </div>
-  </article>
-  {% endfor %}
+<div class="job-grid job-grid-3col" id="job-grid">
+  {% include "_job_card.html" %}
 </div>
+{% if view == 'infinite' %}
+{# Chế độ "cuộn vô hạn": nút "Tải thêm" (click thủ công, CHƯA tự động
+   load khi cuộn tới đáy — xem plan, mục "dễ kiểm soát, dễ test, tránh
+   bắn quá nhiều request vào rate limit"). data-cursor rỗng ngay từ đầu
+   nghĩa là hết job, ẩn nút hiện dòng chữ hết dữ liệu luôn không cần đợi
+   JS chạy. #}
+<div class="load-more-wrap">
+  {% if next_cursor %}
+  <button type="button" id="load-more-btn" class="btn btn-ghost"
+          data-cursor="{{ next_cursor }}"
+          data-url="{{ url_for('jobs.more', **pagination_filters) }}">Tải thêm</button>
+  {% else %}
+  <p class="load-more-done">Đã hết job phù hợp.</p>
+  {% endif %}
+  <p id="load-more-error" class="load-more-error" hidden></p>
+</div>
+{% else %}
 {% include "_pagination.html" %}
+{% endif %}
 {% else %}
 <div class="empty-state">
   <p>Chưa có job nào khớp bộ lọc.</p>
   <a class="btn btn-primary" href="{{ url_for('jobs.add') }}">Thêm job đầu tiên</a>
 </div>
+{% endif %}
+
+{% if view == 'infinite' %}
+<script>
+(function () {
+  var btn = document.getElementById("load-more-btn");
+  if (!btn) return;
+  var grid = document.getElementById("job-grid");
+  var errorEl = document.getElementById("load-more-error");
+  var baseUrl = btn.dataset.url;
+
+  btn.addEventListener("click", function () {
+    var cursor = btn.dataset.cursor;
+    if (!cursor) return;
+
+    // Disable + đổi text khi đang tải — tránh double-click bắn 2
+    // request cùng lúc (xem plan Phase 6).
+    btn.disabled = true;
+    var originalText = btn.textContent;
+    btn.textContent = "Đang tải...";
+    errorEl.hidden = true;
+
+    var url = baseUrl + (baseUrl.indexOf("?") === -1 ? "?" : "&") + "cursor=" + encodeURIComponent(cursor);
+
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (data.error) throw new Error(data.error);
+        if (data.html) {
+          grid.insertAdjacentHTML("beforeend", data.html);
+        }
+        if (data.next_cursor) {
+          btn.dataset.cursor = data.next_cursor;
+          btn.disabled = false;
+          btn.textContent = originalText;
+        } else {
+          // Hết dữ liệu — thay nút bằng thông báo, không tự retry.
+          var done = document.createElement("p");
+          done.className = "load-more-done";
+          done.textContent = "Đã hết job phù hợp.";
+          btn.replaceWith(done);
+        }
+      })
+      .catch(function (err) {
+        // Lỗi mạng/429 rate limit — hiện lỗi ngắn gọn, cho bấm lại,
+        // KHÔNG tự retry vòng lặp (xem plan Phase 6).
+        btn.disabled = false;
+        btn.textContent = originalText;
+        errorEl.textContent = "Không tải được job mới (" + err.message + "). Vui lòng thử lại.";
+        errorEl.hidden = false;
+      });
+  });
+})();
+</script>
 {% endif %}
 
 {% endblock %}
