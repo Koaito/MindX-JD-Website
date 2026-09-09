@@ -65,7 +65,12 @@
      href="{{ url_for('jobs.index', view='infinite', **pagination_filters) }}">⏬ Cuộn liên tục</a>
 </div>
 
-{% if jobs %}
+{# Chế độ trang có page/per_page để tính khoảng "Hiển thị X–Y / Z" —
+   chế độ infinite (view=infinite) KHÔNG có 2 biến này (không phân
+   trang cố định, số dòng thực tế tăng dần theo mỗi lần "Tải thêm"),
+   nên chỉ hiện tổng số job phù hợp, không hiện khoảng X–Y (thêm
+   09/2026, xem lịch sử trao đổi "2 chế độ phân trang"). #}
+{% if jobs and view != 'infinite' %}
 <p class="result-count">
   Hiển thị {{ (page - 1) * per_page + 1 }}–{{ (page - 1) * per_page + jobs|length }} / {{ total_jobs }} job phù hợp
 </p>

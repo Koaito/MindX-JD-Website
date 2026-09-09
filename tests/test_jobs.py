@@ -18,6 +18,7 @@ File blueprint phức tạp nhất trong 10 blueprint (234 dòng). Trọng tâm:
 
 import pytest
 
+import crawler_client
 from crawler_client import CrawlerAPIError
 
 from backend_auth import BackendAuthError
@@ -384,3 +385,320 @@ class TestJobsDelete:
         resp = staff_client.post("/jobs/job-1/delete", follow_redirects=False)
         assert resp.status_code == 302
         assert "/jobs/job-1" in resp.headers["Location"]
+
+
+# ---------------------------------------------------------------------------
+# index(view=infinite) + /jobs/more — chế độ "cuộn vô hạn" (thêm 09/2026,
+# xem lịch sử trao đổi "2 chế độ phân trang + toggle chuyển qua lại").
+#
+# Trọng tâm:
+# 1. index() rẽ đúng nhánh cursor khi ?view=infinite, KHÔNG đụng nhánh
+#    offset/limit cũ khi view=page (mặc định) — 2 nhánh phải độc lập.
+# 2. more() luôn dùng ĐÚNG bộ filter (q/industry/level/location/status)
+#    giống index() — lệch filter giữa 2 route là bug nghiêm trọng nhất
+#    có thể xảy ra ở tính năng này (job không khớp filter bị trộn vào
+#    danh sách đang lọc).
+# 3. more() không tự bịa cursor rỗng thành "load từ đầu" — thiếu cursor
+#    nghĩa là hết dữ liệu, trả về rỗng luôn, không gọi backend.
+# 4. Lỗi backend (bao gồm 422 cursor+offset/cursor sai định dạng, backend
+#    tự raise CrawlerAPIError) phải trả JSON lỗi gọn cho more(), KHÔNG
+#    làm vỡ trang (route này chỉ phục vụ fetch(), không có HTML fallback).
+# ---------------------------------------------------------------------------
+
+class TestJobsIndexInfiniteMode:
+    def test_view_infinite_calls_cursor_function_not_offset_function(self, client, mocker):
+        """?view=infinite phải gọi list_jobs_cursor() — KHÔNG được gọi
+        list_jobs() (hàm offset/limit cũ) — 2 nhánh phải tách biệt hoàn
+        toàn, đúng nguyên tắc "không đụng đường code cũ"."""
+        cursor_mock = mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor", return_value=([], None)
+        )
+        offset_mock = mocker.patch("blueprints.jobs.db_data.list_jobs")
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=infinite")
+        assert resp.status_code == 200
+        cursor_mock.assert_called_once()
+        offset_mock.assert_not_called()
+
+    def test_view_page_default_still_calls_offset_function_not_cursor(self, client, mocker):
+        """Ngược lại — không truyền view (hoặc view=page) phải đi đúng
+        nhánh cũ, KHÔNG gọi list_jobs_cursor(). Test đối chiếu để chứng
+        minh việc thêm chế độ mới không làm lệch hành vi mặc định."""
+        offset_mock = mocker.patch("blueprints.jobs.db_data.list_jobs", return_value=[])
+        cursor_mock = mocker.patch("blueprints.jobs.db_data.list_jobs_cursor")
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs")
+        assert resp.status_code == 200
+        offset_mock.assert_called_once()
+        cursor_mock.assert_not_called()
+
+    def test_invalid_view_value_falls_back_to_page_mode(self, client, mocker):
+        """?view=xyz (giá trị lạ, không phải page/infinite) phải coi như
+        chưa truyền gì — fallback về chế độ trang, không crash."""
+        offset_mock = mocker.patch("blueprints.jobs.db_data.list_jobs", return_value=[])
+        cursor_mock = mocker.patch("blueprints.jobs.db_data.list_jobs_cursor")
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=xyz")
+        assert resp.status_code == 200
+        offset_mock.assert_called_once()
+        cursor_mock.assert_not_called()
+
+    def test_infinite_mode_passes_same_filters_as_page_mode(self, client, mocker):
+        """Filter (q/industry/level/location/status) truyền cho
+        list_jobs_cursor() phải khớp CHÍNH XÁC với những gì list_jobs()
+        (chế độ trang) nhận — dùng chung _index_filters() đảm bảo điều
+        này, test đối chiếu trực tiếp qua call_args.kwargs."""
+        cursor_mock = mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor", return_value=([], None)
+        )
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get(
+            "/jobs?view=infinite&q=python&industry=IT&level=Intern&location=Hà+Nội&status=ALL"
+        )
+        assert resp.status_code == 200
+        kwargs = cursor_mock.call_args.kwargs
+        assert kwargs["q"] == "python"
+        assert kwargs["industry"] == "IT"
+        assert kwargs["level"] == "Intern"
+        assert kwargs["location"] == "Hà Nội"
+        # status=ALL -> status_filter rỗng (bỏ lọc trạng thái), y hệt
+        # hành vi chế độ trang (xem test_status_all_clears_filter ở trên).
+        assert kwargs["status"] == ""
+
+    def test_infinite_mode_default_status_filters_open_jobs(self, client, mocker):
+        """Không truyền ?status ở chế độ infinite cũng phải mặc định lọc
+        'Đang tuyển', giống hệt chế độ trang — không phải 1 bộ mặc định
+        khác đi kèm mode mới."""
+        cursor_mock = mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor", return_value=([], None)
+        )
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=infinite")
+        assert resp.status_code == 200
+        assert cursor_mock.call_args.kwargs["status"] == "Đang tuyển"
+
+    def test_infinite_mode_backend_failure_still_renders_empty_list(self, client, mocker):
+        """Giống nhánh offset cũ (test_backend_failure_still_renders_empty_list)
+        — lỗi backend không được làm vỡ trang, chỉ flash lỗi + hiện danh
+        sách rỗng."""
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            side_effect=CrawlerAPIError("backend lỗi"),
+        )
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=0)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=infinite")
+        assert resp.status_code == 200
+
+    def test_infinite_mode_passes_next_cursor_to_template(self, client, mocker):
+        """next_cursor trả về từ list_jobs_cursor() phải xuất hiện trong
+        HTML (data-cursor trên nút "Tải thêm") — xác nhận template thật
+        sự nhận được giá trị, không chỉ route không crash."""
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            return_value=([{"id": "job-1", "position": "Dev", "company": "ACME",
+                             "industry": "IT", "level": "Intern", "location": "HN",
+                             "status": "Đang tuyển", "skills": "", "salary": "",
+                             "deadline": None, "source": "MANUAL", "jd_link": ""}],
+                          "opaque-cursor-abc"),
+        )
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=1)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=infinite")
+        assert resp.status_code == 200
+        assert b'data-cursor="opaque-cursor-abc"' in resp.data
+
+    def test_infinite_mode_no_next_cursor_shows_done_message_not_button(self, client, mocker):
+        """next_cursor=None (hết dữ liệu ngay từ lần render đầu) phải ẩn
+        nút "Tải thêm", hiện thông báo hết job — không đợi JS chạy mới
+        biết (xem plan Phase 5)."""
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            return_value=([{"id": "job-1", "position": "Dev", "company": "ACME",
+                             "industry": "IT", "level": "Intern", "location": "HN",
+                             "status": "Đang tuyển", "skills": "", "salary": "",
+                             "deadline": None, "source": "MANUAL", "jd_link": ""}],
+                          None),
+        )
+        mocker.patch("blueprints.jobs.db_data.count_jobs", return_value=1)
+        mocker.patch("blueprints.jobs.db_data.get_level_codes", return_value=["Intern"])
+
+        resp = client.get("/jobs?view=infinite")
+        assert resp.status_code == 200
+        assert b'id="load-more-btn"' not in resp.data
+        assert "Đã hết job phù hợp".encode() in resp.data
+
+
+class TestJobsMoreRoute:
+    def test_missing_cursor_returns_empty_without_calling_backend(self, client, mocker):
+        """Không truyền cursor (hoặc rỗng) = coi như hết dữ liệu — trả
+        JSON rỗng NGAY, không gọi list_jobs_cursor() (tránh 1 lệnh gọi
+        backend thừa cho request vô nghĩa)."""
+        cursor_mock = mocker.patch("blueprints.jobs.db_data.list_jobs_cursor")
+        resp = client.get("/jobs/more")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"html": "", "next_cursor": None}
+        cursor_mock.assert_not_called()
+
+    def test_valid_cursor_returns_html_fragment_and_next_cursor(self, client, mocker):
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            return_value=([{"id": "job-2", "position": "Data Analyst", "company": "XYZ",
+                             "industry": "Data", "level": "Fresher", "location": "HCM",
+                             "status": "Đang tuyển", "skills": "SQL, Python", "salary": "",
+                             "deadline": None, "source": "TopCV", "jd_link": "https://x.co"}],
+                          "next-cursor-2"),
+        )
+        resp = client.get("/jobs/more?cursor=abc123")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["next_cursor"] == "next-cursor-2"
+        assert "Data Analyst" in data["html"]
+
+    def test_last_batch_returns_next_cursor_none(self, client, mocker):
+        """Batch cuối cùng — next_cursor=None để JS phía client biết dừng
+        hẳn (thay nút bằng thông báo hết job, không tự retry)."""
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            return_value=([{"id": "job-3", "position": "QA", "company": "ACME",
+                             "industry": "IT", "level": "Intern", "location": "HN",
+                             "status": "Đang tuyển", "skills": "", "salary": "",
+                             "deadline": None, "source": "MANUAL", "jd_link": ""}],
+                          None),
+        )
+        resp = client.get("/jobs/more?cursor=last-page-cursor")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["next_cursor"] is None
+
+    def test_backend_error_returns_json_400_not_500(self, client, mocker):
+        """cursor sai định dạng / dùng chung cursor+offset (backend trả
+        422, crawler_client._request tự raise CrawlerAPIError) — more()
+        phải trả JSON lỗi gọn 400 cho JS tự xử lý, KHÔNG để lỗi bay lên
+        thành trang 500 (route này không có HTML fallback nào cả)."""
+        mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor",
+            side_effect=CrawlerAPIError("cursor không đúng định dạng"),
+        )
+        resp = client.get("/jobs/more?cursor=broken-cursor")
+        assert resp.status_code == 400
+        assert "error" in resp.get_json()
+
+    def test_filters_passed_to_more_match_filters_from_index(self, client, mocker):
+        """more() phải nhận và truyền đi CHÍNH XÁC bộ filter giống
+        index() — đây là rủi ro lớn nhất trong plan gốc (2 route dùng
+        chung _index_filters() để đảm bảo điều này, test đối chiếu trực
+        tiếp)."""
+        cursor_mock = mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor", return_value=([], None)
+        )
+        resp = client.get(
+            "/jobs/more?cursor=abc&q=react&industry=IT&level=Fresher&location=HCM&status=Đã+đóng"
+        )
+        assert resp.status_code == 200
+        kwargs = cursor_mock.call_args.kwargs
+        assert kwargs["q"] == "react"
+        assert kwargs["industry"] == "IT"
+        assert kwargs["level"] == "Fresher"
+        assert kwargs["location"] == "HCM"
+        assert kwargs["status"] == "Đã đóng"
+        assert kwargs["cursor"] == "abc"
+
+    def test_more_default_status_filters_open_jobs_same_as_index(self, client, mocker):
+        """Không truyền ?status ở /jobs/more cũng phải mặc định 'Đang
+        tuyển' — khớp mặc định của index(), tránh tình trạng bấm "Tải
+        thêm" kéo về job đã đóng dù đang xem danh sách mặc định."""
+        cursor_mock = mocker.patch(
+            "blueprints.jobs.db_data.list_jobs_cursor", return_value=([], None)
+        )
+        resp = client.get("/jobs/more?cursor=abc")
+        assert resp.status_code == 200
+        assert cursor_mock.call_args.kwargs["status"] == "Đang tuyển"
+
+
+# ---------------------------------------------------------------------------
+# crawler_client.jobs.list_jobs_cursor() — lớp thấp hơn, test trực tiếp
+# hàm gọi backend (không qua Flask route) để cô lập lỗi encode param/
+# decode response khỏi lỗi ở tầng blueprint.
+# ---------------------------------------------------------------------------
+
+class TestListJobsCursor:
+    def test_first_call_no_cursor_param_sent(self, mocker):
+        """Lần gọi đầu tiên (cursor=None) — KHÔNG được gửi param `cursor`
+        lên backend (backend coi cursor rỗng khác cursor không truyền,
+        xem api/routers/jobs.py bên scrap-jd-api: cursor=None nghĩa là
+        chế độ offset/limit, không phải "trang đầu của chế độ cursor")."""
+        request_mock = mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={"items": [], "next_cursor": "cursor-1"},
+        )
+        crawler_client.list_jobs_cursor()
+        params = request_mock.call_args.kwargs["params"]
+        assert "cursor" not in params
+
+    def test_subsequent_call_sends_cursor_param(self, mocker):
+        request_mock = mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={"items": [], "next_cursor": None},
+        )
+        crawler_client.list_jobs_cursor(cursor="cursor-1")
+        params = request_mock.call_args.kwargs["params"]
+        assert params["cursor"] == "cursor-1"
+
+    def test_default_limit_is_20_not_200(self, mocker):
+        """Batch mặc định của chế độ cursor (20) phải KHÁC list_jobs()
+        cũ (200) — batch nhỏ hơn để tránh chạm rate limit 60/phút khi
+        người dùng bấm "Tải thêm" liên tục (xem plan Phase 2)."""
+        request_mock = mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={"items": [], "next_cursor": None},
+        )
+        crawler_client.list_jobs_cursor()
+        assert request_mock.call_args.kwargs["params"]["limit"] == 20
+
+    def test_returns_normalized_jobs_and_next_cursor_tuple(self, mocker):
+        mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={
+                "items": [{"job_id": "j1", "job_title": "Backend Dev", "company_name": "ACME"}],
+                "next_cursor": "cursor-xyz",
+            },
+        )
+        jobs, next_cursor = crawler_client.list_jobs_cursor()
+        assert len(jobs) == 1
+        assert jobs[0]["id"] == "j1"
+        assert jobs[0]["position"] == "Backend Dev"
+        assert next_cursor == "cursor-xyz"
+
+    def test_missing_next_cursor_in_response_returns_none(self, mocker):
+        """Backend không trả next_cursor (hoặc trả None) khi hết dữ liệu
+        — hàm phải trả None sạch sẽ, không KeyError."""
+        mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={"items": []},
+        )
+        _, next_cursor = crawler_client.list_jobs_cursor()
+        assert next_cursor is None
+
+    def test_status_filter_converted_to_backend_code(self, mocker):
+        """status truyền vào là nhãn tiếng Việt ('Đang tuyển') — phải
+        được đổi sang mã backend ('OPEN') qua JOB_STATUS_MAP_REV, giống
+        hệt list_jobs() cũ."""
+        request_mock = mocker.patch(
+            "crawler_client.jobs._request",
+            return_value={"items": [], "next_cursor": None},
+        )
+        crawler_client.list_jobs_cursor(status="Đang tuyển")
+        assert request_mock.call_args.kwargs["params"]["status"] == "OPEN"
