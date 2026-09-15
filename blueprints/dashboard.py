@@ -4,10 +4,8 @@ from datetime import date
 
 from flask import Blueprint, flash, render_template, request
 
-import backend_auth
 import crawler_client as db_data
-from backend_auth import BackendAuthError
-from constants import INDUSTRIES, JOB_STATUSES
+from constants import INDUSTRIES
 from crawler_client import CrawlerAPIError
 from helpers import _auth_tokens_from_session, _jobs_by_month, _parse_any_date, now_vn, _io_pool as _pool
 from utils.decorators import staff_required
@@ -297,23 +295,25 @@ def _monthly_recap(jobs, companies, engagement_monthly):
 @dashboard_bp.route("/dashboard")
 @staff_required
 def index():
-    # Song song hoá 6 lệnh gọi backend ĐỘC LẬP NHAU — jobs/companies/
-    # users/stats/engagement/contacts KHÔNG phụ thuộc kết quả của nhau
-    # (thêm 08/2026, xem lịch sử trao đổi "/dashboard chậm nhất trong
-    # các trang, 4.21s — 6 round-trip tuần tự chưa từng được song song
-    # hoá dù đã ghi chú từ đợt audit đầu"). access_token lấy 1 LẦN Ở ĐÂY
-    # (main thread, có Flask session context) rồi truyền tay vào các
-    # future cần JWT (list_users/list_all_contacts) — KHÔNG gọi
-    # _auth_tokens_from_session() bên trong worker thread (session proxy
-    # của Flask cần request context, worker thread không có, giống lý do
-    # đã giải thích ở blueprints/crawl.py::_source_active_state()).
+    # Song song hoá 5 lệnh gọi backend ĐỘC LẬP NHAU — jobs/companies/
+    # stats/engagement/contacts KHÔNG phụ thuộc kết quả của nhau (thêm
+    # 08/2026, xem lịch sử trao đổi "/dashboard chậm nhất trong các
+    # trang, 4.21s — 6 round-trip tuần tự chưa từng được song song hoá
+    # dù đã ghi chú từ đợt audit đầu"; còn 5 sau khi bỏ lệnh list_users
+    # riêng cho total_students — 09/2026, xem chú thích ở jobs_by_status
+    # bên dưới). access_token lấy 1 LẦN Ở ĐÂY (main thread, có Flask
+    # session context) rồi truyền tay vào future cần JWT
+    # (list_all_contacts) — KHÔNG gọi _auth_tokens_from_session() bên
+    # trong worker thread (session proxy của Flask cần request context,
+    # worker thread không có, giống lý do đã giải thích ở
+    # blueprints/crawl.py::_source_active_state()).
     #
-    # Trước đây gọi tuần tự (tổng thời gian = tổng 6 round-trip), giờ
+    # Trước đây gọi tuần tự (tổng thời gian = tổng số round-trip), giờ
     # bắn cùng lúc bằng ThreadPoolExecutor (tổng thời gian ≈ round-trip
-    # CHẬM NHẤT trong 6 cái). An toàn tuyệt đối — cả 6 đều là GET thuần,
-    # không có side-effect, không tranh chấp trạng thái với nhau. Mỗi
-    # future được except riêng để 1 lệnh lỗi không chặn 5 lệnh còn lại
-    # (khác hành vi CŨ ở jobs/companies — trước đây 2 lệnh đó CHUNG 1
+    # CHẬM NHẤT). An toàn tuyệt đối — tất cả đều là GET thuần, không có
+    # side-effect, không tranh chấp trạng thái với nhau. Mỗi future
+    # được except riêng để 1 lệnh lỗi không chặn các lệnh còn lại (khác
+    # hành vi CŨ ở jobs/companies — trước đây 2 lệnh đó CHUNG 1
     # try/except nên 1 lệnh lỗi kéo cả 2 về rỗng; giờ tách riêng, lỗi
     # jobs không còn làm rỗng companies và ngược lại — cải thiện nhỏ,
     # không phải hành vi cố ý giữ nguyên 100%).
@@ -321,7 +321,6 @@ def index():
 
     jobs_future = _pool.submit(db_data.list_all_jobs)
     companies_future = _pool.submit(db_data.list_all_companies)
-    users_future = _pool.submit(backend_auth.list_users, access_token) if access_token else None
     stats_future = _pool.submit(db_data.get_stats)
     engagement_future = _pool.submit(db_data.get_engagement_stats)
     contacts_future = _pool.submit(db_data.list_all_contacts, access_token) if access_token else None
@@ -344,7 +343,6 @@ def index():
     # TTL 5 phút — nếu backend đổi enum, dashboard nhận được trong tối đa
     # 5 phút mà không cần restart server.
     jobs_by_level = {lv: sum(1 for j in jobs if j["level"] == lv) for lv in db_data.get_level_codes()}
-    jobs_by_status = {st: sum(1 for j in jobs if j["status"] == st) for st in JOB_STATUSES}
     jobs_by_location = {}
     for j in jobs:
         jobs_by_location[j["location"]] = jobs_by_location.get(j["location"], 0) + 1
@@ -356,20 +354,23 @@ def index():
     for c in companies:
         companies_by_city[c["city"]] = companies_by_city.get(c["city"], 0) + 1
 
-    total_students = None
-    if users_future is not None:
-        try:
-            users = users_future.result()
-            total_students = sum(1 for u in users if u.get("role") == "user")
-        except BackendAuthError:
-            pass
-
     total_applications = None
     total_saved_jobs = None
+    total_students = None
+    # jobs_by_status: trước đây tự đếm client-side từ list jobs (như
+    # jobs_by_industry/jobs_by_level phía trên) — giờ đọc thẳng field
+    # backend trả sẵn ở GET /stats (thêm 09/2026, xem StatsOut ở
+    # api/schemas/stats.py bên Scrap_JD) để khỏi lệch nếu BE đổi enum
+    # status. total_students cũng đọc thẳng từ đây thay vì gọi riêng
+    # GET /auth/users (admin-only, cần access_token) rồi tự đếm role
+    # "user" — bớt hẳn 1 trong 6 lệnh gọi song song ở trên.
+    jobs_by_status = {}
     try:
         stats = stats_future.result()
         total_applications = stats.get("total_applications")
         total_saved_jobs = stats.get("total_saved_jobs")
+        total_students = stats.get("total_students")
+        jobs_by_status = stats.get("jobs_by_status", {})
     except CrawlerAPIError:
         pass
 

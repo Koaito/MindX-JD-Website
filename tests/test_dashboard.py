@@ -1,23 +1,27 @@
 """Lớp 3 cho blueprints/dashboard.py.
 
-Route /dashboard gọi RẤT NHIỀU hàm crawler_client/backend_auth (list_all_jobs,
-list_all_companies, get_level_codes, list_users, get_stats,
-get_engagement_stats, list_all_contacts) — mock toàn bộ, mỗi hàm bọc
-trong try/except riêng ở route thật nên 1 hàm lỗi không nên làm cả trang
-sập, chỉ mất đúng phần dữ liệu đó (test_partial_backend_failure_still_
-renders bên dưới cover đúng hành vi này).
+Route /dashboard gọi RẤT NHIỀU hàm crawler_client (list_all_jobs,
+list_all_companies, get_level_codes, get_stats, get_engagement_stats,
+list_all_contacts) — mock toàn bộ, mỗi hàm bọc trong try/except riêng ở
+route thật nên 1 hàm lỗi không nên làm cả trang sập, chỉ mất đúng phần
+dữ liệu đó (test_partial_backend_failure_still_renders bên dưới cover
+đúng hành vi này).
 
 Trọng tâm theo kế hoạch: get_level_codes() vừa sửa (GET /enums cache
 TTL) — đảm bảo dashboard gọi đúng hàm này (không phải LEVELS tĩnh cũ đã
 bị xoá khỏi constants.py) để tính jobs_by_level.
+
+09/2026: dashboard KHÔNG còn gọi backend_auth.list_users() riêng để tự
+đếm total_students, cũng không tự đếm jobs_by_status từ list jobs nữa —
+cả 2 đọc thẳng từ GET /stats (StatsOut.total_students/jobs_by_status,
+xem test_get_stats_fields_used_directly_from_backend bên dưới).
 """
 
 
-from backend_auth import BackendAuthError
 from crawler_client import CrawlerAPIError
 
 
-def _mock_all_dashboard_deps(mocker, *, jobs=None, companies=None, level_codes=None):
+def _mock_all_dashboard_deps(mocker, *, jobs=None, companies=None, level_codes=None, stats=None):
     """Mock toàn bộ dependency của dashboard.index() với dữ liệu rỗng/mặc
     định hợp lý — từng test override thêm phần cần thiết."""
     mocker.patch("blueprints.dashboard.db_data.list_all_jobs", return_value=jobs or [])
@@ -26,8 +30,7 @@ def _mock_all_dashboard_deps(mocker, *, jobs=None, companies=None, level_codes=N
         "blueprints.dashboard.db_data.get_level_codes",
         return_value=level_codes if level_codes is not None else ["Intern", "Junior", "Senior"],
     )
-    mocker.patch("blueprints.dashboard.backend_auth.list_users", return_value=[])
-    mocker.patch("blueprints.dashboard.db_data.get_stats", return_value={})
+    mocker.patch("blueprints.dashboard.db_data.get_stats", return_value=stats if stats is not None else {})
     mocker.patch("blueprints.dashboard.db_data.get_engagement_stats", return_value={})
     mocker.patch("blueprints.dashboard.db_data.list_all_contacts", return_value=[])
 
@@ -56,6 +59,26 @@ class TestDashboardHappyPath:
         assert resp.status_code == 200
         get_level_codes_mock.assert_called()
 
+    def test_get_stats_fields_used_directly_from_backend(self, staff_client, mocker):
+        """09/2026 — jobs_by_status/total_students PHẢI đến từ GET /stats
+        (db_data.get_stats()), không còn tự đếm từ list jobs / gọi riêng
+        backend_auth.list_users(). Route không còn import backend_auth
+        nên nếu code cũ (đã xoá) hồi sinh, patch list_all_jobs với 1 job
+        có status không khớp field jobs_by_status giả bên dưới sẽ lộ ra —
+        route phải dùng đúng số trong stats, không tự đếm lại từ jobs."""
+        _mock_all_dashboard_deps(
+            mocker,
+            jobs=[{"industry": "Code", "level": "Junior", "status": "OPEN", "location": "Hà Nội"}],
+            stats={
+                "total_applications": 12,
+                "total_saved_jobs": 5,
+                "total_students": 300,
+                "jobs_by_status": {"OPEN": 90, "CLOSED": 30},
+            },
+        )
+        resp = staff_client.get("/dashboard")
+        assert resp.status_code == 200
+
     def test_total_jobs_and_contacts_reflect_counts(self, staff_client, mocker):
         jobs = [
             {"industry": "Code", "level": "Junior", "status": "OPEN", "location": "Hà Nội"},
@@ -80,15 +103,6 @@ class TestDashboardPartialBackendFailure:
         mocker.patch(
             "blueprints.dashboard.db_data.list_all_jobs",
             side_effect=CrawlerAPIError("backend lỗi"),
-        )
-        resp = staff_client.get("/dashboard")
-        assert resp.status_code == 200
-
-    def test_list_users_failure_still_renders(self, staff_client, mocker):
-        _mock_all_dashboard_deps(mocker)
-        mocker.patch(
-            "blueprints.dashboard.backend_auth.list_users",
-            side_effect=BackendAuthError("token hết hạn"),
         )
         resp = staff_client.get("/dashboard")
         assert resp.status_code == 200
@@ -134,10 +148,6 @@ class TestDashboardPartialBackendFailure:
         mocker.patch(
             "blueprints.dashboard.db_data.get_level_codes",
             return_value=["Intern"],
-        )
-        mocker.patch(
-            "blueprints.dashboard.backend_auth.list_users",
-            side_effect=BackendAuthError("sập"),
         )
         mocker.patch(
             "blueprints.dashboard.db_data.get_stats",
