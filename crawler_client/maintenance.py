@@ -148,7 +148,7 @@ MAINTENANCE_STAT_LABELS = {
         ("expired_by_deadline", "Đóng do quá deadline"),
         ("expired_by_source_dead", "Đóng do nguồn đã gỡ"),
         ("still_alive", "Vẫn còn sống"),
-        ("cần_kiểm_tra_tay", "Cần kiểm tra tay"),
+        ("needs_manual_check", "Cần kiểm tra tay"),
     ],
 }
 
