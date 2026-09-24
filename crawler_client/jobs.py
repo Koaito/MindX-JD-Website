@@ -334,6 +334,19 @@ def update_job(access_token, job_id, form) -> dict:
         # docstring base.py, mục "AUDIT LOG NOTE").
         "note": (form.get("activity_note") or "").strip() or None,
     }
+    # 4 field deadline/level_code/province_name/work_type: với PATCH /jobs
+    # của backend (commit bb6132d, 09/2026), gửi RÕ `null` = XOÁ giá trị
+    # trong DB (trước đây `null` chỉ bị bỏ qua). Form Flask gửi None cho
+    # các ô trống, nhưng ô "Địa điểm" của Flask chỉ có 4 lựa chọn cố định
+    # nên job mang tỉnh ngoài 4 giá trị đó (vd "Hồ Chí Minh") mở ra hiện
+    # "— chọn —" -> bấm Lưu sẽ xoá mất tỉnh mà người dùng không hề chủ ý.
+    # Flask KHÔNG đổi hành vi trong lúc chạy song song với Next.js (Phần
+    # 4 mục 7 của plan) nên bỏ hẳn key khỏi payload khi trống: backend giữ
+    # nguyên giá trị cũ như trước. Xoá thật các field này chỉ làm được ở
+    # form Next.js (JobForm).
+    for key in ("level_code", "province_name", "work_type", "deadline"):
+        if payload[key] is None:
+            del payload[key]
     parsed = _build_parsed_content(form)
     if parsed:
         payload["parsed_content"] = parsed

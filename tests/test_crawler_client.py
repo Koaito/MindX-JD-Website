@@ -237,3 +237,53 @@ class TestReExportCompleteness:
             f"crawler_client.<tên> đang trỏ NHẦM object khác (đụng tên với "
             f"submodule khác) cho: {wrong_object} (từ {submodule_name}.py)"
         )
+
+
+# ---------------------------------------------------------------------------
+# update_job — KHÔNG gửi null cho 4 field xoá được (bb6132d ở backend)
+# ---------------------------------------------------------------------------
+
+class TestUpdateJobDoesNotClearFields:
+    """Backend (PATCH /jobs) giờ hiểu `null` ở deadline/level_code/
+    province_name/work_type là lệnh XOÁ. Flask phải bỏ hẳn key khi ô trống
+    để giữ hành vi cũ (giữ nguyên giá trị) trong lúc chạy song song với
+    Next.js — xem comment trong crawler_client/jobs.py::update_job."""
+
+    CLEARABLE = ("level_code", "province_name", "work_type", "deadline")
+
+    def _call(self, mocker, form):
+        request_mock = mocker.patch("crawler_client.jobs._request", return_value={})
+        mocker.patch("crawler_client.jobs._normalize_job", return_value={})
+        crawler_client.update_job("token", "job-1", form)
+        return request_mock.call_args.kwargs["json"]
+
+    def test_blank_fields_are_omitted_not_sent_as_null(self, mocker):
+        payload = self._call(mocker, {"position": "Data Analyst"})
+
+        for key in self.CLEARABLE:
+            assert key not in payload
+        assert payload["job_title"] == "Data Analyst"
+
+    def test_whitespace_only_values_are_omitted(self, mocker):
+        payload = self._call(
+            mocker,
+            {"position": "Data Analyst", "level": "  ", "location": "   ", "deadline": ""},
+        )
+
+        assert "level_code" not in payload
+        assert "province_name" not in payload
+        assert "deadline" not in payload
+
+    def test_filled_values_are_still_sent(self, mocker):
+        payload = self._call(
+            mocker,
+            {
+                "position": "Data Analyst", "level": "Junior", "location": "Hà Nội",
+                "work_type": "Toàn thời gian", "deadline": "2026-12-31",
+            },
+        )
+
+        assert payload["level_code"] == "Junior"
+        assert payload["province_name"] == "Hà Nội"
+        assert payload["work_type"] == "FULL_TIME"
+        assert payload["deadline"] == "2026-12-31"
