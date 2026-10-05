@@ -174,7 +174,7 @@
           {% if run.status == 'done' and run.stat_items %}
             <div class="crawl-result-main">{{ run.stat_items[0][1] }} job mới</div>
             <details class="crawl-result-details">
-              <summary>Xem đủ 8 chỉ số</summary>
+              <summary>Xem đủ chỉ số</summary>
               <dl>
                 {% for label, value in run.stat_items %}
                   <dt>{{ label }}</dt><dd>{{ value }}</dd>

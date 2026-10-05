@@ -287,3 +287,40 @@ class TestUpdateJobDoesNotClearFields:
         assert payload["province_name"] == "Hà Nội"
         assert payload["work_type"] == "FULL_TIME"
         assert payload["deadline"] == "2026-12-31"
+
+
+class TestCrawlStatLabels:
+    """3 bộ đếm theo mã job (VietnamWorks) phải hiện trên /crawl và /lịch sử."""
+
+    NEW_KEYS = ["updated_by_job_code", "linked_by_job_code_only", "job_code_title_mismatch"]
+
+    def test_new_counters_listed_after_the_original_ones(self):
+        keys = [k for k, _ in crawler_client.CRAWL_STAT_LABELS]
+        for key in self.NEW_KEYS:
+            assert key in keys
+        # "inserted" luôn đứng đầu (template lấy làm số nổi bật), key mới đứng cuối.
+        assert keys[0] == "inserted"
+        assert keys[-3:] == self.NEW_KEYS
+        assert len(keys) == len(set(keys))
+        assert all(label.strip() for _, label in crawler_client.CRAWL_STAT_LABELS)
+
+    def test_run_without_new_counters_shows_zero(self):
+        # Lượt chạy cũ / nguồn khác: backend không gửi 3 key này (chỉ gửi khi > 0).
+        from crawler_client.crawl import _normalize_crawl_run
+        run = _normalize_crawl_run({"run_id": "r1", "status": "done", "stats": {"inserted": 5, "fetched": 9}})
+        items = dict((label, value) for label, value in run["stat_items"])
+        assert run["stat_items"][0] == ("Job mới", 5)
+        for key in self.NEW_KEYS:
+            label = dict(crawler_client.CRAWL_STAT_LABELS)[key]
+            assert items[label] == 0
+
+    def test_run_with_new_counters_shows_values(self):
+        from crawler_client.crawl import _normalize_crawl_run
+        stats = {"inserted": 1, "updated_by_job_code": 4, "linked_by_job_code_only": 2,
+                 "job_code_title_mismatch": 1}
+        run = _normalize_crawl_run({"run_id": "r2", "status": "done", "stats": stats})
+        labels = dict(crawler_client.CRAWL_STAT_LABELS)
+        items = dict(run["stat_items"])
+        assert items[labels["updated_by_job_code"]] == 4
+        assert items[labels["linked_by_job_code_only"]] == 2
+        assert items[labels["job_code_title_mismatch"]] == 1

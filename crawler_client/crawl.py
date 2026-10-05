@@ -10,11 +10,18 @@ thiết kế.
 
 from .base import _request
 
-# Thứ tự + nhãn tiếng Việt cho 8 chỉ số trong `stats` (dict trả về từ
+# Thứ tự + nhãn tiếng Việt cho các chỉ số trong `stats` (dict trả về từ
 # pipeline.run_pipeline() phía backend, xem docstring CrawlStatusOut).
 # Giữ CỐ ĐỊNH thứ tự này — dùng chung cho cả bảng lịch sử (server-render)
 # lẫn card "đang chạy" cập nhật qua JS (xem crawl.html, JS đọc lại đúng
-# 8 key này để không phải định nghĩa nhãn 2 lần ở 2 nơi).
+# các key này để không phải định nghĩa nhãn 2 lần ở 2 nơi).
+#
+# 3 key cuối (updated_by_job_code, linked_by_job_code_only,
+# job_code_title_mismatch) là bộ đếm TUỲ CHỌN của backend: chỉ có trong `stats`
+# khi > 0 (hiện chỉ VietnamWorks, nguồn có mã job ổn định trong URL). Lượt
+# chạy cũ hoặc nguồn khác không có key này nên hiện 0 qua stats.get(key, 0).
+# `stat_items[0]` luôn là "inserted" (template lấy làm số nổi bật) — thêm chỉ
+# số mới thì chỉ thêm vào SAU, không chèn lên đầu.
 CRAWL_STAT_LABELS = [
     ("inserted", "Job mới"),
     ("fetched", "Tổng lấy về"),
@@ -24,6 +31,9 @@ CRAWL_STAT_LABELS = [
     ("skipped_fetch_failed", "Lỗi fetch JD (bỏ qua)"),
     ("skipped_anonymous_employer", "NTD ẩn danh (bỏ qua)"),
     ("errors", "Lỗi khác"),
+    ("updated_by_job_code", "Cập nhật theo mã job (NTD sửa tiêu đề)"),
+    ("linked_by_job_code_only", "Chỉ ghi URL mới (job đã sửa tay)"),
+    ("job_code_title_mismatch", "Trùng mã job nhưng tiêu đề khác hẳn"),
 ]
 
 CRAWL_STATUS_LABELS = {
