@@ -37,6 +37,12 @@ class TestMergeJobLabel:
         out = _normalize_audit_log({"log_id": "1", "action_type": "MERGE_JOB", "entity_type": "JOB"})
         assert out["action_label"] == "Gộp JD trùng"
 
+    def test_normalize_maps_reopen_job_to_vietnamese_label(self):
+        from crawler_client.audit_logs import _normalize_audit_log
+
+        out = _normalize_audit_log({"log_id": "1", "action_type": "REOPEN_JOB", "entity_type": "JOB"})
+        assert out["action_label"] == "Tự mở lại JD (tin đăng lại)"
+
     def test_unknown_action_still_falls_back_to_raw_code(self):
         from crawler_client.audit_logs import _normalize_audit_log
 

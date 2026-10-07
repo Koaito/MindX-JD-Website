@@ -14,6 +14,8 @@ ACTION_TYPE_MAP = {
     # Gộp job trùng bằng CLI backend (`main.py merge-duplicates --apply`). Cùng nhãn với
     # Next.js (lib/constants.ts). Không có nhãn thì action_label rơi về mã thô "MERGE_JOB".
     "MERGE_JOB": "Gộp JD trùng",
+    # Pipeline tự mở lại job đã đóng khi gặp tin đăng lại (backend A2). Cùng nhãn với Next.js.
+    "REOPEN_JOB": "Tự mở lại JD (tin đăng lại)",
 }
 ENTITY_TYPE_MAP = {"JOB": "JD", "COMPANY": "Công ty", "CONTACT": "Người liên hệ", "APPLICATION": "Đơn ứng tuyển"}
 
