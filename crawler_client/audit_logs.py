@@ -11,6 +11,9 @@ ACTION_TYPE_MAP = {
     "CREATE_CONTACT": "Thêm người liên hệ", "UPDATE_CONTACT": "Sửa người liên hệ",
     "DELETE_CONTACT": "Xoá người liên hệ", "ASSIGN_CONTACT": "Gán người phụ trách",
     "APPLY_JOB": "Ứng viên nộp CV", "WITHDRAW_JOB_APPLICATION": "Ứng viên huỷ ứng tuyển",
+    # Gộp job trùng bằng CLI backend (`main.py merge-duplicates --apply`). Cùng nhãn với
+    # Next.js (lib/constants.ts). Không có nhãn thì action_label rơi về mã thô "MERGE_JOB".
+    "MERGE_JOB": "Gộp JD trùng",
 }
 ENTITY_TYPE_MAP = {"JOB": "JD", "COMPANY": "Công ty", "CONTACT": "Người liên hệ", "APPLICATION": "Đơn ứng tuyển"}
 

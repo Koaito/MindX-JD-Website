@@ -27,6 +27,35 @@ def _mock_logs_deps(mocker, *, logs=None, total=0, companies=None, users=None):
     )
 
 
+class TestMergeJobLabel:
+    """Log MERGE_JOB (gộp job trùng, backend Phần 3b) phải hiện nhãn tiếng Việt,
+    không phải mã thô "MERGE_JOB"."""
+
+    def test_normalize_maps_merge_job_to_vietnamese_label(self):
+        from crawler_client.audit_logs import _normalize_audit_log
+
+        out = _normalize_audit_log({"log_id": "1", "action_type": "MERGE_JOB", "entity_type": "JOB"})
+        assert out["action_label"] == "Gộp JD trùng"
+
+    def test_unknown_action_still_falls_back_to_raw_code(self):
+        from crawler_client.audit_logs import _normalize_audit_log
+
+        out = _normalize_audit_log({"log_id": "1", "action_type": "SOMETHING_NEW", "entity_type": "JOB"})
+        assert out["action_label"] == "SOMETHING_NEW"
+
+    def test_page_shows_merge_job_label(self, staff_client, mocker):
+        log = {
+            "id": "log-1", "actor_id": None, "actor_name": "Hệ thống (tự động)",
+            "action_type": "MERGE_JOB", "action_label": "Gộp JD trùng",
+            "entity_type": "JOB", "entity_label_type": "JD", "entity_id": "job-1",
+            "entity_label": "Nhân viên kinh doanh", "company_id": None, "company_name": "",
+            "note": "", "note_required": False, "created_at": None,
+        }
+        _mock_logs_deps(mocker, logs=[log], total=1)
+        html = staff_client.get("/activity-logs").get_data(as_text=True)
+        assert "Gộp JD trùng" in html
+
+
 class TestActivityLogsIndex:
     def test_renders_200_default_view(self, staff_client, mocker):
         _mock_logs_deps(mocker)
